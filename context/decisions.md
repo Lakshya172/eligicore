@@ -13,7 +13,7 @@
 | [ADR-001](../artifacts/decisions/ADR-001-local-first-personal-data.md) | Local-first personal data | §8.1a, §10 | Accepted |
 | [ADR-002](../artifacts/decisions/ADR-002-stateless-candidate-apis.md) | Stateless candidate APIs | §11 | Accepted |
 | [ADR-003](../artifacts/decisions/ADR-003-deterministic-eligibility-precedence.md) | Deterministic eligibility precedence | §12.1, §13.3 | Accepted |
-| [ADR-004](../artifacts/decisions/ADR-004-ai-provider-abstraction.md) | AI provider abstraction | §9.2 | Accepted (default provider deferred) |
+| [ADR-004](../artifacts/decisions/ADR-004-ai-provider-abstraction.md) | AI provider abstraction | §9.2 | Accepted (Phase 1 default now set by ADR-013) |
 | [ADR-005](../artifacts/decisions/ADR-005-pluggable-job-source-adapters.md) | Pluggable job-source adapters | §9.3, §6 | Accepted |
 | [ADR-006](../artifacts/decisions/ADR-006-explainable-eligibility.md) | Explainable eligibility and matching | §12.2, §13.4 | Accepted |
 | [ADR-007](../artifacts/decisions/ADR-007-truthfulness-validation.md) | Truthfulness validation | §12.3, §6 | Accepted |
@@ -22,6 +22,7 @@
 | [ADR-010](../artifacts/decisions/ADR-010-api-versioning.md) | API versioning under `/api/v1/` | §1, §11 | Accepted |
 | [ADR-011](../artifacts/decisions/ADR-011-no-server-side-candidate-or-application-persistence.md) | No server-side candidate or application persistence — **ruling on C-1** | §8.2 vs §10.2 | Accepted 2026-09-10 |
 | [ADR-012](../artifacts/decisions/ADR-012-ingestion-state-operational-model.md) | `ingestion_state` as an operational model — **ruling on C-2** | §8.2 vs §10.2 | Accepted 2026-09-10 |
+| [ADR-013](../artifacts/decisions/ADR-013-gemini-flash-phase-1-default-provider.md) | Gemini Flash as the Phase 1 default AI provider — **resolves C-4 / D-1** | §9.2 | Accepted 2026-09-10 |
 
 > **ADR-011 and ADR-012 are contradiction rulings.** They resolve internal inconsistencies in
 > the dossier by owner decision. They do not overrule the dossier — they determine which of two
@@ -33,7 +34,7 @@
 
 | # | Decision | Needed by | Note |
 |---|---|---|---|
-| D-1 | Which AI provider is the Phase 1 default | Week 2 | See `ADR-004` and contradiction C-4 in `context/state.md`. The abstraction is decided; the default is not. |
+| ~~D-1~~ | ~~Which AI provider is the Phase 1 default~~ | ~~Week 2~~ | **RESOLVED 2026-09-10 — Google Gemini Flash. See ADR-013.** Concrete Phase 1 implementation only; the ADR-004 abstraction is unchanged and mandatory. |
 | ~~D-2~~ | ~~Whether `models/candidate.py` / `models/application.py` exist at all~~ | ~~Week 1~~ | **RESOLVED 2026-09-10 — they must not exist. See ADR-011.** |
 | D-3 | Hosting target — Render vs Railway | Week 9 | Either satisfies the dossier. No impact on application code. |
 | D-4 | Whether `ingestion_state` needs its own deduplication-hash ledger, given `jobs.content_hash` is already the canonical dedup index | Week 3 | Opened by ADR-012. Deliberately not settled during Phase 0 — deciding it would mean designing the ingestion engine before it is approved. |

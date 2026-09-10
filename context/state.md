@@ -81,9 +81,10 @@ Expected scope: `app/services/resume_parser.py` (pdfplumber, python-docx, spaCy 
 `app/ai/providers/base.py` plus a mock provider and one concrete provider, `app/ai/ai_service.py`,
 `app/ai/prompts/`, and `POST /api/v1/resumes/parse`.
 
-**Blocking decision before Week 2 starts:** C-4 / D-1 — which AI provider is the Phase 1 default.
-The abstraction is provider-agnostic by construction, but a concrete provider cannot be written
-until this is settled.
+**AI provider — DECIDED.** C-4 / D-1 resolved 2026-09-10: the Phase 1 default is
+**Google Gemini Flash** ([ADR-013](../artifacts/decisions/ADR-013-gemini-flash-phase-1-default-provider.md)).
+Concrete implementation only — the ADR-004 abstraction is unchanged and mandatory, the mock
+provider stays mandatory, and the model identifier is configuration.
 
 Reviewers: ai + security + qa (+ api for the parse endpoint). Gates: QG-001, QG-003, QG-004,
 QG-005.
@@ -127,6 +128,7 @@ never silently fixed. These are internal to the dossier.
 | # | Contradiction | Where | Ruling |
 |---|---|---|---|
 | **C-1** | §8.2 folder structure lists `models/candidate.py` and `models/application.py` (SQLAlchemy ORM models), but §10.2 states plainly "there is no server-side `candidates` table and no server-side store of evaluations by default." | dossier §8.2 vs §10.2 | **RESOLVED 2026-09-10 — [ADR-011](../artifacts/decisions/ADR-011-no-server-side-candidate-or-application-persistence.md).** §8.2's listing is **stale**; local-first has authority. Those models and tables **must not exist**. Candidate and application-tracking data remain client-owned; candidate APIs remain stateless; application status remains client-side. Pydantic schemas are unaffected. |
+| **C-4** | §8.2 shows only `openai_provider.py`; §9.2 names OpenAI, OpenRouter, Anthropic and local models as swappable. Which is the Phase 1 default was unstated. | dossier §8.2 vs §9.2 | **RESOLVED 2026-09-10 — [ADR-013](../artifacts/decisions/ADR-013-gemini-flash-phase-1-default-provider.md).** Phase 1 default is **Google Gemini Flash**. Owner decision. A concrete implementation behind the ADR-004 abstraction, not a dependency of it: the mock provider stays mandatory, credentials are never committed, and the model id is configuration. |
 | **C-2** | §8.2 lists no model for `ingestion_state`, but §10.2 requires that table for ingestion to work across runs. | dossier §8.2 vs §10.2 | **RESOLVED 2026-09-10 — [ADR-012](../artifacts/decisions/ADR-012-ingestion-state-operational-model.md).** Same staleness, opposite direction. Ingestion is server-side operational functionality, so `app/models/ingestion_state.py` is legitimate — bounded to adapter identity, run history, timestamps, outcome counts and status. Never a `candidate_id`, never personal data. **Not yet implemented — Week 3 work.** |
 
 ### Still open — not to be resolved without instruction
@@ -134,7 +136,7 @@ never silently fixed. These are internal to the dossier.
 | # | Contradiction | Where | Status |
 |---|---|---|---|
 | C-3 | §12.3 says generated content is checked "against the **stored** candidate profile." Under local-first nothing is stored server-side; §11 confirms the profile travels in the request body. Wording predates the local-first revision. | dossier §12.3 vs §8.1a/§11 | **OPEN — low impact, not urgent.** Reads as stale wording rather than a design conflict. Relevant at Week 7. |
-| C-4 | §8.2 shows only `openai_provider.py` as a concrete provider; §9.2 names OpenAI, OpenRouter, Anthropic and local models as swappable. Which is the Phase 1 default is unstated. | dossier §8.2 vs §9.2 | **OPEN — needs a decision before Week 2.** Not a design conflict; an unmade choice. Recorded in `ADR-004` as deferred, and as D-1 in `context/decisions.md`. |
+
 
 ---
 
@@ -184,11 +186,9 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Human: settle C-4 / D-1** — which AI provider is the Phase 1 default. **Blocks Week 2.**
-   The provider abstraction (ADR-004) is provider-agnostic by construction, but no concrete
-   provider can be written until this is chosen.
-2. **Await explicit instruction to begin Week 2.** No phase rolls into the next automatically.
+1. **Week 2 in progress** on `feature/week-2-resume-ai` — resume parser + AI service layer.
+2. **Human: review the Week 2 PR when opened.** It must not be merged without explicit
+   authorization, regardless of CI status.
 
-**Week 2 has not started.** No Week 2 branch exists. No resume parsing, AI provider integration,
-job ingestion, eligibility, matching or application preparation code exists anywhere in the
-repository.
+**Weeks 3–10 have not started.** No job ingestion, eligibility, matching, recommendations or
+application preparation code exists anywhere in the repository.

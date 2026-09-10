@@ -36,14 +36,17 @@ Provider output is **untrusted input**. Every response is validated against a Py
 before it reaches business logic. A response that fails validation yields `NEEDS_REVIEW` — never
 a silent pass, and never an unhandled crash.
 
-## Deferred: which provider is the Phase 1 default
+## RESOLVED: which provider is the Phase 1 default
 
 The dossier's §8.2 folder listing shows only `openai_provider.py`, while §9.2 names four
-options. **The Phase 1 default is not decided** — tracked as contradiction C-4 in
-`context/state.md` and deferred decision D-1 in `context/decisions.md`.
+options, and the Phase 1 default was left open as contradiction C-4 / decision D-1.
 
-This does not block the interface, which is provider-agnostic by construction. It must be
-settled before Week 2 implementation of a concrete provider.
+**Resolved 2026-09-10: Google Gemini Flash** — see
+[ADR-013](ADR-013-gemini-flash-phase-1-default-provider.md).
+
+This changes nothing in this ADR. Gemini Flash is a concrete implementation behind the
+interface, not a dependency of it. The abstraction, the mandatory mock provider, and INV-5
+all stand exactly as written above.
 
 ## Enforcement
 
