@@ -28,6 +28,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
 from app.config import get_settings
+
+# Registers operational models on Base.metadata. Import for the side effect: without
+# it, Alembic and the privacy guards see an empty schema.
+import app.models  # noqa: F401
 from app.routers import candidates, resumes
 
 settings = get_settings()

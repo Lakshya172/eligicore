@@ -14,11 +14,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import inspect
 
 from app.database import Base, engine
+from tests.conftest import ALLOWED_OPERATIONAL_TABLES, FORBIDDEN_TABLES
 
 VALIDATE_URL = "/api/v1/candidates/validate"
 NORMALIZE_URL = "/api/v1/candidates/normalize"
 
-FORBIDDEN_TABLES = {"candidates", "candidate", "applications", "application", "evaluations"}
 
 
 # ---------------------------------------------------------------------------------------
@@ -263,9 +263,16 @@ def test_candidate_id_is_not_a_server_lookup_key(
 
 
 def test_no_candidate_tables_are_registered() -> None:
-    """INV-1: no ORM model may represent a candidate, application or evaluation."""
+    """INV-1: no ORM model may represent a candidate, application or evaluation.
+
+    Checked as an **allowlist** rather than a ban list. Weeks 1–2 asserted the set was
+    empty, which held then only because no table existed at all; Week 3 introduced the job
+    catalogue. Requiring every registered table to be one we named keeps the check strict —
+    a personal-data table under an unanticipated name still fails.
+    """
     registered = set(Base.metadata.tables)
-    assert registered == set(), f"unexpected tables registered: {registered}"
+    unexpected = registered - ALLOWED_OPERATIONAL_TABLES
+    assert not unexpected, f"unexpected tables registered: {unexpected}"
     assert not (registered & FORBIDDEN_TABLES)
 
 

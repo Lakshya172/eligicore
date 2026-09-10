@@ -44,12 +44,18 @@ jobs:
       - name: Verify no personal-data tables are registered
         run: |
           python - <<'PY'
+          import app.models  # register operational models
           from app.database import Base
-          forbidden = {"candidates", "candidate", "applications", "application", "evaluations"}
+          # Allowlist, not a ban list: a personal-data table under an unanticipated name
+          # must still fail this check.
+          allowed = {"jobs", "ingestion_state"}
+          forbidden = {"candidates", "candidate", "applications", "application",
+                       "evaluations", "evaluation", "profiles", "resumes"}
           registered = set(Base.metadata.tables)
-          leaked = registered & forbidden
-          assert not leaked, f"forbidden tables registered: {leaked}"
-          print(f"registered tables: {sorted(registered) or 'none'} - OK")
+          unexpected = registered - allowed
+          assert not unexpected, f"unexpected tables registered: {unexpected}"
+          assert not (registered & forbidden), f"forbidden tables registered: {registered & forbidden}"
+          print(f"registered tables: {sorted(registered)} - OK")
           PY
 
       - name: Alembic environment check

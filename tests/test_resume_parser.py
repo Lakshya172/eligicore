@@ -378,4 +378,4 @@ async def test_parse_resume_does_not_persist_anything() -> None:
 
     service = AIService(MockAIProvider())
     await parse_resume(build_pdf(SAMPLE_RESUME_LINES), "r.pdf", service)
-    assert list(Base.metadata.tables) == []
+    assert not (set(Base.metadata.tables) - {"jobs", "ingestion_state"})
