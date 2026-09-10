@@ -1,0 +1,131 @@
+# EligiCore — AgentOS engineering layer configuration
+#
+# Machine-readable routing map for reviewers, gates and context loading.
+# This file configures the ENGINEERING layer only. It is not read by the
+# EligiCore application at runtime and ships with nothing.
+#
+# Never put secrets here. Application secrets live in .env (see standards/security_privacy.md).
+
+layer:
+  name: eligicore-agentos
+  version: 1.0.0
+  initialized: 2026-09-10
+  adapted_from: https://github.com/Rexy-5097/raptors-way
+  note: >
+    Adapted, not copied. The upstream runtime/, validation/ and metrics/ layers were
+    evaluated and rejected — see context/decisions.md § Rejected.
+
+project:
+  name: EligiCore
+  package: eligicore
+  api_namespace: /api/v1
+  env_prefix: ELIGICORE_
+  database_name: eligicore
+  phase: "Phase 0 — initialization complete / Week 1 ready"
+  next_approved_phase: "Week 1 — Foundation and Candidate Profile Schema (not started)"
+  source_of_truth: EligiCore_Dossier_update.md
+  vcs:
+    initialized: 2026-09-10
+    branch: master
+    remote: none          # do not invent or configure one
+    commits: 0            # no initial commit made; awaiting owner decision
+
+# Read at the start of every session, without exception.
+context:
+  required:
+    - context/state.md
+    - context/vision.md
+    - context/workflow.md
+    - context/memory.md
+  conditional:
+    architecture:
+      - context/architecture.md
+      - context/decisions.md
+    api:
+      - context/architecture.md
+      - standards/api_design.md
+    eligibility:
+      - standards/eligibility.md
+      - artifacts/decisions/ADR-003-deterministic-eligibility-precedence.md
+      - artifacts/decisions/ADR-006-explainable-eligibility.md
+    ai:
+      - standards/ai.md
+      - artifacts/decisions/ADR-004-ai-provider-abstraction.md
+    personal_data:
+      - standards/security_privacy.md
+      - artifacts/decisions/ADR-001-local-first-personal-data.md
+      - artifacts/decisions/ADR-002-stateless-candidate-apis.md
+      - artifacts/decisions/ADR-011-no-server-side-candidate-or-application-persistence.md
+    adapters:
+      - artifacts/decisions/ADR-005-pluggable-job-source-adapters.md
+      - context/architecture.md
+    database:
+      - artifacts/decisions/ADR-009-database-strategy.md
+      - artifacts/decisions/ADR-011-no-server-side-candidate-or-application-persistence.md
+      - artifacts/decisions/ADR-012-ingestion-state-operational-model.md
+      - standards/security_privacy.md
+
+# Reviewers are selected by change impact. Do not run all of them on every change.
+reviewers:
+  roster:
+    - architect
+    - api
+    - security
+    - ai
+    - qa
+    - performance
+    - documentation
+    - release
+  always_on:
+    personal_data: security
+    logic: qa
+  trigger_map:
+    eligibility_engine:      [architect, ai, qa]
+    ai_provider_or_prompts:  [ai, security, qa]
+    api_endpoint:            [api, qa]
+    database_model_migration: [architect, security, qa]
+    job_adapter_ingestion:   [architect, qa]
+    matching_engine:         [architect, qa]
+    application_prep:        [ai, security, qa]
+    resume_parsing_upload:   [security, qa]
+    personal_data:           [security]
+    deployment:              [security, release]
+    performance_path:        [performance, qa]
+    documentation:           [documentation]
+    release:                 [release, documentation]
+  trivial_changes_need_no_reviewer: true
+  escalation: human   # no agent hierarchy; conflicts and disputed FAILs go to the human
+
+quality_gates:
+  QG-001: {name: feature_completion,  file: checklists/QG-001-feature-completion.md, warning_tier: true}
+  QG-002: {name: eligibility_change,  file: checklists/QG-002-eligibility-change.md, warning_tier: false}
+  QG-003: {name: ai_change,           file: checklists/QG-003-ai-change.md,          warning_tier: true}
+  QG-004: {name: api_contract,        file: checklists/QG-004-api-contract.md,       warning_tier: true}
+  QG-005: {name: privacy_data,        file: checklists/QG-005-privacy-data.md,       warning_tier: false}
+  QG-006: {name: migration,           file: checklists/QG-006-migration.md,          warning_tier: true}
+  QG-007: {name: deployment,          file: checklists/QG-007-deployment.md,         warning_tier: false}
+
+# Breaking one of these is a defect even if every test passes.
+# Full text in context/architecture.md §9.
+invariants:
+  INV-1:  >
+    No server-side persistence of candidate personal data. No candidates, applications or
+    evaluations table, and no models/candidate.py or models/application.py — the dossier
+    §8.2 listing that shows them is STALE. Ruled in ADR-011.
+  INV-2:  AI never overrides a verified deterministic hard-constraint failure
+  INV-3:  Missing or invalid data yields UNKNOWN/NEEDS_REVIEW, never automatic NOT_ELIGIBLE
+  INV-4:  No PII in logs, including via stack traces and captured request bodies
+  INV-5:  Business logic never imports a vendor AI SDK
+  INV-6:  A new job source is one new adapter class, with no engine changes
+  INV-7:  Routers hold no business logic; services are testable without FastAPI
+  INV-8:  Every eligibility verdict carries a breakdown and a human-readable reason
+  INV-9:  Generated content contains no claim untraceable to supplied profile data
+  INV-10: No auto-submit, browser automation, or anti-bot/CAPTCHA/OTP circumvention
+  INV-11: Temporary resume files deleted on both success and failure paths
+  INV-12: All endpoints under /api/v1/
+
+workflow:
+  loop: [understand, plan, implement, test, review, validate, update_context, commit]
+  human_approval_required_before_implementation: true
+  contradiction_policy: report_never_silently_resolve
+  architectural_change_requires: [human_approval, adr]

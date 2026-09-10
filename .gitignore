@@ -1,0 +1,99 @@
+# EligiCore — .gitignore
+#
+# Two things this file is load-bearing for, beyond the usual noise:
+#   1. Secrets. AI provider keys land in .env from Week 2 (standards/security_privacy.md §5).
+#   2. Personal data. Resumes and candidate profiles must never reach the repository
+#      (ADR-001, INV-1, INV-4). Test fixtures must be obviously synthetic.
+
+# ---------- Secrets and configuration ----------
+.env
+.env.*
+!.env.example
+
+# ---------- Personal data — never commit ----------
+# Real resumes, profiles, or generated application content.
+# Synthetic fixtures belong in tests/fixtures/ and ARE tracked.
+/uploads/
+/tmp/
+*.resume.pdf
+*.resume.docx
+
+# ---------- Databases ----------
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib60/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ---------- Virtual environments ----------
+.venv/
+venv/
+ENV/
+env/
+.python-version
+
+# ---------- Testing and coverage ----------
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ---------- Type checking and linting ----------
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.pytype/
+
+# ---------- spaCy / model artifacts ----------
+*.spacy
+
+# ---------- Logs ----------
+*.log
+logs/
+
+# ---------- Editors and IDEs ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.claude/
+
+# ---------- OS ----------
+# Development is on Windows; deployment is Linux. Both sets apply.
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.AppleDouble
+.LSOverride
