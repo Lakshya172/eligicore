@@ -6,7 +6,7 @@
 > **"Am I actually eligible for these roles, and why?"**
 
 [![Status](https://img.shields.io/badge/status-pre--release%20development-orange)](CHANGELOG.md)
-[![Phase](https://img.shields.io/badge/phase-Week%202%20of%2010-blue)](context/state.md)
+[![Phase](https://img.shields.io/badge/phase-Week%203%20of%2010-blue)](context/state.md)
 [![CI](https://github.com/Lakshya172/eligicore/actions/workflows/ci.yml/badge.svg)](https://github.com/Lakshya172/eligicore/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -48,7 +48,7 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 
 ## Project status
 
-**Pre-release development. Week 2 of a 10-week solo build.**
+**Pre-release development. Week 3 of a 10-week solo build.**
 
 Current stable checkpoint: **Checkpoint 2** (`91dd31d`), merged via PR #4. 203 tests passing.
 
@@ -72,8 +72,9 @@ runs, and is tested. The authoritative, always-current state lives in
   produces a scale-independent view of each grade
 - **`POST /api/v1/resumes/parse`** — parses a PDF or DOCX resume into a structured profile with per-field confidence. The uploaded file is deleted after processing, on both the success and failure paths.
 - **AI provider abstraction** — one interface, a mandatory deterministic mock, and a Google Gemini Flash implementation for Phase 1. Swapping providers is a configuration change.
+- **`GET /api/v1/jobs`, `GET /api/v1/jobs/{id}`** — the job catalogue, ingested from a pluggable source adapter with canonical deduplication. Closed postings are kept and stay retrievable with their reason, never deleted.
 - **`GET /api/v1/health`** — liveness
-- **203 tests**, running offline with no credentials and no network
+- **318 tests**, running offline with no credentials and no network
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
 - Repository workflow: branching, conventional commits, PR standard, CI, checkpoint discipline
 
@@ -88,7 +89,7 @@ asserts none exists. Uploaded resumes exist only for the duration of processing.
 |---|---|---|
 | 1 | Foundation, config, database base, candidate profile schema, stateless validate/normalize endpoints | **Complete** |
 | 2 | Resume parser and AI provider abstraction | **Complete** |
-| 3 | Job schema, source adapters, ingestion, deduplication | Not started |
+| 3 | Job schema, source adapters, ingestion, deduplication | **Complete** |
 | 4 | Eligibility engine — deterministic rules plus AI for ambiguity | Not started |
 | 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | Not started |
 | 6 | **Polish, Excel export, testing — complete demoable MVP** | Not started |

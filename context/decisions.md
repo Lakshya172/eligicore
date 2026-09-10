@@ -23,6 +23,9 @@
 | [ADR-011](../artifacts/decisions/ADR-011-no-server-side-candidate-or-application-persistence.md) | No server-side candidate or application persistence — **ruling on C-1** | §8.2 vs §10.2 | Accepted 2026-09-10 |
 | [ADR-012](../artifacts/decisions/ADR-012-ingestion-state-operational-model.md) | `ingestion_state` as an operational model — **ruling on C-2** | §8.2 vs §10.2 | Accepted 2026-09-10 |
 | [ADR-013](../artifacts/decisions/ADR-013-gemini-flash-phase-1-default-provider.md) | Gemini Flash as the Phase 1 default AI provider — **resolves C-4 / D-1** | §9.2 | Accepted 2026-09-10 |
+| [ADR-014](../artifacts/decisions/ADR-014-job-status-model.md) | Job status: dossier enum stored, `is_active` derived — **reconciles C-5** | §10.2 | Accepted 2026-09-10 |
+| [ADR-015](../artifacts/decisions/ADR-015-ingestion-state-one-row-per-source.md) | `ingestion_state`: one row per source, no run log, no hash ledger — **resolves C-6 / D-4** | §10.2 | Accepted 2026-09-10 |
+| [ADR-016](../artifacts/decisions/ADR-016-local-personal-data-store.md) | Phase 1 local personal-data store at `~/.eligicore/` — **recorded, not implemented** | §8.1a, §10.1 | Accepted 2026-09-10 |
 
 > **ADR-011 and ADR-012 are contradiction rulings.** They resolve internal inconsistencies in
 > the dossier by owner decision. They do not overrule the dossier — they determine which of two
@@ -37,7 +40,7 @@
 | ~~D-1~~ | ~~Which AI provider is the Phase 1 default~~ | ~~Week 2~~ | **RESOLVED 2026-09-10 — Google Gemini Flash. See ADR-013.** Concrete Phase 1 implementation only; the ADR-004 abstraction is unchanged and mandatory. |
 | ~~D-2~~ | ~~Whether `models/candidate.py` / `models/application.py` exist at all~~ | ~~Week 1~~ | **RESOLVED 2026-09-10 — they must not exist. See ADR-011.** |
 | D-3 | Hosting target — Render vs Railway | Week 9 | Either satisfies the dossier. No impact on application code. |
-| D-4 | Whether `ingestion_state` needs its own deduplication-hash ledger, given `jobs.content_hash` is already the canonical dedup index | Week 3 | Opened by ADR-012. Deliberately not settled during Phase 0 — deciding it would mean designing the ingestion engine before it is approved. |
+| ~~D-4~~ | ~~Whether `ingestion_state` needs its own deduplication-hash ledger~~ | ~~Week 3~~ | **RESOLVED 2026-09-10 — no ledger. See ADR-015.** `jobs.content_hash` stays the single dedup index; a second hash store would be a copy with its own chance to drift. |
 
 ---
 

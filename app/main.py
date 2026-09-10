@@ -28,7 +28,11 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
 from app.config import get_settings
-from app.routers import candidates, resumes
+
+# Registers operational models on Base.metadata. Import for the side effect: without
+# it, Alembic and the privacy guards see an empty schema.
+import app.models  # noqa: F401
+from app.routers import candidates, jobs, resumes
 
 settings = get_settings()
 
@@ -114,6 +118,13 @@ app = FastAPI(
             "description": (
                 "Stateless resume parsing. The uploaded file exists only for the "
                 "duration of processing and is deleted afterwards."
+            ),
+        },
+        {
+            "name": "jobs",
+            "description": (
+                "The job catalogue. Public data - these endpoints handle no personal "
+                "data and take no candidate parameter."
             ),
         },
         {"name": "system", "description": "Operational endpoints."},
@@ -270,3 +281,4 @@ async def health() -> HealthResponse:
 
 app.include_router(candidates.router, prefix=settings.api_v1_prefix)
 app.include_router(resumes.router, prefix=settings.api_v1_prefix)
+app.include_router(jobs.router, prefix=settings.api_v1_prefix)

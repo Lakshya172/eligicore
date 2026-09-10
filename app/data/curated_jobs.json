@@ -1,0 +1,138 @@
+[
+  {
+    "company_name": "Example Analytics Pvt. Ltd.",
+    "role_title": "Software Engineering Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Bengaluru, India",
+    "description": "Six-month internship building internal data tooling. Work with the platform team on ingestion pipelines and internal APIs.",
+    "requirements": {
+      "notes": "Open to pre-final and final year students."
+    },
+    "min_cgpa": 7.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology",
+      "Electronics"
+    ],
+    "max_backlogs": 0,
+    "min_grad_year": 2026,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "Python",
+      "SQL",
+      "Git"
+    ],
+    "apply_link": "https://careers.example.com/roles/swe-intern-2027",
+    "deadline": "2026-11-15",
+    "source_job_id": "EX-INT-001"
+  },
+  {
+    "company_name": "Example Cloud Systems Inc",
+    "role_title": "Backend Engineer",
+    "job_type": "FULL_TIME",
+    "location": "Remote, India",
+    "description": "Design and operate backend services. Ownership of service reliability and API design.",
+    "requirements": {
+      "notes": "Graduating 2026 or earlier."
+    },
+    "min_cgpa": 6.5,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology"
+    ],
+    "max_backlogs": 2,
+    "min_grad_year": 2024,
+    "max_grad_year": 2026,
+    "required_skills": [
+      "Python",
+      "PostgreSQL",
+      "Docker",
+      "REST APIs"
+    ],
+    "apply_link": "https://careers.example.com/roles/backend-engineer",
+    "deadline": null,
+    "source_job_id": "EX-FT-002"
+  },
+  {
+    "company_name": "Example Research Labs",
+    "role_title": "Machine Learning Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Hyderabad, India",
+    "description": "Applied ML internship. Prototype and evaluate models on production datasets.",
+    "requirements": {
+      "notes": "Strong fundamentals expected; publications not required."
+    },
+    "min_cgpa": 8.0,
+    "min_cgpa_scale": null,
+    "allowed_fields": [
+      "Computer Science",
+      "Data Science",
+      "Mathematics"
+    ],
+    "max_backlogs": null,
+    "min_grad_year": 2026,
+    "max_grad_year": 2028,
+    "required_skills": [
+      "Python",
+      "PyTorch",
+      "Machine Learning"
+    ],
+    "apply_link": "https://careers.example.com/roles/ml-intern",
+    "deadline": "2026-12-01",
+    "source_job_id": "EX-INT-003"
+  },
+  {
+    "company_name": "Example Fintech Corp",
+    "role_title": "Graduate Software Engineer",
+    "job_type": "FULL_TIME",
+    "location": "Pune, India",
+    "description": "Graduate programme across payments and risk platforms. Structured rotation in the first year.",
+    "requirements": {
+      "notes": "No active backlogs at the time of joining."
+    },
+    "min_cgpa": 7.5,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology",
+      "Electrical"
+    ],
+    "max_backlogs": 0,
+    "min_grad_year": 2026,
+    "max_grad_year": 2026,
+    "required_skills": [
+      "Java",
+      "SQL",
+      "Data Structures and Algorithms"
+    ],
+    "apply_link": "https://careers.example.com/roles/grad-swe",
+    "deadline": "2026-10-30",
+    "source_job_id": "EX-FT-004"
+  },
+  {
+    "company_name": "Example Product Studio",
+    "role_title": "Frontend Engineering Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Remote",
+    "description": "Build and ship user-facing features. Pairing with senior engineers throughout.",
+    "requirements": {
+      "notes": "Portfolio or open-source work welcome."
+    },
+    "min_cgpa": null,
+    "min_cgpa_scale": null,
+    "allowed_fields": [],
+    "max_backlogs": null,
+    "min_grad_year": 2027,
+    "max_grad_year": 2028,
+    "required_skills": [
+      "JavaScript",
+      "React",
+      "CSS"
+    ],
+    "apply_link": "https://careers.example.com/roles/frontend-intern",
+    "deadline": null,
+    "source_job_id": "EX-INT-005"
+  }
+]

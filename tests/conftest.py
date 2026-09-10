@@ -18,6 +18,29 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
+#: Tables the server is permitted to have. An **allowlist**, deliberately: naming only the
+#: forbidden tables would let a fourth personal-data table through under a name nobody
+#: thought to ban. Anything registered outside this set fails the privacy tests, which is
+#: the behaviour we want when someone adds a model without thinking about INV-1.
+#:
+#: Weeks 1–2 asserted this set was empty, which was true then but was never the invariant.
+#: Week 3 adds the first operational tables; the rule — operational data only, no personal
+#: data — is unchanged.
+ALLOWED_OPERATIONAL_TABLES = {"jobs", "ingestion_state"}
+
+#: Names that must never appear, checked in addition to the allowlist so the intent stays
+#: legible at each call site.
+FORBIDDEN_TABLES = {
+    "candidates",
+    "candidate",
+    "applications",
+    "application",
+    "evaluations",
+    "evaluation",
+    "profiles",
+    "resumes",
+}
+
 
 @pytest.fixture
 def anyio_backend() -> str:

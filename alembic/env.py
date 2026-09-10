@@ -26,6 +26,11 @@ from sqlalchemy import engine_from_config, pool
 from app.config import get_settings
 from app.database import Base
 
+# Importing the models package registers every operational model on Base.metadata.
+# Without this, autogenerate sees an empty schema and would cheerfully emit a migration
+# dropping every table.
+import app.models  # noqa: F401  (imported for its registration side effect)
+
 # Alembic Config object, providing access to alembic.ini values.
 config = context.config
 

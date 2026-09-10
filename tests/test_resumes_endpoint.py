@@ -20,6 +20,7 @@ from app.ai.errors import AIProviderUnavailableError
 from app.ai.providers.mock import MockAIProvider
 from app.database import Base, engine
 from app.main import app
+from tests.conftest import ALLOWED_OPERATIONAL_TABLES, FORBIDDEN_TABLES
 from app.schemas.resume import ResumeExtraction
 from tests.fixtures_documents import (
     SAMPLE_RESUME_LINES,
@@ -31,7 +32,6 @@ from tests.fixtures_documents import (
 )
 
 PARSE_URL = "/api/v1/resumes/parse"
-FORBIDDEN_TABLES = {"candidates", "candidate", "applications", "application", "evaluations"}
 
 
 @pytest.fixture
@@ -238,7 +238,7 @@ def test_errors_use_the_standard_envelope(resume_client: TestClient) -> None:
 def test_parsing_creates_no_personal_data_table(resume_client: TestClient) -> None:
     resume_client.post(PARSE_URL, files=_pdf_upload())
 
-    assert set(Base.metadata.tables) == set()
+    assert not (set(Base.metadata.tables) - ALLOWED_OPERATIONAL_TABLES)
     assert not (set(inspect(engine).get_table_names()) & FORBIDDEN_TABLES)
 
 

@@ -258,6 +258,38 @@ Not at request time — the app will not import at all.
 **What to do:** it is pinned in `requirements.txt`. Any future endpoint accepting `File` or
 `Form` depends on it.
 
+### D-16 · SQLite `:memory:` needs StaticPool when a TestClient is involved
+A `:memory:` database belongs to the connection that opened it. The default pool hands
+TestClient's worker thread a *fresh, empty* database, and every query fails with
+"no such table: jobs" despite `create_all` having run.
+**What to do:** `poolclass=StaticPool` plus `check_same_thread: False`. The failure mode is
+opaque enough to have its own comment in the fixture. Applies to any future suite that
+drives endpoints against an in-memory catalogue.
+
+### D-17 · FastAPI cannot distinguish an omitted bool query param from an explicit null
+`is_active: bool | None = True` cannot express "return everything" — `?is_active=null` is
+just an invalid bool and 422s.
+**Why it matters:** I documented a tri-state that could not exist. The test caught it.
+**What to do:** either invent a sentinel (ugly) or accept a two-state filter. Week 3 chose
+two states, because nothing in scope needed the third. Do not document a behaviour without
+a test exercising it.
+
+### D-18 · Alembic autogenerate needs the models package imported
+`alembic/env.py` importing only `Base` sees empty metadata, and autogenerate would happily
+emit a migration **dropping every table**.
+**What to do:** `import app.models` for its registration side effect, in both `env.py` and
+`app/main.py`. Adding a new operational model means adding it to `app/models/__init__.py`,
+or it is invisible to migrations.
+
+### D-19 · A "zero tables" privacy assertion is not the invariant
+Weeks 1–2 asserted `Base.metadata.tables == set()`. That held only because no table existed
+at all; Week 3's first operational table would have failed it.
+**What to do:** the assertion is now an **allowlist** — every registered table must be one we
+named. That is stricter than the old ban list, because a personal-data table under an
+unanticipated name fails too. When adding an operational table, add it to
+`ALLOWED_OPERATIONAL_TABLES` in `tests/conftest.py` *and* the CI guard, deliberately — the
+friction is the point.
+
 ---
 
 ## Lessons
