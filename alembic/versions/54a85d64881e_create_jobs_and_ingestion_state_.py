@@ -13,11 +13,8 @@ WHAT THIS DELIBERATELY DOES NOT CREATE
     stale.
 
 PORTABILITY (ADR-009 — SQLite in development, PostgreSQL in production)
-    Enums use native_enum=False with create_constraint=True, so they are VARCHAR plus a
-    CHECK constraint on both engines rather than a PostgreSQL native type that SQLite
-    cannot express. create_constraint is NOT the SQLAlchemy 2.0 default: without it the
-    column is a bare VARCHAR and the database accepts any string, which would make the
-    four-state job status (ADR-014) a convention rather than a guarantee.
+    Enums use native_enum=False, so they are VARCHAR plus a CHECK constraint on both
+    engines rather than a PostgreSQL native type that SQLite cannot express.
     Index creation runs inside batch_alter_table, which SQLite requires.
     JSON columns map to JSON on PostgreSQL and TEXT on SQLite via SQLAlchemy.
 
@@ -49,7 +46,7 @@ def upgrade() -> None:
     sa.Column('source', sa.String(length=100), nullable=False),
     sa.Column('last_run_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('last_success_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('last_status', sa.Enum('SUCCESS', 'PARTIAL', 'FAILED', name='ingestionstatus', native_enum=False, length=20, create_constraint=True), nullable=False),
+    sa.Column('last_status', sa.Enum('SUCCESS', 'PARTIAL', 'FAILED', name='ingestionstatus', native_enum=False, length=20), nullable=False),
     sa.Column('last_error', sa.Text(), nullable=True),
     sa.Column('jobs_seen', sa.Integer(), nullable=False),
     sa.Column('jobs_created', sa.Integer(), nullable=False),
@@ -63,7 +60,7 @@ def upgrade() -> None:
     sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('company_name', sa.String(length=300), nullable=False),
     sa.Column('role_title', sa.String(length=300), nullable=False),
-    sa.Column('job_type', sa.Enum('INTERNSHIP', 'FULL_TIME', name='jobtype', native_enum=False, length=20, create_constraint=True), nullable=False),
+    sa.Column('job_type', sa.Enum('INTERNSHIP', 'FULL_TIME', name='jobtype', native_enum=False, length=20), nullable=False),
     sa.Column('location', sa.String(length=300), nullable=True),
     sa.Column('description', sa.Text(), nullable=False),
     sa.Column('requirements', sa.JSON(), nullable=False),
@@ -79,7 +76,7 @@ def upgrade() -> None:
     sa.Column('source', sa.String(length=100), nullable=False),
     sa.Column('source_job_id', sa.String(length=200), nullable=True),
     sa.Column('content_hash', sa.String(length=64), nullable=False),
-    sa.Column('status', sa.Enum('ACTIVE', 'EXPIRED', 'CLOSED', 'UNKNOWN', name='jobstatus', native_enum=False, length=20, create_constraint=True), nullable=False),
+    sa.Column('status', sa.Enum('ACTIVE', 'EXPIRED', 'CLOSED', 'UNKNOWN', name='jobstatus', native_enum=False, length=20), nullable=False),
     sa.Column('last_verified_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
