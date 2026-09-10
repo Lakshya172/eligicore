@@ -12,12 +12,12 @@
 | Field | Value |
 |---|---|
 | **Date** | 2026-09-10 |
-| **Phase** | **Phase 0 — initialization complete / Week 1 ready** |
-| **Roadmap position** | Pre-Week-1. Zero product code written. |
-| **Health** | 🟢 GREEN — no code, therefore no defects; scope and architecture settled; no open blockers |
-| **Next milestone** | Week 1: running API + operational DB + candidate profile schema |
-| **Repository** | Git initialized 2026-09-10. Branch `master`. No commits yet, no remote configured. |
-| **Python available** | 3.12.10 (dossier requires 3.11+ — satisfied) |
+| **Phase** | **Week 1 — Foundation and Candidate Profile Schema** |
+| **Roadmap position** | Week 1 of 10 implemented. Weeks 2–10 not started. |
+| **Health** | 🟢 GREEN — 86 tests passing, no open blockers |
+| **Next milestone** | Week 2: resume parser + AI service layer |
+| **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
+| **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
 
 ---
 
@@ -31,19 +31,27 @@
 | **Git repository initialized** | `.git/` on branch `master`; `.gitignore` written and verified (`.env` ignored, `.env.example` tracked, `.gitkeep` tracked). No commits, no remote. |
 | **Contradiction C-1 ruled** | `ADR-011` — no server-side candidate or application persistence |
 | **Contradiction C-2 ruled** | `ADR-012` — `ingestion_state` is a legitimate operational model |
+| **GitHub repository established** | `Lakshya172/eligicore`, public, `main` protected (PR required, `test` check required, force-push and deletion blocked). CI workflow runs install → import check → no-personal-data-table guard → `alembic check` → `pytest`. |
+| **Week 1 — application foundation** | `app/config.py` (ELIGICORE_ settings), `app/database.py` (engine, session factory, `Base` — **zero models**), `app/main.py` (app, middleware, sanitized error handlers) |
+| **Week 1 — candidate schema** | `app/schemas/candidate.py` — universal profile, multiple education entries, explicit `GradeScale` with first-class `UNKNOWN` |
+| **Week 1 — normalization service** | `app/services/candidate_normalizer.py` — skill canonicalization, scale-independent grade fractions, gap reporting. No FastAPI import; verified to run headless. |
+| **Week 1 — stateless endpoints** | `POST /api/v1/candidates/validate`, `POST /api/v1/candidates/normalize`, `GET /api/v1/health` |
+| **Week 1 — Alembic** | Environment initialized and wired to settings. **No migration exists** — Week 1 creates no tables; `alembic check` reports no pending operations. |
+| **Week 1 — tests** | 86 passing. Includes 9 privacy tests and mutation-verified coverage of the unknown-scale rule and the PII-echo guard. |
 
 ## Partial
 
-*Nothing. There is no partially-built product code.*
+| Item | State |
+|---|---|
+| Skill alias map (`app/services/candidate_normalizer.py`) | A deliberate **seed** of ~60 common variants, not an ontology. Extend it as real resumes reveal real variants. Unknown skills pass through with their casing intact. |
+| Operational database | Foundation only — engine, session factory, `Base`. No models, no migrations. First table is the job catalogue in Week 3. |
+| `get_db()` dependency | Written and exercised by no endpoint. Week 1 endpoints are stateless by design; it exists so Week 3 has a session source. |
 
 ## Missing — i.e. everything in the product
 
 | Component | Roadmap week | Status |
 |---|---|---|
-| `app/` package, `main.py`, `config.py` | 1 | NOT STARTED |
-| `database.py`, SQLAlchemy base/session | 1 | NOT STARTED |
-| Candidate Pydantic schemas + validate/normalize endpoints | 1 | NOT STARTED |
-| Alembic setup and first migration | 1 | NOT STARTED |
+| First Alembic **migration** (none needed yet — no tables until Week 3) | 3 | NOT STARTED |
 | Resume parser (pdfplumber / python-docx / spaCy) | 2 | NOT STARTED |
 | AI provider abstraction + first concrete provider + mock | 2 | NOT STARTED |
 | Job model, base adapter, manual adapter, ingestion, dedup | 3 | NOT STARTED |
@@ -51,7 +59,7 @@
 | Eligibility engine (AI ambiguity stage) | 4 | NOT STARTED |
 | Matching engine (skill normalization, TF-IDF, cosine) | 5 | NOT STARTED |
 | Excel export (openpyxl) | 6 | NOT STARTED |
-| Test suite (pytest), deterministic eligibility suite | 1–6, continuous | NOT STARTED |
+| Deterministic **eligibility** test suite (boundary/missing/invalid per constraint) | 4 | NOT STARTED |
 | Application preparation + truthfulness validator | 7 | NOT STARTED |
 | Caching, AI cost logging | 8 | NOT STARTED |
 | Deployment (Render/Railway), README, docs | 9 | NOT STARTED |
@@ -63,12 +71,19 @@ demoable. Weeks 7–10 are enhancement.
 
 ## Next approved phase
 
-**Week 1 — Foundation and Candidate Profile Schema.** Approved as the next phase. **Not started,
-and not authorized to start** — implementation begins only on explicit instruction.
+**Week 2 — Resume Parser and AI Service Layer.** **Not started, and not authorized to start** —
+implementation begins only on explicit instruction.
 
-Scope, expected files, tests, reviewers (api + qa + security + architect) and gates
-(QG-001, QG-004, QG-005) are as reported in the Phase 0 session and must be re-confirmed before
-implementation begins.
+Expected scope: `app/services/resume_parser.py` (pdfplumber, python-docx, spaCy fallback),
+`app/ai/providers/base.py` plus a mock provider and one concrete provider, `app/ai/ai_service.py`,
+`app/ai/prompts/`, and `POST /api/v1/resumes/parse`.
+
+**Blocking decision before Week 2 starts:** C-4 / D-1 — which AI provider is the Phase 1 default.
+The abstraction is provider-agnostic by construction, but a concrete provider cannot be written
+until this is settled.
+
+Reviewers: ai + security + qa (+ api for the parse endpoint). Gates: QG-001, QG-003, QG-004,
+QG-005.
 
 **No implementation may begin without explicit human approval of the specific step.**
 
@@ -132,11 +147,22 @@ Full index in `context/decisions.md`.
 
 ---
 
+## Checkpoints
+
+| # | Checkpoint | Branch | State |
+|---|---|---|---|
+| 0 | Phase 0 — AgentOS engineering layer initialized | `main` | Merged |
+| 1 | Week 1 — Foundation and Candidate Profile Schema | `feature/week-1-foundation` | See PR |
+
+Recovery: every checkpoint is a commit on `main`. If a later phase regresses, identify the last
+green checkpoint, investigate, propose a `git revert`, and **wait for human approval**. Never
+`git reset --hard` on `main` and never rewrite published history
+(`CONTRIBUTING.md` § Checkpoints and rollback).
+
+---
+
 ## Next actions
 
-1. **Await instruction to begin Week 1.** Phase 0 is complete; nothing is blocked.
-2. At Week 1 start: confirm scope, then implement Foundation and Candidate Profile Schema.
-3. Before Week 2: settle C-4 / D-1 — which AI provider is the Phase 1 default.
-4. Open question for the owner, non-blocking: whether to make an initial commit of the Phase 0
-   engineering layer. `git init` was run as instructed; **no commit was made**, because none was
-   requested. 46 files are currently untracked.
+1. **Human: review and merge the Week 1 PR.**
+2. **Human: settle C-4 / D-1** — which AI provider is the Phase 1 default. Blocks Week 2.
+3. **Await explicit instruction to begin Week 2.** No phase rolls into the next automatically.
