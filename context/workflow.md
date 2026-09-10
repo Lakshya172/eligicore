@@ -154,7 +154,21 @@ the single commit on `main` where that phase's merge landed.
 | # | Checkpoint | Commit on `main` | Produced by | CI | Tests | State |
 |---|---|---|---|---|---|---|
 | **0** | Phase 0 — AgentOS engineering layer | `e8c68b7` | Direct commits to `main` before branch protection (`7f7abbb` then `e8c68b7`) | n/a — CI did not exist yet | n/a — no product code | **Stable** |
-| **1** | Week 1 — Foundation and Candidate Profile Schema | *recorded on merge* | PR #2 (`feature/week-1-foundation`) | *recorded on merge* | *recorded on merge* | **Pending merge** |
+| **1** | Week 1 — Foundation and Candidate Profile Schema | `2e79454` | PR #2 (`feature/week-1-foundation`), merged 2026-09-10 | ✅ `test` success on `2e79454` | 86 passed | **Stable** |
+
+**Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
+
+Verified before being declared stable:
+
+| Check | Result |
+|---|---|
+| PR #2 merged on GitHub | `merged: true`, `merge_commit_sha` matches `main` HEAD |
+| Merge commit shape | Two parents — `e8c68b7` (Checkpoint 0) and `6814dad` (branch HEAD). Real merge, not squashed; implementation history preserved. |
+| Working tree on `main` | Clean, up to date with `origin/main` |
+| Full suite from `main` | 86 passed |
+| CI on the merged commit | `test` completed, conclusion `success` |
+| `Base.metadata.tables` | `[]` — no personal-data table registered (INV-1) |
+| `alembic check` | No new upgrade operations detected |
 
 Notes that remove the ambiguities this registry exists to close:
 

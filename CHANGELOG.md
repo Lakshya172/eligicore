@@ -20,8 +20,9 @@ Nothing pending.
 
 ## Checkpoint 1 — Week 1: Foundation and Candidate Profile Schema
 
-**Date:** 2026-09-10 · **Produced by:** PR #2 (`feature/week-1-foundation`) · **Tests:** 86 passing
-**Commit on `main`:** _recorded when PR #2 merges._ Until then this checkpoint is **pending**, not stable.
+**Date:** 2026-09-10 · **Commit on `main`:** `2e79454` · **Status:** Stable
+**Produced by:** PR #2 (`feature/week-1-foundation`, 11 commits), merged 2026-09-10
+**Full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77` · **CI:** `test` success · **Tests:** 86 passing from `main`
 
 First product implementation phase. A running FastAPI application, the operational database
 foundation, the universal candidate profile schema, and two stateless candidate endpoints.

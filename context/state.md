@@ -12,10 +12,13 @@
 | Field | Value |
 |---|---|
 | **Date** | 2026-09-10 |
-| **Phase** | **Week 1 — Foundation and Candidate Profile Schema** |
-| **Roadmap position** | Week 1 of 10 implemented. Weeks 2–10 not started. |
-| **Health** | 🟢 GREEN — 86 tests passing, no open blockers |
-| **Next milestone** | Week 2: resume parser + AI service layer |
+| **Phase** | **Week 1 — Foundation and Candidate Profile Schema · COMPLETE** |
+| **Roadmap position** | Week 1 of 10 complete and merged. **Week 2 NOT started.** |
+| **Health** | 🟢 GREEN — 86 tests passing on `main`, CI green, no open blockers |
+| **Stable branch** | `main` |
+| **Current checkpoint** | **Checkpoint 1** — `2e79454f787019ff29af39fcfd285aee59c8bc77` |
+| **Produced by** | PR #2, **MERGED** 2026-09-10 |
+| **Next milestone** | Week 2: resume parser + AI service layer — awaiting explicit approval |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
 
@@ -155,11 +158,24 @@ governs; this is a summary.
 | # | Checkpoint | Commit on `main` | Produced by | State |
 |---|---|---|---|---|
 | **0** | Phase 0 — AgentOS engineering layer | `e8c68b7` | Direct commits before branch protection | **Stable** |
-| **1** | Week 1 — Foundation and Candidate Profile Schema | *recorded on merge* | PR #2 | **Pending merge** |
+| **1** | Week 1 — Foundation and Candidate Profile Schema | `2e79454` | PR #2, merged 2026-09-10 | **Stable** |
+
+**Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
+
+```
+main
+  |
+  ├── e8c68b7  Checkpoint 0 — Phase 0 (AgentOS engineering layer)
+  |
+  └── 2e79454  Checkpoint 1 — Week 1 Foundation
+                    ↑
+                  PR #2  (feature/week-1-foundation, 11 commits)
+```
 
 Checkpoint 0 is the single commit `e8c68b7` — the state of `main` at the end of Phase 0 — not the
-two-commit range that built it. Checkpoint 1 is not declared stable until the merged `main` state
-has been verified.
+two-commit range that built it. Checkpoint 1 was declared stable only after the merged `main`
+state was verified: merge confirmed on GitHub, tree clean, 86 tests passing from `main`, and CI
+green on `2e79454`.
 
 Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: never rewrite
 `main` history, never `git reset --hard` as recovery, never roll back without human approval.
@@ -168,6 +184,11 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Human: review and merge the Week 1 PR.**
-2. **Human: settle C-4 / D-1** — which AI provider is the Phase 1 default. Blocks Week 2.
-3. **Await explicit instruction to begin Week 2.** No phase rolls into the next automatically.
+1. **Human: settle C-4 / D-1** — which AI provider is the Phase 1 default. **Blocks Week 2.**
+   The provider abstraction (ADR-004) is provider-agnostic by construction, but no concrete
+   provider can be written until this is chosen.
+2. **Await explicit instruction to begin Week 2.** No phase rolls into the next automatically.
+
+**Week 2 has not started.** No Week 2 branch exists. No resume parsing, AI provider integration,
+job ingestion, eligibility, matching or application preparation code exists anywhere in the
+repository.
