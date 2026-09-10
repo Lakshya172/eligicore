@@ -142,6 +142,59 @@ If a task seems to require one of these, that is a signal the task is misunderst
 
 ---
 
+## Checkpoint registry
+
+**This table is the canonical definition of every checkpoint.** Where any other document
+mentions a checkpoint, this one governs.
+
+A **checkpoint** is one exact commit on `main` at which the project was verified healthy. It is
+not a release, not a version, and not a tag. A phase may take many commits; the checkpoint is
+the single commit on `main` where that phase's merge landed.
+
+| # | Checkpoint | Commit on `main` | Produced by | CI | Tests | State |
+|---|---|---|---|---|---|---|
+| **0** | Phase 0 — AgentOS engineering layer | `e8c68b7` | Direct commits to `main` before branch protection (`7f7abbb` then `e8c68b7`) | n/a — CI did not exist yet | n/a — no product code | **Stable** |
+| **1** | Week 1 — Foundation and Candidate Profile Schema | *recorded on merge* | PR #2 (`feature/week-1-foundation`) | *recorded on merge* | *recorded on merge* | **Pending merge** |
+
+Notes that remove the ambiguities this registry exists to close:
+
+- **Checkpoint 0 is the commit `e8c68b7`, not a range.** Phase 0 was built over two commits; the
+  checkpoint is the state of `main` at the end of it. `7f7abbb` is an intermediate commit, not a
+  checkpoint of its own. There is exactly one Phase 0 checkpoint.
+- **Checkpoint 0 has no CI or test result** because Phase 0 contained no product code and CI was
+  introduced in Week 1. Recording "n/a" is accurate; recording "passing" would not be.
+- **A checkpoint is only declared stable after the merged `main` state has been verified** —
+  merge confirmed on GitHub, working tree clean, full suite run from `main`, and CI green on the
+  merged commit. Until then it reads *pending*, and its commit column stays empty rather than
+  carrying a guess.
+
+---
+
+## Recovery and rollback
+
+`main` must always be recoverable to a checkpoint in this registry.
+
+If a future phase introduces a regression:
+
+1. **Identify the regression** — what broke, and which commit introduced it.
+2. **Identify the last known stable checkpoint** from the registry above.
+3. **Investigate the cause.** A revert without a diagnosis usually means reverting again later.
+4. **Propose a recovery strategy** — normally `git revert` of the offending merge commit.
+5. **Wait for explicit human approval.** Recovery is never automatic.
+6. **Perform the approved recovery**, producing a visible revert commit.
+
+Hard rules:
+
+- **Never rewrite `main` history.** No rebase, no amend, no force-push to `main`.
+- **Never use `git reset --hard` as a production recovery mechanism.** It discards work silently
+  and leaves no record that anything happened.
+- **Never roll back automatically.** Detecting a regression means reporting it, not acting on it.
+
+Recovery should be visible in the history, not hidden from it. A revert commit tells the next
+reader that something went wrong and was addressed; a rewritten history tells them nothing.
+
+---
+
 ## Session start and end
 
 **Start:** read `context/state.md`, `context/vision.md`, `context/workflow.md`,

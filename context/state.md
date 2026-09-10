@@ -149,15 +149,20 @@ Full index in `context/decisions.md`.
 
 ## Checkpoints
 
-| # | Checkpoint | Branch | State |
-|---|---|---|---|
-| 0 | Phase 0 — AgentOS engineering layer initialized | `main` | Merged |
-| 1 | Week 1 — Foundation and Candidate Profile Schema | `feature/week-1-foundation` | See PR |
+**Canonical registry: [`context/workflow.md`](workflow.md) § Checkpoint registry.** That table
+governs; this is a summary.
 
-Recovery: every checkpoint is a commit on `main`. If a later phase regresses, identify the last
-green checkpoint, investigate, propose a `git revert`, and **wait for human approval**. Never
-`git reset --hard` on `main` and never rewrite published history
-(`CONTRIBUTING.md` § Checkpoints and rollback).
+| # | Checkpoint | Commit on `main` | Produced by | State |
+|---|---|---|---|---|
+| **0** | Phase 0 — AgentOS engineering layer | `e8c68b7` | Direct commits before branch protection | **Stable** |
+| **1** | Week 1 — Foundation and Candidate Profile Schema | *recorded on merge* | PR #2 | **Pending merge** |
+
+Checkpoint 0 is the single commit `e8c68b7` — the state of `main` at the end of Phase 0 — not the
+two-commit range that built it. Checkpoint 1 is not declared stable until the merged `main` state
+has been verified.
+
+Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: never rewrite
+`main` history, never `git reset --hard` as recovery, never roll back without human approval.
 
 ---
 

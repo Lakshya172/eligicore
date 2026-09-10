@@ -20,7 +20,8 @@ Nothing pending.
 
 ## Checkpoint 1 — Week 1: Foundation and Candidate Profile Schema
 
-**Date:** 2026-09-10 · **Branch:** `feature/week-1-foundation` · **Tests:** 86 passing
+**Date:** 2026-09-10 · **Produced by:** PR #2 (`feature/week-1-foundation`) · **Tests:** 86 passing
+**Commit on `main`:** _recorded when PR #2 merges._ Until then this checkpoint is **pending**, not stable.
 
 First product implementation phase. A running FastAPI application, the operational database
 foundation, the universal candidate profile schema, and two stateless candidate endpoints.
@@ -65,7 +66,10 @@ preparation, frontend, authentication, deployment.
 
 ## Checkpoint 0 — Phase 0: Engineering environment initialized
 
-**Date:** 2026-09-10 · **Branch:** `main`
+**Date:** 2026-09-10 · **Commit on `main`:** `e8c68b7` · **Status:** Stable
+Built over two commits (`7f7abbb`, then `e8c68b7`). The checkpoint is the end state,
+`e8c68b7` — a single commit, not the range. CI and tests read n/a: neither existed yet,
+because Phase 0 contained no product code.
 
 The AgentOS engineering layer, the repository standard, and the two architectural contradiction
 rulings. **No product code.**
