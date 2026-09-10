@@ -89,7 +89,11 @@ class Job(Base):
     company_name: Mapped[str] = mapped_column(String(300), nullable=False)
     role_title: Mapped[str] = mapped_column(String(300), nullable=False)
     job_type: Mapped[JobType] = mapped_column(
-        SAEnum(JobType, native_enum=False, length=20), nullable=False
+        # create_constraint=True is not the default in SQLAlchemy 2.0. Without it the
+        # column is a bare VARCHAR and the database will accept any string, so a typo in
+        # a future write path would only surface on read.
+        SAEnum(JobType, native_enum=False, length=20, create_constraint=True),
+        nullable=False,
     )
     location: Mapped[str | None] = mapped_column(String(300), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -120,7 +124,9 @@ class Job(Base):
 
     # --- freshness --------------------------------------------------------------------
     status: Mapped[JobStatus] = mapped_column(
-        SAEnum(JobStatus, native_enum=False, length=20),
+        # The four states are the canonical persisted representation (ADR-014), so the
+        # database enforces them rather than trusting every write path to be correct.
+        SAEnum(JobStatus, native_enum=False, length=20, create_constraint=True),
         nullable=False,
         default=JobStatus.ACTIVE,
     )
