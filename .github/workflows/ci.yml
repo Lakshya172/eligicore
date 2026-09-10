@@ -1,0 +1,61 @@
+name: CI
+
+# Deliberately minimal: install, import-check, verify no stray models, run pytest.
+# No deployment, no containers, no cloud infrastructure — see CONTRIBUTING.md § Scope.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job id is `test` so the branch-protection required status check resolves to "test".
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Import check
+        run: python -c "import app.main; print('application imports cleanly')"
+
+      # INV-1 / ADR-011. A model registering a personal-data table would surface here
+      # before any test runs. No environment secrets are needed for this or anything below.
+      - name: Verify no personal-data tables are registered
+        run: |
+          python - <<'PY'
+          from app.database import Base
+          forbidden = {"candidates", "candidate", "applications", "application", "evaluations"}
+          registered = set(Base.metadata.tables)
+          leaked = registered & forbidden
+          assert not leaked, f"forbidden tables registered: {leaked}"
+          print(f"registered tables: {sorted(registered) or 'none'} - OK")
+          PY
+
+      - name: Alembic environment check
+        run: alembic check
+
+      # No ELIGICORE_* variables and no API key are set anywhere in this workflow.
+      # The suite must pass offline and unconfigured (standards/testing.md §1).
+      - name: Run tests
+        run: pytest -q
