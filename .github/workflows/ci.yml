@@ -58,8 +58,23 @@ jobs:
           print(f"registered tables: {sorted(registered)} - OK")
           PY
 
-      - name: Alembic environment check
+      # `alembic check` compares the models against the *database*, so the migration has to
+      # have been applied first. Until Week 3 there were no models and this passed
+      # trivially; now it verifies something real — that the migration on disk actually
+      # produces the schema the models describe.
+      - name: Apply migrations
+        run: alembic upgrade head
+
+      - name: Verify models and migrations agree
         run: alembic check
+
+      # The first migration is the one most worth round-tripping: a downgrade that does not
+      # work is only discovered when it is needed, which is the worst moment to find out.
+      - name: Verify migration rollback
+        run: |
+          alembic downgrade base
+          alembic upgrade head
+          alembic check
 
       # No ELIGICORE_* variables and no API key are set anywhere in this workflow.
       # The suite must pass offline and unconfigured (standards/testing.md §1).
