@@ -56,7 +56,8 @@ class IngestionState(Base):
         DateTime(timezone=True), nullable=True
     )
     last_status: Mapped[IngestionStatus] = mapped_column(
-        SAEnum(IngestionStatus, native_enum=False, length=20), nullable=False
+        SAEnum(IngestionStatus, native_enum=False, length=20, create_constraint=True),
+        nullable=False,
     )
     #: Sanitized failure summary — a category, never a raw provider or source payload.
     #: A future live source's error body could quote the content it was fetching.

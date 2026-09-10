@@ -379,6 +379,78 @@ def test_failed_run_is_recorded_and_raises(session: Session) -> None:
     assert state.last_success_at is None
 
 
+def test_failed_ingestion_does_not_deactivate_existing_jobs(session: Session) -> None:
+    """A failed fetch must never be read as "the source has no jobs".
+
+    This is the most dangerous failure mode ingestion has. A network blip, an expired
+    credential, or a malformed response would otherwise close the entire catalogue for that
+    source — silently, since nothing about a closed job looks like an error afterwards.
+
+    It holds because the failure path raises before `_close_disappeared` is reached. That is
+    easy to break by accident: catching the error and continuing, or hoisting the close step
+    out of the try block, would both do it without touching a single assertion elsewhere.
+    """
+    jobs = [make_raw(source_job_id=f"EX-{i}") for i in range(3)]
+    ingest_source(session, FakeAdapter(jobs))
+    assert len(active_jobs(session)) == 3
+
+    with pytest.raises(AdapterError):
+        ingest_source(session, FakeAdapter([], fail_with=AdapterError("source unreachable")))
+    session.expire_all()
+
+    assert len(active_jobs(session)) == 3, "a failed fetch must not close anything"
+    assert all(j.status is JobStatus.ACTIVE for j in active_jobs(session))
+
+
+def test_failed_ingestion_leaves_the_catalogue_byte_identical(session: Session) -> None:
+    """Not just still-active: entirely untouched."""
+    ingest_source(session, FakeAdapter([make_raw()]))
+    before = {
+        (j.id, j.status, j.content_hash, j.role_title)
+        for j in session.execute(select(Job)).scalars()
+    }
+
+    with pytest.raises(AdapterError):
+        ingest_source(session, FakeAdapter([], fail_with=AdapterError("down")))
+    session.expire_all()
+
+    after = {
+        (j.id, j.status, j.content_hash, j.role_title)
+        for j in session.execute(select(Job)).scalars()
+    }
+    assert before == after
+
+
+def test_a_failing_source_does_not_deactivate_another_sources_jobs(
+    session: Session,
+) -> None:
+    """Failure isolation extends to the disappearance rule, not just to the run."""
+    ingest_source(session, FakeAdapter([make_raw()], source_name="good"))
+
+    ingest_all(
+        session,
+        [FakeAdapter([], source_name="bad", fail_with=AdapterError("unreachable"))],
+    )
+    session.expire_all()
+
+    assert len(active_jobs(session, "good")) == 1
+
+
+def test_successful_empty_fetch_does_close_jobs(session: Session) -> None:
+    """The counterpart, and the reason the distinction matters.
+
+    An authoritative source returning zero jobs *successfully* is evidence — it is saying
+    it has none. That must close them, while a failure must not. These two cases look
+    identical from the catalogue's side afterwards, so they are asserted together.
+    """
+    ingest_source(session, FakeAdapter([make_raw()]))
+    outcome = ingest_source(session, FakeAdapter([]))
+    session.expire_all()
+
+    assert outcome.jobs_deactivated == 1
+    assert len(active_jobs(session)) == 0
+
+
 def test_failure_after_success_preserves_last_success_at(session: Session) -> None:
     """A run of failures must not make a source look fresh."""
     ingest_source(session, FakeAdapter([make_raw()]))
@@ -391,6 +463,61 @@ def test_failure_after_success_preserves_last_success_at(session: Session) -> No
     state = session.get(IngestionState, "fake")
     assert state.last_status is IngestionStatus.FAILED
     assert state.last_success_at == success_time
+
+
+def test_database_rejects_a_status_outside_the_four_states(session: Session) -> None:
+    """ADR-014's four states are enforced by the database, not just by convention.
+
+    SQLAlchemy 2.0 defaults ``create_constraint=False``, which leaves an enum column as a
+    bare VARCHAR that accepts any string. Without the constraint a future write path could
+    store `status="ELIGIBLE"` and nothing would notice until read time — by which point the
+    catalogue is already wrong.
+    """
+    import datetime
+    import uuid
+
+    from sqlalchemy.exc import IntegrityError
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    session.add(
+        Job(
+            id=str(uuid.uuid4()), company_name="X", role_title="Y",
+            job_type="INTERNSHIP", description="d", requirements={},
+            allowed_fields=[], required_skills=[], source="t", content_hash="h",
+            status="NOT_A_REAL_STATE",
+            last_verified_at=now, created_at=now, updated_at=now,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        session.commit()
+    session.rollback()
+
+
+@pytest.mark.parametrize("state", ["ACTIVE", "EXPIRED", "CLOSED", "UNKNOWN"])
+def test_all_four_canonical_states_are_accepted(session: Session, state: str) -> None:
+    """The constraint must not be so tight it rejects a state the model defines."""
+    import datetime
+    import uuid
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    session.add(
+        Job(
+            id=str(uuid.uuid4()), company_name="X", role_title=state,
+            job_type="FULL_TIME", description="d", requirements={},
+            allowed_fields=[], required_skills=[], source="t", content_hash=state,
+            status=state, last_verified_at=now, created_at=now, updated_at=now,
+        )
+    )
+    session.commit()
+    stored = session.execute(select(Job).where(Job.content_hash == state)).scalar_one()
+    assert stored.status.value == state
+    assert stored.is_active is (state == "ACTIVE")
+
+
+def test_is_active_is_not_a_database_column() -> None:
+    """Derived, not persisted (ADR-014). Two sources of truth would be one too many."""
+    assert "is_active" not in Job.__table__.columns.keys()
+    assert isinstance(Job.is_active, property)
 
 
 def test_state_holds_no_candidate_identifier() -> None:
