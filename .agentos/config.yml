@@ -21,14 +21,14 @@ project:
   api_namespace: /api/v1
   env_prefix: ELIGICORE_
   database_name: eligicore
-  phase: "Phase 0 — initialization complete / Week 1 ready"
-  next_approved_phase: "Week 1 — Foundation and Candidate Profile Schema (not started)"
+  phase: "Week 2 — Resume Parser and AI Service Layer (in review)"
+  next_approved_phase: "Week 3 — Job Schema, Adapters and Ingestion (not started)"
   source_of_truth: EligiCore_Dossier_update.md
+  ai_provider_phase_1: gemini-flash   # ADR-013. Concrete implementation, not a dependency.
   vcs:
-    initialized: 2026-09-10
-    branch: master
-    remote: none          # do not invent or configure one
-    commits: 0            # no initial commit made; awaiting owner decision
+    remote: https://github.com/Lakshya172/eligicore
+    default_branch: main
+    last_stable_checkpoint: "Checkpoint 1 — 2e79454f787019ff29af39fcfd285aee59c8bc77"
 
 # Read at the start of every session, without exception.
 context:
@@ -51,6 +51,7 @@ context:
     ai:
       - standards/ai.md
       - artifacts/decisions/ADR-004-ai-provider-abstraction.md
+      - artifacts/decisions/ADR-013-gemini-flash-phase-1-default-provider.md
     personal_data:
       - standards/security_privacy.md
       - artifacts/decisions/ADR-001-local-first-personal-data.md
@@ -87,7 +88,7 @@ reviewers:
     job_adapter_ingestion:   [architect, qa]
     matching_engine:         [architect, qa]
     application_prep:        [ai, security, qa]
-    resume_parsing_upload:   [security, qa]
+    resume_parsing_upload:   [architect, ai, security, qa]
     personal_data:           [security]
     deployment:              [security, release]
     performance_path:        [performance, qa]
@@ -104,6 +105,7 @@ quality_gates:
   QG-005: {name: privacy_data,        file: checklists/QG-005-privacy-data.md,       warning_tier: false}
   QG-006: {name: migration,           file: checklists/QG-006-migration.md,          warning_tier: true}
   QG-007: {name: deployment,          file: checklists/QG-007-deployment.md,         warning_tier: false}
+  QG-008: {name: resume_processing,   file: checklists/QG-008-resume-processing.md,  warning_tier: true}
 
 # Breaking one of these is a defect even if every test passes.
 # Full text in context/architecture.md §9.
