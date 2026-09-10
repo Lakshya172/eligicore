@@ -12,13 +12,14 @@
 | Field | Value |
 |---|---|
 | **Date** | 2026-09-10 |
-| **Phase** | **Week 1 — Foundation and Candidate Profile Schema · COMPLETE** |
-| **Roadmap position** | Week 1 of 10 complete and merged. **Week 2 NOT started.** |
-| **Health** | 🟢 GREEN — 86 tests passing on `main`, CI green, no open blockers |
+| **Phase** | **Week 2 — Resume Parser and AI Service Layer · implementation complete, PR open** |
+| **Roadmap position** | Week 1 merged. Week 2 implemented and awaiting review. **Week 3 NOT started.** |
+| **Health** | 🟢 GREEN — 203 tests passing, no open blockers |
 | **Stable branch** | `main` |
 | **Current checkpoint** | **Checkpoint 1** — `2e79454f787019ff29af39fcfd285aee59c8bc77` |
 | **Produced by** | PR #2, **MERGED** 2026-09-10 |
-| **Next milestone** | Week 2: resume parser + AI service layer — awaiting explicit approval |
+| **Next milestone** | Week 3: job schema, adapters and ingestion — **not started, not authorized** |
+| **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
 
@@ -41,6 +42,13 @@
 | **Week 1 — stateless endpoints** | `POST /api/v1/candidates/validate`, `POST /api/v1/candidates/normalize`, `GET /api/v1/health` |
 | **Week 1 — Alembic** | Environment initialized and wired to settings. **No migration exists** — Week 1 creates no tables; `alembic check` reports no pending operations. |
 | **Week 1 — tests** | 86 passing. Includes 9 privacy tests and mutation-verified coverage of the unknown-scale rule and the PII-echo guard. |
+| **AI provider decision** | `ADR-013` — Gemini Flash as the Phase 1 default, resolving C-4 / D-1. Concrete implementation only; ADR-004's abstraction unchanged. |
+| **Week 2 — AI abstraction** | `app/ai/providers/base.py` (interface), `mock.py` (mandatory, default), `gemini.py` (Phase 1 concrete), `errors.py`, `ai_service.py` (selection + usage logging), `prompts/` (files, not inline strings) |
+| **Week 2 — resume parser** | `app/services/resume_parser.py` — magic-byte format detection, pdfplumber/python-docx extraction incl. table cells, temp-file lifecycle, traceability checking, deterministic confidence rules |
+| **Week 2 — endpoint** | `POST /api/v1/resumes/parse` — stateless, file deleted after processing on both paths |
+| **Week 2 — tests** | 117 new (203 total). Week 1's 86 unchanged and passing. Suite runs offline with no API key. |
+| **Week 2 — privacy fix** | pdfminer logged resume text at DEBUG; library loggers now pinned at WARNING with propagation off. Found by test, mutation-verified. |
+| **QG-008** | New quality gate for resume processing and AI extraction |
 
 ## Partial
 
@@ -48,15 +56,17 @@
 |---|---|
 | Skill alias map (`app/services/candidate_normalizer.py`) | A deliberate **seed** of ~60 common variants, not an ontology. Extend it as real resumes reveal real variants. Unknown skills pass through with their casing intact. |
 | Operational database | Foundation only — engine, session factory, `Base`. No models, no migrations. First table is the job catalogue in Week 3. |
-| `get_db()` dependency | Written and exercised by no endpoint. Week 1 endpoints are stateless by design; it exists so Week 3 has a session source. |
+| `get_db()` dependency | Written and exercised by no endpoint. Week 1 and 2 endpoints are stateless by design; it exists so Week 3 has a session source. |
+| **Gemini provider** | Implemented and fully tested through `httpx.MockTransport`, but **never executed against the live Gemini service** — no API key exists in this environment and the suite must run without one. The default model identifier is a configured default, not a verified one (ADR-013 § Unverified). First live use is an outstanding integration step. |
+| **Traceability checking** | Covers skills only. Free-text fields (job descriptions, project summaries) are legitimately paraphrased during extraction and cannot be verified by substring matching. Documented in the service docstring as a known limitation. |
+| **spaCy fallback** | Not implemented. The dossier lists it as a deterministic cost-saver for predictable fields (emails, phones, dates). Currently every parse makes an AI call. Deferred, not forgotten. |
 
 ## Missing — i.e. everything in the product
 
 | Component | Roadmap week | Status |
 |---|---|---|
 | First Alembic **migration** (none needed yet — no tables until Week 3) | 3 | NOT STARTED |
-| Resume parser (pdfplumber / python-docx / spaCy) | 2 | NOT STARTED |
-| AI provider abstraction + first concrete provider + mock | 2 | NOT STARTED |
+| spaCy deterministic fallback extraction (cost-saver, dossier §9) | 2 (deferred) | NOT STARTED |
 | Job model, base adapter, manual adapter, ingestion, dedup | 3 | NOT STARTED |
 | Eligibility engine (deterministic stage) | 4 | NOT STARTED |
 | Eligibility engine (AI ambiguity stage) | 4 | NOT STARTED |
@@ -74,19 +84,17 @@ demoable. Weeks 7–10 are enhancement.
 
 ## Next approved phase
 
-**Week 2 — Resume Parser and AI Service Layer.** **Not started, and not authorized to start** —
+**Week 3 — Job Schema, Adapters and Ingestion.** **Not started, and not authorized to start** —
 implementation begins only on explicit instruction.
 
-Expected scope: `app/services/resume_parser.py` (pdfplumber, python-docx, spaCy fallback),
-`app/ai/providers/base.py` plus a mock provider and one concrete provider, `app/ai/ai_service.py`,
-`app/ai/prompts/`, and `POST /api/v1/resumes/parse`.
+Expected scope: `app/models/job.py` and `app/models/ingestion_state.py` (the first operational
+tables, and the first Alembic migration), `app/adapters/base_adapter.py` and
+`manual_adapter.py`, `app/data/curated_jobs.json`, and the `/api/v1/jobs` endpoints.
 
-**Blocking decision before Week 2 starts:** C-4 / D-1 — which AI provider is the Phase 1 default.
-The abstraction is provider-agnostic by construction, but a concrete provider cannot be written
-until this is settled.
+Open decision due at Week 3: **D-4** — whether `ingestion_state` needs its own deduplication
+hash ledger given `jobs.content_hash` is already the canonical dedup index (ADR-012).
 
-Reviewers: ai + security + qa (+ api for the parse endpoint). Gates: QG-001, QG-003, QG-004,
-QG-005.
+Reviewers: architect + security + qa. Gates: QG-001, QG-004, QG-006.
 
 **No implementation may begin without explicit human approval of the specific step.**
 
@@ -127,6 +135,7 @@ never silently fixed. These are internal to the dossier.
 | # | Contradiction | Where | Ruling |
 |---|---|---|---|
 | **C-1** | §8.2 folder structure lists `models/candidate.py` and `models/application.py` (SQLAlchemy ORM models), but §10.2 states plainly "there is no server-side `candidates` table and no server-side store of evaluations by default." | dossier §8.2 vs §10.2 | **RESOLVED 2026-09-10 — [ADR-011](../artifacts/decisions/ADR-011-no-server-side-candidate-or-application-persistence.md).** §8.2's listing is **stale**; local-first has authority. Those models and tables **must not exist**. Candidate and application-tracking data remain client-owned; candidate APIs remain stateless; application status remains client-side. Pydantic schemas are unaffected. |
+| **C-4** | §8.2 shows only `openai_provider.py`; §9.2 names OpenAI, OpenRouter, Anthropic and local models as swappable. Which is the Phase 1 default was unstated. | dossier §8.2 vs §9.2 | **RESOLVED 2026-09-10 — [ADR-013](../artifacts/decisions/ADR-013-gemini-flash-phase-1-default-provider.md).** Phase 1 default is **Google Gemini Flash**. Owner decision. A concrete implementation behind the ADR-004 abstraction, not a dependency of it: the mock provider stays mandatory, credentials are never committed, and the model id is configuration. |
 | **C-2** | §8.2 lists no model for `ingestion_state`, but §10.2 requires that table for ingestion to work across runs. | dossier §8.2 vs §10.2 | **RESOLVED 2026-09-10 — [ADR-012](../artifacts/decisions/ADR-012-ingestion-state-operational-model.md).** Same staleness, opposite direction. Ingestion is server-side operational functionality, so `app/models/ingestion_state.py` is legitimate — bounded to adapter identity, run history, timestamps, outcome counts and status. Never a `candidate_id`, never personal data. **Not yet implemented — Week 3 work.** |
 
 ### Still open — not to be resolved without instruction
@@ -134,7 +143,7 @@ never silently fixed. These are internal to the dossier.
 | # | Contradiction | Where | Status |
 |---|---|---|---|
 | C-3 | §12.3 says generated content is checked "against the **stored** candidate profile." Under local-first nothing is stored server-side; §11 confirms the profile travels in the request body. Wording predates the local-first revision. | dossier §12.3 vs §8.1a/§11 | **OPEN — low impact, not urgent.** Reads as stale wording rather than a design conflict. Relevant at Week 7. |
-| C-4 | §8.2 shows only `openai_provider.py` as a concrete provider; §9.2 names OpenAI, OpenRouter, Anthropic and local models as swappable. Which is the Phase 1 default is unstated. | dossier §8.2 vs §9.2 | **OPEN — needs a decision before Week 2.** Not a design conflict; an unmade choice. Recorded in `ADR-004` as deferred, and as D-1 in `context/decisions.md`. |
+
 
 ---
 
@@ -184,11 +193,14 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Human: settle C-4 / D-1** — which AI provider is the Phase 1 default. **Blocks Week 2.**
-   The provider abstraction (ADR-004) is provider-agnostic by construction, but no concrete
-   provider can be written until this is chosen.
-2. **Await explicit instruction to begin Week 2.** No phase rolls into the next automatically.
+1. **Human: review the Week 2 PR.** It must not be merged without explicit authorization,
+   regardless of CI status.
+2. On merge: verify `main`, then record **Checkpoint 2** with its exact commit SHA.
+3. **Await explicit instruction to begin Week 3.** No phase rolls into the next automatically.
 
-**Week 2 has not started.** No Week 2 branch exists. No resume parsing, AI provider integration,
-job ingestion, eligibility, matching or application preparation code exists anywhere in the
-repository.
+**Outstanding integration step, not blocking the PR:** the Gemini provider has never run
+against the live service. Confirm the model identifier and exercise one real call before
+relying on live extraction.
+
+**Weeks 3–10 have not started.** No Week 3 branch exists. No job ingestion, eligibility, matching, recommendations or
+application preparation code exists anywhere in the repository.

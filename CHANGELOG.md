@@ -12,9 +12,51 @@ dossier considers the system complete and demoable. No release is claimed before
 
 ---
 
-## [Unreleased]
+## [Unreleased] — Week 2: Resume Parser and AI Service Layer
 
-Nothing pending.
+**Branch:** `feature/week-2-resume-ai` · **Tests:** 203 passing (86 Week 1, unchanged)
+**Status:** implementation complete, PR open. **Not a checkpoint until merged and verified.**
+
+### Added
+
+- **AI provider abstraction** — `app/ai/providers/base.py`, plus `errors.py`, `ai_service.py`
+  (provider selection and the single point of usage logging), and `prompts/` as files
+- **Mock provider** — mandatory and the runtime default, so an unconfigured checkout cannot
+  make a paid call. Deterministic, with injectable failure modes.
+- **Gemini Flash provider** — the Phase 1 concrete implementation (ADR-013), via the official
+  REST API through httpx. The only file that knows Gemini exists.
+- **Resume parser** — `app/services/resume_parser.py`: magic-byte format detection, PDF and
+  DOCX extraction including table cells, temp-file lifecycle, traceability checking, and
+  deterministic confidence rules
+- **`POST /api/v1/resumes/parse`** — stateless; the uploaded file is deleted after processing
+  on both the success and failure paths
+- **QG-008** — quality gate for resume processing and AI extraction
+- 117 new tests, none of which make a network call or need an API key
+
+### Decided
+
+- **ADR-013** Google Gemini Flash as the Phase 1 default AI provider, resolving contradiction
+  C-4 / decision D-1. Concrete implementation only — ADR-004's abstraction is unchanged.
+
+### Fixed
+
+- **pdfminer logged the literal resume text at DEBUG level.** Found by a privacy test, not by
+  inspection: no application log statement was involved, so raising the root log level would
+  have dumped candidate data into the logs. Library loggers are now pinned at WARNING with
+  propagation disabled.
+
+### Known limitations
+
+- The Gemini provider has **never been executed against the live service** — no API key exists
+  in this environment. The default model identifier is a configured default, not a verified one.
+- Traceability checking covers skills only; free-text fields are legitimately paraphrased and
+  cannot be verified by substring matching.
+- The spaCy deterministic fallback is not implemented, so every parse currently makes an AI call.
+
+### Not included
+
+Job ingestion, job adapters, eligibility, matching, recommendations, application preparation,
+frontend, authentication, deployment.
 
 ---
 

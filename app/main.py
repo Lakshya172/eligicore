@@ -28,7 +28,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
 from app.config import get_settings
-from app.routers import candidates
+from app.routers import candidates, resumes
 
 settings = get_settings()
 
@@ -108,6 +108,13 @@ app = FastAPI(
         {
             "name": "candidates",
             "description": "Stateless candidate profile operations. Nothing is stored.",
+        },
+        {
+            "name": "resumes",
+            "description": (
+                "Stateless resume parsing. The uploaded file exists only for the "
+                "duration of processing and is deleted afterwards."
+            ),
         },
         {"name": "system", "description": "Operational endpoints."},
     ],
@@ -262,3 +269,4 @@ async def health() -> HealthResponse:
 
 
 app.include_router(candidates.router, prefix=settings.api_v1_prefix)
+app.include_router(resumes.router, prefix=settings.api_v1_prefix)

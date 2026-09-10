@@ -188,6 +188,21 @@ in exactly one place.
 AI is called **only** where deterministic code genuinely cannot resolve the question. Spending
 an AI call to compare two numbers is slower, costlier, and less reliable than `>=`.
 
+**Phase 1 default provider: Google Gemini Flash** (ADR-013), reached through the official REST
+API via httpx rather than a vendor SDK. It is the concrete implementation, not a dependency —
+`app/ai/providers/gemini.py` is the only file in the codebase that knows Gemini exists. The
+runtime default is `mock`, so an unconfigured checkout cannot make a paid call.
+
+As built:
+
+```
+services  ->  ai_service  ->  AIProvider (abstract)  ->  MockAIProvider
+                                                     \-> GeminiFlashProvider
+```
+
+Provider failures are translated into `app/ai/errors.py` types at the provider boundary, so no
+service or router ever sees an httpx or vendor exception.
+
 ---
 
 ## 7. Job architecture (dossier §9.3, §10.2)

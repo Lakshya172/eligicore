@@ -20,6 +20,16 @@ from app.main import app
 
 
 @pytest.fixture
+def anyio_backend() -> str:
+    """Run async tests on asyncio only.
+
+    anyio would otherwise parameterize every async test across asyncio and trio, doubling
+    the suite to exercise a backend this project does not use.
+    """
+    return "asyncio"
+
+
+@pytest.fixture
 def client() -> TestClient:
     """A test client for the FastAPI application."""
     return TestClient(app)

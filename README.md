@@ -6,7 +6,7 @@
 > **"Am I actually eligible for these roles, and why?"**
 
 [![Status](https://img.shields.io/badge/status-pre--release%20development-orange)](CHANGELOG.md)
-[![Phase](https://img.shields.io/badge/phase-Week%201%20of%2010-blue)](context/state.md)
+[![Phase](https://img.shields.io/badge/phase-Week%202%20of%2010-blue)](context/state.md)
 [![CI](https://github.com/Lakshya172/eligicore/actions/workflows/ci.yml/badge.svg)](https://github.com/Lakshya172/eligicore/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -48,7 +48,7 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 
 ## Project status
 
-**Pre-release development. Week 1 of a 10-week solo build.**
+**Pre-release development. Week 2 of a 10-week solo build.**
 
 This section is kept honest deliberately. Nothing is listed as implemented until it exists,
 runs, and is tested. The authoritative, always-current state lives in
@@ -64,20 +64,24 @@ runs, and is tested. The authoritative, always-current state lives in
   than rejecting them
 - **`POST /api/v1/candidates/normalize`** — canonicalizes skills, cleans text fields, and
   produces a scale-independent view of each grade
+- **`POST /api/v1/resumes/parse`** — parses a PDF or DOCX resume into a structured profile with per-field confidence. The uploaded file is deleted after processing, on both the success and failure paths.
+- **AI provider abstraction** — one interface, a mandatory deterministic mock, and a Google Gemini Flash implementation for Phase 1. Swapping providers is a configuration change.
 - **`GET /api/v1/health`** — liveness
-- **86 tests**, running offline with no credentials
+- **203 tests**, running offline with no credentials and no network
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
 - Repository workflow: branching, conventional commits, PR standard, CI, checkpoint discipline
 
-Both candidate endpoints are stateless. Nothing is stored: there is no `candidates` table, and a
-test asserts none exists.
+All endpoints are stateless. Nothing is stored: there is no `candidates` table, and a test
+asserts none exists. Uploaded resumes exist only for the duration of processing.
+
+**Nothing is fabricated.** Fields a resume does not state are left absent rather than guessed; a grade without a stated scale keeps `scale: UNKNOWN` rather than being assumed out of 10; an unstated backlog count stays `null` rather than becoming `0`; and extracted skills that cannot be traced back to the resume text are removed and reported.
 
 ### Planned — the 10-week build
 
 | Week | Deliverable | Status |
 |---|---|---|
 | 1 | Foundation, config, database base, candidate profile schema, stateless validate/normalize endpoints | **Complete** |
-| 2 | Resume parser and AI provider abstraction | Not started |
+| 2 | Resume parser and AI provider abstraction | **Complete** |
 | 3 | Job schema, source adapters, ingestion, deduplication | Not started |
 | 4 | Eligibility engine — deterministic rules plus AI for ambiguity | Not started |
 | 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | Not started |
@@ -194,7 +198,8 @@ answer is treated as a failure, not a result.
 | NLP fallback | spaCy | Deterministic extraction of predictable fields with no AI call |
 | Matching | scikit-learn | TF-IDF and cosine similarity — no training, and **explainable** |
 | Export | openpyxl | Excel tracker generation |
-| HTTP client | httpx | Async-capable, for AI provider calls |
+| AI provider | Google Gemini Flash | Phase 1 default ([ADR-013](artifacts/decisions/ADR-013-gemini-flash-phase-1-default-provider.md)). A concrete implementation behind the provider abstraction, not a dependency — swapping it is a config change plus one class. |
+| HTTP client | httpx | Async-capable, for AI provider calls. Used instead of a vendor SDK. |
 | Testing | pytest | Written alongside features, not at the end |
 
 TF-IDF was chosen over embeddings specifically because it is explainable — the system can state

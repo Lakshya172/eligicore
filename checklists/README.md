@@ -16,12 +16,13 @@
 | [QG-005](QG-005-privacy-data.md) | Anything touches personal data | security |
 | [QG-006](QG-006-migration.md) | A database model or migration changes | architect + security + qa |
 | [QG-007](QG-007-deployment.md) | Deploying | security + release |
+| [QG-008](QG-008-resume-processing.md) | Resume parsing, file upload or AI extraction changes | architect + ai + security + qa |
 
 ---
 
 ## Selecting gates by change size
 
-**Proportion matters.** Running seven gates on a typo is how a process gets abandoned.
+**Proportion matters.** Running eight gates on a typo is how a process gets abandoned.
 
 | Change | Gates |
 |---|---|
@@ -32,9 +33,10 @@
 | Eligibility rule change | QG-001 + QG-002 (+ QG-005) |
 | New AI call or prompt | QG-001 + QG-003 (+ QG-005) |
 | New model or migration | QG-001 + QG-006 |
+| Resume parsing or AI extraction | QG-001 + QG-003 + QG-005 + QG-008 |
 | Deployment | QG-007 |
 
-**QG-005 is non-negotiable** on anything touching personal data, regardless of change size. It
+**QG-005 and QG-008 have no warning tier on their privacy items**, and QG-005 applies to anything touching personal data, regardless of change size. It
 guards the project's differentiating property, and the differentiator is the thing that erodes
 quietly.
 
