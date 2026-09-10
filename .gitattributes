@@ -1,0 +1,32 @@
+# Normalize line endings.
+#
+# Development is on Windows; deployment targets Linux (Render / Railway).
+# Without this, checkouts diverge by platform and diffs fill with whitespace noise.
+# Everything is stored as LF in the repository; Git converts on checkout as needed.
+
+* text=auto eol=lf
+
+# Explicitly text
+*.py      text eol=lf
+*.md      text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.json    text eol=lf
+*.toml    text eol=lf
+*.cfg     text eol=lf
+*.ini     text eol=lf
+*.txt     text eol=lf
+*.sh      text eol=lf
+.env.example text eol=lf
+.gitignore   text eol=lf
+.gitattributes text eol=lf
+
+# Explicitly binary — never munge these
+*.pdf     binary
+*.docx    binary
+*.xlsx    binary
+*.png     binary
+*.jpg     binary
+*.ico     binary
+*.db      binary
+*.sqlite3 binary
