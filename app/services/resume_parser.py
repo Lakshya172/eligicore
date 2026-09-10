@@ -49,6 +49,25 @@ from app.services.candidate_normalizer import normalize_skills
 
 logger = logging.getLogger("eligicore.resume")
 
+# ---------------------------------------------------------------------------------------
+# Silence the extraction libraries. This is a privacy control, not noise reduction.
+#
+# pdfminer (which pdfplumber sits on) logs the *contents* of every text-showing operator at
+# DEBUG level — the literal resume text, line by line. Anyone raising the root log level to
+# DEBUG, in production or while chasing an unrelated bug, would dump candidate data into the
+# logs without ever writing a log statement themselves (INV-4).
+#
+# Pinning these loggers at WARNING makes that impossible regardless of root configuration.
+# `propagate = False` stops records escaping to a root handler that was configured before
+# this module was imported.
+#
+# Regression test: test_pdf_library_cannot_log_document_content.
+# ---------------------------------------------------------------------------------------
+for _noisy in ("pdfminer", "pdfplumber", "docx"):
+    _library_logger = logging.getLogger(_noisy)
+    _library_logger.setLevel(logging.WARNING)
+    _library_logger.propagate = False
+
 _WHITESPACE_RUN = re.compile(r"[ \t ]+")
 _BLANK_LINES = re.compile(r"\n{3,}")
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
