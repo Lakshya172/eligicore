@@ -50,7 +50,7 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 
 **Pre-release development. Week 3 of a 10-week solo build.**
 
-Current stable checkpoint: **Checkpoint 2** (`91dd31d`), merged via PR #4. 203 tests passing.
+Current stable checkpoint: **Checkpoint 3** (`2cfd4f0`). 328 tests passing.
 
 > **Not production-ready.** The Gemini Flash provider has not been exercised against the live
 > API — no key is configured and the test suite runs without one. The provider contract is
@@ -74,7 +74,7 @@ runs, and is tested. The authoritative, always-current state lives in
 - **AI provider abstraction** — one interface, a mandatory deterministic mock, and a Google Gemini Flash implementation for Phase 1. Swapping providers is a configuration change.
 - **`GET /api/v1/jobs`, `GET /api/v1/jobs/{id}`** — the job catalogue, ingested from a pluggable source adapter with canonical deduplication. Closed postings are kept and stay retrievable with their reason, never deleted.
 - **`GET /api/v1/health`** — liveness
-- **318 tests**, running offline with no credentials and no network
+- **328 tests**, running offline with no credentials and no network
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
 - Repository workflow: branching, conventional commits, PR standard, CI, checkpoint discipline
 

@@ -155,11 +155,64 @@ the single commit on `main` where that phase's merge landed.
 |---|---|---|---|---|---|---|
 | **0** | Phase 0 — AgentOS engineering layer | `e8c68b7` | Direct commits to `main` before branch protection (`7f7abbb` then `e8c68b7`) | n/a — CI did not exist yet | n/a — no product code | **Stable** |
 | **1** | Week 1 — Foundation and Candidate Profile Schema | `2e79454` | PR #2 (`feature/week-1-foundation`), merged 2026-09-10 | ✅ `test` success on `2e79454` | 86 passed | **Stable** |
-
 | **2** | Week 2 — Resume Parser and Gemini Flash AI Service Layer | `91dd31d` | PR #4 (`feature/week-2-resume-ai`), merged 2026-09-10 | ✅ `test` success on `91dd31d` | 203 passed | **Stable** |
+| **3** | Week 3 — Job Schema, Adapters and Ingestion | `2cfd4f0` | PR #6 (`f538015`) + PR #7 (`2cfd4f0`), merged 2026-09-10 | ✅ `test` success on `2cfd4f0` | 328 passed | **Stable — current** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
 **Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
+**Checkpoint 3 full SHA:** `2cfd4f0276b60de393ec604afc10b3c52f483ca7`
+
+### Checkpoint 3 — verification record
+
+**Phase:** Week 3 — Job Schema + Adapters + Ingestion
+**Produced by two merges, not one:**
+
+| PR | Merge SHA | Contents |
+|---|---|---|
+| **#6** | `f538015` | Week 3 implementation. Merged externally during final verification. |
+| **#7** | `2cfd4f0` | Verification repairs found *after* #6 merged. **The checkpoint is here**, not at `f538015`. |
+
+`f538015` is deliberately **not** a checkpoint: at that commit the database accepted
+`status='NOT_A_STATE'`, so ADR-014's four states were a convention rather than a guarantee,
+and the failed-ingestion path was untested. Recording it would have marked a state we had
+already found defects in.
+
+Verified before being declared stable:
+
+| Check | Result |
+|---|---|
+| PR #7 merged on GitHub | `merged: true`, `merge_commit_sha` = `main` HEAD |
+| Merge shape | Two parents (`f538015`, `314beea`). Real merge; history preserved. |
+| Working tree on `main` | Clean, in sync with `origin/main` |
+| Full suite from `main` | **328 passed** |
+| Weeks 1–2 regression | **203 passed**, unchanged |
+| CI on `2cfd4f0` | `test` completed, conclusion `success` |
+| **Migration chain** | `<base>` → `54a85d64881e` → `7c2f1a9b4d30` (head) |
+| `54a85d64881e` unchanged since merge | **Yes — byte-identical.** A shipped migration must never be amended. |
+| Upgrade / downgrade→base / re-upgrade | ✅ all clean |
+| `alembic check` | No new upgrade operations detected |
+| **Enum CHECK constraints** | `status IN ('ACTIVE','EXPIRED','CLOSED','UNKNOWN')`, `job_type IN (...)`, `last_status IN (...)` |
+| Invalid status rejected | `IntegrityError` on `status='NOT_A_STATE'` |
+| All four states accepted | ACTIVE/EXPIRED/CLOSED/UNKNOWN, `is_active` derived correctly for each |
+| `is_active` a DB column | **No** — derived, per ADR-014 |
+| Personal-data tables | **None**. Server tables: `jobs`, `ingestion_state`. |
+| Ingestion — new / unchanged / changed / duplicate / disappeared | ✅ all five verified against a real database |
+| **Failed ingestion** | 0 jobs deactivated, catalogue byte-identical, state `FAILED`, `last_success_at` preserved |
+| **Empty successful authoritative fetch** | 5 deactivated → `CLOSED`, rows retained, state `SUCCESS` — correctly distinct from a failure |
+| `ingestion_state` rows | 1 per source; no run log; no hash ledger |
+| API | `GET /jobs`, `GET /jobs/{id}`; filters exactly `is_active, job_type, source, limit, offset`; `POST /jobs/ingest` absent by design |
+| Normalized schema, not raw payload | ✅ no `raw`/`payload`/`source_data` field |
+| Privacy | No candidate/eligibility/match/profile/resume/email string in any response; server log clean |
+
+**Known limitations carried into this checkpoint** — see `context/state.md` § Partial for the
+full list. Chiefly: no PostgreSQL run (QG-007); `batch_alter_table` verified on SQLite only;
+CHECK constraints are not autogenerate-detected, so a future enum member needs a hand-written
+migration; `EXPIRED` and `UNKNOWN` are modelled but unset by any code path; and
+`POST /api/v1/jobs/ingest` remains deferred.
+
+**Week 4 has not started.**
+
+### Checkpoint 2 — verification record
 
 ### Checkpoint 2 — verification record
 
@@ -224,9 +277,15 @@ Notes that remove the ambiguities this registry exists to close:
 
 | Priority | Checkpoint | Commit | Role |
 |---|---|---|---|
-| **1st** | Checkpoint 2 — Week 2 | `91dd31d` | **Current stable point.** If Week 3 introduces a regression, this is the immediate rollback reference. |
-| **2nd** | Checkpoint 1 — Week 1 | `2e79454` | Previous known-good state. Remains available indefinitely as a historical recovery point. |
-| **3rd** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
+| **1st** | Checkpoint 3 — Week 3 | `2cfd4f0` | **Current stable point.** If Week 4 introduces a regression, this is the immediate rollback reference. |
+| **2nd** | Checkpoint 2 — Week 2 | `91dd31d` | Previous known-good state. |
+| **3rd** | Checkpoint 1 — Week 1 | `2e79454` | Remains available indefinitely as a historical recovery point. |
+| **4th** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
+
+**Recovering past Checkpoint 3 requires a database step.** Checkpoints 0–2 predate any table,
+so reverting to them is code-only. Checkpoint 3 introduced the schema, so a rollback below it
+also needs `alembic downgrade base`. No personal data is at risk either way — the catalogue is
+public job postings.
 
 Checkpoint 1 is **not** superseded by Checkpoint 2 — it stays recoverable. A regression whose
 cause turns out to predate Week 2 needs a target older than the newest checkpoint, and deleting
