@@ -12,12 +12,14 @@
 | Field | Value |
 |---|---|
 | **Date** | 2026-09-10 |
-| **Phase** | **Week 2 — Resume Parser and AI Service Layer · implementation complete, PR open** |
-| **Roadmap position** | Week 1 merged. Week 2 implemented and awaiting review. **Week 3 NOT started.** |
-| **Health** | 🟢 GREEN — 203 tests passing, no open blockers |
+| **Phase** | **Week 2 — Resume Parser and AI Service Layer · COMPLETE** |
+| **Roadmap position** | Weeks 1–2 complete and merged. **Week 3 NOT started.** |
+| **Health** | 🟢 GREEN — 203 tests passing on `main`, CI green, no open blockers |
 | **Stable branch** | `main` |
-| **Current checkpoint** | **Checkpoint 1** — `2e79454f787019ff29af39fcfd285aee59c8bc77` |
-| **Produced by** | PR #2, **MERGED** 2026-09-10 |
+| **Stable branch** | `main` |
+| **Current checkpoint** | **Checkpoint 2** — `91dd31d50e7749ad37acf14babd5d1ee90141abd` |
+| **Produced by** | PR #4, **MERGED** 2026-09-10 |
+| **Rollback target** | Checkpoint 2 first; Checkpoint 1 (`2e79454`) remains available |
 | **Next milestone** | Week 3: job schema, adapters and ingestion — **not started, not authorized** |
 | **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
@@ -168,23 +170,31 @@ governs; this is a summary.
 |---|---|---|---|---|
 | **0** | Phase 0 — AgentOS engineering layer | `e8c68b7` | Direct commits before branch protection | **Stable** |
 | **1** | Week 1 — Foundation and Candidate Profile Schema | `2e79454` | PR #2, merged 2026-09-10 | **Stable** |
+| **2** | Week 2 — Resume Parser and Gemini Flash AI Service Layer | `91dd31d` | PR #4, merged 2026-09-10 | **Stable — current** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
+**Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
 
 ```
 main
   |
   ├── e8c68b7  Checkpoint 0 — Phase 0 (AgentOS engineering layer)
   |
-  └── 2e79454  Checkpoint 1 — Week 1 Foundation
-                    ↑
-                  PR #2  (feature/week-1-foundation, 11 commits)
+  ├── 2e79454  Checkpoint 1 — Week 1 Foundation
+  |                 ↑  PR #2  (feature/week-1-foundation, 11 commits)
+  |
+  └── 91dd31d  Checkpoint 2 — Week 2 Resume Parser + Gemini Flash AI  <- current
+                    ↑  PR #4  (feature/week-2-resume-ai, 16 commits)
 ```
 
 Checkpoint 0 is the single commit `e8c68b7` — the state of `main` at the end of Phase 0 — not the
-two-commit range that built it. Checkpoint 1 was declared stable only after the merged `main`
-state was verified: merge confirmed on GitHub, tree clean, 86 tests passing from `main`, and CI
-green on `2e79454`.
+two-commit range that built it. Each checkpoint is declared stable only after the merged `main`
+state is verified: merge confirmed on GitHub, tree clean, full suite run from `main`, and CI
+green on the merged commit.
+
+**Checkpoint 2 is the current rollback target. Checkpoint 1 remains recoverable indefinitely**
+and is not superseded — a regression whose cause predates Week 2 needs a target older than the
+newest checkpoint.
 
 Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: never rewrite
 `main` history, never `git reset --hard` as recovery, never roll back without human approval.
@@ -193,10 +203,9 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Human: review the Week 2 PR.** It must not be merged without explicit authorization,
-   regardless of CI status.
-2. On merge: verify `main`, then record **Checkpoint 2** with its exact commit SHA.
-3. **Await explicit instruction to begin Week 3.** No phase rolls into the next automatically.
+1. **Await explicit instruction to begin Week 3.** No phase rolls into the next automatically.
+2. Before Week 3: settle **D-4** — whether `ingestion_state` needs its own deduplication hash
+   ledger given `jobs.content_hash` is already the canonical dedup index (ADR-012).
 
 **Outstanding integration step, not blocking the PR:** the Gemini provider has never run
 against the live service. Confirm the model identifier and exercise one real call before

@@ -12,10 +12,18 @@ dossier considers the system complete and demoable. No release is claimed before
 
 ---
 
-## [Unreleased] — Week 2: Resume Parser and AI Service Layer
+## [Unreleased]
 
-**Branch:** `feature/week-2-resume-ai` · **Tests:** 203 passing (86 Week 1, unchanged)
-**Status:** implementation complete, PR open. **Not a checkpoint until merged and verified.**
+Nothing pending.
+
+---
+
+## Checkpoint 2 — Week 2: Resume Parser and Gemini Flash AI Service Layer
+
+**Date:** 2026-09-10 · **Commit on `main`:** `91dd31d` · **Status:** Stable
+**Produced by:** PR #4 (`feature/week-2-resume-ai`, 16 commits), merged 2026-09-10
+**Full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd` · **CI:** `test` success ·
+**Tests:** 203 passing from `main` (Week 1's 86 unchanged)
 
 ### Added
 

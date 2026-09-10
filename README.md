@@ -50,6 +50,12 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 
 **Pre-release development. Week 2 of a 10-week solo build.**
 
+Current stable checkpoint: **Checkpoint 2** (`91dd31d`), merged via PR #4. 203 tests passing.
+
+> **Not production-ready.** The Gemini Flash provider has not been exercised against the live
+> API — no key is configured and the test suite runs without one. The provider contract is
+> covered through a mocked transport; a live smoke test remains pending.
+
 This section is kept honest deliberately. Nothing is listed as implemented until it exists,
 runs, and is tested. The authoritative, always-current state lives in
 [`context/state.md`](context/state.md).

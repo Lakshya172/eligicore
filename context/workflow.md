@@ -156,7 +156,39 @@ the single commit on `main` where that phase's merge landed.
 | **0** | Phase 0 — AgentOS engineering layer | `e8c68b7` | Direct commits to `main` before branch protection (`7f7abbb` then `e8c68b7`) | n/a — CI did not exist yet | n/a — no product code | **Stable** |
 | **1** | Week 1 — Foundation and Candidate Profile Schema | `2e79454` | PR #2 (`feature/week-1-foundation`), merged 2026-09-10 | ✅ `test` success on `2e79454` | 86 passed | **Stable** |
 
+| **2** | Week 2 — Resume Parser and Gemini Flash AI Service Layer | `91dd31d` | PR #4 (`feature/week-2-resume-ai`), merged 2026-09-10 | ✅ `test` success on `91dd31d` | 203 passed | **Stable** |
+
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
+**Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
+
+### Checkpoint 2 — verification record
+
+Merged 2026-09-10 by PR #4. Declared stable only after every check below:
+
+| Check | Result |
+|---|---|
+| PR #4 merged on GitHub | `merged: true`, `merged_by: Lakshya172` |
+| `merge_commit_sha` vs `main` HEAD | `91dd31d50e7749ad37acf14babd5d1ee90141abd` — identical |
+| Merge commit shape | Two parents — `9409f50` and `b770d90`. Real merge, not squashed; the 16 Week 2 commits are preserved. |
+| Working tree on `main` | Clean, in sync with `origin/main` |
+| Full suite from `main` | **203 passed** |
+| Week 1 regression in isolation | **86 passed**, unchanged |
+| CI on the merged commit | `test` completed, conclusion `success` |
+| `Base.metadata.tables` | `[]` — no personal-data table registered (INV-1) |
+| Database tables | `alembic_version` only (Alembic's own revision pointer) |
+| `alembic check` | No new upgrade operations detected |
+| Default AI provider | `mock` — an unconfigured checkout cannot make a paid call |
+| Secrets / PII | No `.env`, no credential patterns, no `.pdf`/`.docx`/`.db` committed |
+| Week 3 scope | Absent — no adapters, models, migrations, eligibility or matching |
+
+**Known limitation carried into this checkpoint:** the Gemini Flash provider has **not** been
+exercised against the live Gemini API. No key is configured and the suite is required to run
+without one. The provider contract is covered through a mocked httpx transport; a live smoke
+test remains pending, and the default model identifier should be confirmed before first real
+provider use. **This checkpoint is a verified stable development state, not a production-ready
+system.**
+
+### Checkpoint 1 — verification record
 
 Verified before being declared stable:
 
@@ -187,6 +219,21 @@ Notes that remove the ambiguities this registry exists to close:
 ## Recovery and rollback
 
 `main` must always be recoverable to a checkpoint in this registry.
+
+### Current recovery targets
+
+| Priority | Checkpoint | Commit | Role |
+|---|---|---|---|
+| **1st** | Checkpoint 2 — Week 2 | `91dd31d` | **Current stable point.** If Week 3 introduces a regression, this is the immediate rollback reference. |
+| **2nd** | Checkpoint 1 — Week 1 | `2e79454` | Previous known-good state. Remains available indefinitely as a historical recovery point. |
+| **3rd** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
+
+Checkpoint 1 is **not** superseded by Checkpoint 2 — it stays recoverable. A regression whose
+cause turns out to predate Week 2 needs a target older than the newest checkpoint, and deleting
+history to tidy the registry would remove exactly the option you would want.
+
+Do not confuse `ea383c4`/`9409f50` (PR #3, the documentation-only checkpoint record) with
+Checkpoint 1 itself. Checkpoint 1 is the Week 1 *implementation* merge, `2e79454`.
 
 If a future phase introduces a regression:
 

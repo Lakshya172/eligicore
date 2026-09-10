@@ -244,6 +244,15 @@ request content. The request content here is a prompt containing resume text.
 `type(exc).__name__`. Same rule for Pydantic `ValidationError`, whose detail embeds the
 offending values; the provider reports `exc.error_count()` instead. Both have tests.
 
+### D-15 · A merged PR reports `state: CLOSED`, and `gh pr merge` can silently no-op
+Merging PR #4 returned `! Pull request ... was already merged` — the merge had gone through on a
+prior invocation whose output was swallowed.
+**Why it matters:** `state` alone cannot distinguish merged from abandoned, and the CLI's
+success is not evidence. Acting on either would have produced a false report.
+**What to do:** always confirm with `gh api repos/OWNER/REPO/pulls/N` and check `merged`,
+`merged_at` and `merge_commit_sha`, then assert `merge_commit_sha` equals `main` HEAD after
+pulling. Already recorded as D-7; this is the second time it mattered.
+
 ### D-14 · FastAPI file uploads need `python-multipart` and fail at import time without it
 Not at request time — the app will not import at all.
 **What to do:** it is pinned in `requirements.txt`. Any future endpoint accepting `File` or
