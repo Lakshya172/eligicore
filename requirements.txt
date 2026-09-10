@@ -1,12 +1,17 @@
-# EligiCore — Week 1 dependencies
+# EligiCore — dependencies
 #
-# Only what Week 1 actually needs. The rest of the dossier's stack (pdfplumber,
-# python-docx, spaCy, scikit-learn, openpyxl) arrives with the phases that use it.
+# Only what the implemented phases actually need. The remainder of the dossier's stack
+# (spaCy, scikit-learn, openpyxl) arrives with the phases that use it.
+#
+# No AI vendor SDK is listed: the Gemini provider calls the official REST API through
+# httpx, which the dossier §9 already names for exactly this purpose (ADR-013).
 # Versions are pinned so builds are reproducible (standards/security_privacy.md §6).
 
 # --- Web framework ---
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
+# Required by FastAPI to accept multipart file uploads (POST /resumes/parse).
+python-multipart==0.0.20
 
 # --- Validation and configuration ---
 pydantic==2.10.4
@@ -17,6 +22,12 @@ python-dotenv==1.0.1
 # --- Operational database ---
 SQLAlchemy==2.0.36
 alembic==1.14.0
+
+# --- Resume text extraction (Week 2) ---
+# Both are named in the dossier's approved stack (§9). pdfplumber for layout-heavy PDFs,
+# python-docx for Word documents.
+pdfplumber==0.11.4
+python-docx==1.1.2
 
 # --- Testing ---
 pytest==8.3.4
