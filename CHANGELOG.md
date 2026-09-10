@@ -12,10 +12,22 @@ dossier considers the system complete and demoable. No release is claimed before
 
 ---
 
-## [Unreleased] — Week 3: Job Schema, Adapters and Ingestion
+## [Unreleased]
 
-**Branch:** `feature/week-3-jobs-ingestion` · **Tests:** 318 passing (203 from Weeks 1–2, unchanged)
-**Status:** implementation complete, PR open. **Not a checkpoint until merged and verified.**
+Nothing pending.
+
+---
+
+## Checkpoint 3 — Week 3: Job Schema, Adapters and Ingestion
+
+**Date:** 2026-09-10 · **Commit on `main`:** `2cfd4f0` · **Status:** Stable
+**Produced by:** PR #6 (`f538015`, implementation) + PR #7 (`2cfd4f0`, verification repairs)
+**Full SHA:** `2cfd4f0276b60de393ec604afc10b3c52f483ca7` · **CI:** `test` success ·
+**Tests:** 328 passing from `main` (Weeks 1–2's 203 unchanged)
+
+The checkpoint is at PR #7, not PR #6. At `f538015` the database still accepted
+`status='NOT_A_STATE'`, so the four-state job status was a convention rather than a guarantee,
+and the failed-ingestion path was untested.
 
 ### Added
 
@@ -44,11 +56,24 @@ dossier considers the system complete and demoable. No release is claimed before
   because no table existed; an allowlist is stricter, catching a personal-data table under any
   unanticipated name.
 
+### Fixed (PR #7)
+
+- **The four-state job status was not enforced by the database.** SQLAlchemy 2.0 defaults
+  `create_constraint=False`, so the enum columns were bare `VARCHAR`. Repair migration
+  `7c2f1a9b4d30` adds CHECK constraints; `54a85d64881e` is left byte-identical because amending
+  a shipped migration would leave already-migrated databases unconstrained.
+- **The failed-ingestion path was untested.** A failed fetch must never be read as "this source
+  has no jobs" — otherwise a network blip closes the whole catalogue, silently.
+
 ### Known limitations
 
 - `POST /api/v1/jobs/ingest` is in the dossier but not in the approved Week 3 API scope.
   Ingestion is implemented and tested as a service; no trigger endpoint is exposed.
-- No PostgreSQL run yet — the migration is portable by construction but verified only on SQLite.
+- No PostgreSQL run yet — the migration chain is portable by construction but verified only on
+  SQLite. `batch_alter_table` in particular has never run against PostgreSQL.
+- CHECK constraints are not autogenerate-detected, so a future enum member added to a model
+  will not be caught by `alembic check` and needs a hand-written migration.
+- `EXPIRED` and `UNKNOWN` job statuses are modelled but set by no code path.
 
 ### Not included
 

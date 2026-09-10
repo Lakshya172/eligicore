@@ -12,14 +12,14 @@
 | Field | Value |
 |---|---|
 | **Date** | 2026-09-10 |
-| **Phase** | **Week 3 — Job Schema, Adapters and Ingestion · implementation complete, PR open** |
-| **Roadmap position** | Weeks 1–2 merged. Week 3 implemented, awaiting review. **Week 4 NOT started.** |
-| **Health** | 🟢 GREEN — 318 tests passing, no open blockers |
+| **Phase** | **Week 3 — Job Schema, Adapters and Ingestion · COMPLETE** |
+| **Roadmap position** | Weeks 1–3 complete and merged. **Week 4 NOT started.** |
+| **Health** | 🟢 GREEN — 328 tests passing on `main`, CI green, no open blockers |
 | **Stable branch** | `main` |
 | **Stable branch** | `main` |
-| **Current checkpoint** | **Checkpoint 2** — `91dd31d50e7749ad37acf14babd5d1ee90141abd` |
-| **Produced by** | PR #4, **MERGED** 2026-09-10 |
-| **Rollback target** | Checkpoint 2 first; Checkpoint 1 (`2e79454`) remains available |
+| **Current checkpoint** | **Checkpoint 3** — `2cfd4f0276b60de393ec604afc10b3c52f483ca7` |
+| **Produced by** | PR #6 (`f538015`) + PR #7 (`2cfd4f0`), both **MERGED** 2026-09-10 |
+| **Rollback target** | Checkpoint 3 first; Checkpoints 2/1 remain available. Below Checkpoint 3 also needs `alembic downgrade base`. |
 | **Next milestone** | Week 4: eligibility engine — **not started, not authorized** |
 | **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
@@ -56,7 +56,8 @@
 | **Week 3 — normalization + hashing** | `app/services/job_normalizer.py` — canonicalized dedup per dossier §10.2, never raw text |
 | **Week 3 — ingestion** | `app/services/job_ingestion.py` — dedup, upsert, disappearance→CLOSED, one state row per source |
 | **Week 3 — jobs API** | `GET /api/v1/jobs`, `GET /api/v1/jobs/{id}` — minimal filters only |
-| **Week 3 — tests** | 115 new (318 total). Weeks 1–2's 203 unchanged. Three mutations verified. |
+| **Week 3 — tests** | 125 new (328 total). Weeks 1–2's 203 unchanged. Four mutations verified. |
+| **Week 3 — enum enforcement** | Migration `7c2f1a9b4d30` adds DB-level CHECK constraints, so ADR-014's four states are a guarantee rather than a convention. Found during final verification; `f538015` lacked it. |
 | **QG-008** | New quality gate for resume processing and AI extraction |
 
 ## Partial
@@ -181,10 +182,12 @@ governs; this is a summary.
 |---|---|---|---|---|
 | **0** | Phase 0 — AgentOS engineering layer | `e8c68b7` | Direct commits before branch protection | **Stable** |
 | **1** | Week 1 — Foundation and Candidate Profile Schema | `2e79454` | PR #2, merged 2026-09-10 | **Stable** |
-| **2** | Week 2 — Resume Parser and Gemini Flash AI Service Layer | `91dd31d` | PR #4, merged 2026-09-10 | **Stable — current** |
+| **2** | Week 2 — Resume Parser and Gemini Flash AI Service Layer | `91dd31d` | PR #4, merged 2026-09-10 | **Stable** |
+| **3** | Week 3 — Job Schema, Adapters and Ingestion | `2cfd4f0` | PR #6 + PR #7, merged 2026-09-10 | **Stable — current** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
 **Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
+**Checkpoint 3 full SHA:** `2cfd4f0276b60de393ec604afc10b3c52f483ca7`
 
 ```
 main
@@ -194,8 +197,13 @@ main
   ├── 2e79454  Checkpoint 1 — Week 1 Foundation
   |                 ↑  PR #2  (feature/week-1-foundation, 11 commits)
   |
-  └── 91dd31d  Checkpoint 2 — Week 2 Resume Parser + Gemini Flash AI  <- current
-                    ↑  PR #4  (feature/week-2-resume-ai, 16 commits)
+  ├── 91dd31d  Checkpoint 2 — Week 2 Resume Parser + Gemini Flash AI
+  |                 ↑  PR #4  (feature/week-2-resume-ai, 16 commits)
+  |
+  ├── f538015  PR #6 — Week 3 implementation (NOT a checkpoint: defects found after merge)
+  |
+  └── 2cfd4f0  Checkpoint 3 — Week 3 Job Schema + Adapters + Ingestion  <- current
+                    ↑  PR #7  (verification repairs)
 ```
 
 Checkpoint 0 is the single commit `e8c68b7` — the state of `main` at the end of Phase 0 — not the
@@ -214,10 +222,9 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Human: review the Week 3 PR.** It must not be merged without explicit authorization,
-   regardless of CI status.
-2. On merge: verify `main`, then record **Checkpoint 3** with its exact commit SHA.
-3. **Await explicit instruction to begin Week 4.** No phase rolls into the next automatically.
+1. **Await explicit instruction to begin Week 4.** No phase rolls into the next automatically.
+2. Before deployment (Week 9 / QG-007): verify the migration chain against PostgreSQL.
+   `batch_alter_table` has only ever run on SQLite.
 
 **Outstanding integration step, not blocking the PR:** the Gemini provider has never run
 against the live service. Confirm the model identifier and exercise one real call before

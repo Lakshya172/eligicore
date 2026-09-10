@@ -290,6 +290,33 @@ unanticipated name fails too. When adding an operational table, add it to
 `ALLOWED_OPERATIONAL_TABLES` in `tests/conftest.py` *and* the CI guard, deliberately — the
 friction is the point.
 
+### D-20 · SQLAlchemy 2.0 `Enum(native_enum=False)` does NOT create a CHECK constraint
+`create_constraint` defaults to **False**, so the column is a bare `VARCHAR` and the database
+accepts any string. Found only by trying to insert `status='NOT_A_STATE'` — it committed.
+**Why it matters:** an enum you believe is enforced but is not gives false confidence. A typo
+in a future write path surfaces at read time, once the data is already wrong.
+**What to do:** pass `create_constraint=True` explicitly on every `Enum` column, and *test the
+rejection* rather than trusting the declaration. Note that Alembic does **not** autogenerate
+CHECK constraint changes, so adding an enum member later needs a hand-written migration —
+`alembic check` will not catch it.
+
+### D-21 · Never amend a migration that has been merged
+The instinct on finding the missing constraint was to fix `54a85d64881e` in place. That is
+wrong once it is on `main`: a database already stamped at that revision never receives the
+change, while a fresh database gets a different schema from the same revision id. Two
+databases claiming one revision with different schemas is exactly what Alembic exists to
+prevent.
+**What to do:** add a follow-up migration and leave the shipped one byte-identical. Verify
+*both* starting points converge — fresh, and already-at-the-previous-revision.
+
+### D-22 · A merge can land while verification is still running
+PR #6 was merged externally mid-verification, so two defects found afterwards were not on
+`main` and the branch silently became 3 commits ahead of a moved `main`.
+**What to do:** re-read GitHub state at the *start* of every gate rather than trusting the
+previous report — `gh api repos/OWNER/REPO/pulls/N` for `merged`/`merge_commit_sha`, and
+compare `origin/main` against the SHA the report claimed. A checkpoint should be recorded at
+the commit that was actually verified, not the one that happened to merge first.
+
 ---
 
 ## Lessons
