@@ -6,7 +6,8 @@
 > **"Am I actually eligible for these roles, and why?"**
 
 [![Status](https://img.shields.io/badge/status-pre--release%20development-orange)](CHANGELOG.md)
-[![Phase](https://img.shields.io/badge/phase-Week%200%20of%2010-blue)](context/state.md)
+[![Phase](https://img.shields.io/badge/phase-Week%201%20of%2010-blue)](context/state.md)
+[![CI](https://github.com/Lakshya172/eligicore/actions/workflows/ci.yml/badge.svg)](https://github.com/Lakshya172/eligicore/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ---
@@ -47,7 +48,7 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 
 ## Project status
 
-**Pre-release development. Week 0 of a 10-week solo build. No product code yet.**
+**Pre-release development. Week 1 of a 10-week solo build.**
 
 This section is kept honest deliberately. Nothing is listed as implemented until it exists,
 runs, and is tested. The authoritative, always-current state lives in
@@ -55,16 +56,27 @@ runs, and is tested. The authoritative, always-current state lives in
 
 ### Implemented
 
+- **Application foundation** — FastAPI app, environment-based configuration, operational
+  database base (engine, session factory, declarative base), Alembic environment
+- **Candidate profile schema** — universal profile supporting multiple education records, each
+  preserving its own grading scale
+- **`POST /api/v1/candidates/validate`** — validates a profile and reports gaps as issues rather
+  than rejecting them
+- **`POST /api/v1/candidates/normalize`** — canonicalizes skills, cleans text fields, and
+  produces a scale-independent view of each grade
+- **`GET /api/v1/health`** — liveness
+- **86 tests**, running offline with no credentials
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
-- Repository workflow: branching, conventional commits, PR standard, checkpoint discipline
+- Repository workflow: branching, conventional commits, PR standard, CI, checkpoint discipline
 
-*No application code has been written yet.*
+Both candidate endpoints are stateless. Nothing is stored: there is no `candidates` table, and a
+test asserts none exists.
 
 ### Planned — the 10-week build
 
 | Week | Deliverable | Status |
 |---|---|---|
-| 1 | Foundation, config, database base, candidate profile schema, stateless validate/normalize endpoints | Not started |
+| 1 | Foundation, config, database base, candidate profile schema, stateless validate/normalize endpoints | **Complete** |
 | 2 | Resume parser and AI provider abstraction | Not started |
 | 3 | Job schema, source adapters, ingestion, deduplication | Not started |
 | 4 | Eligibility engine — deterministic rules plus AI for ambiguity | Not started |
@@ -192,8 +204,6 @@ unexplainable score is self-defeating.
 ---
 
 ## Development setup
-
-> No application code exists yet. These instructions become runnable at the Week 1 checkpoint.
 
 ```bash
 git clone https://github.com/Lakshya172/eligicore.git

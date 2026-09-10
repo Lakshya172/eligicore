@@ -134,6 +134,59 @@ parity because SQLite tests pass. Prefer portable column types.
 
 ---
 
+## Implementation discoveries
+
+### D-1 · Pydantic enum validators must run in `mode="before"` to accept explicit `null`
+Found in Week 1. `@field_validator("scale")` defaults to *after* mode, which runs only once
+enum coercion has already succeeded — so `{"scale": null}` raised a 422 before the validator
+could map it to `UNKNOWN`. A test caught it.
+**Why it matters:** semantically `"scale": null` and an omitted `scale` say the same thing —
+the scale is not known. Rejecting one and accepting the other is an arbitrary distinction that
+would surface as a confusing client error.
+**What to do:** any validator normalizing `None` into an enum member needs
+`@field_validator(..., mode="before")`. This will recur for every UNKNOWN-bearing enum, and
+Week 4 introduces several.
+
+### D-2 · FastAPI's default 422 echoes the submitted value, and `ctx` leaks too
+`RequestValidationError.errors()` includes an `input` key holding the exact rejected value, and
+Pydantic embeds offending values inside `ctx` for several error types.
+**Why it matters:** the direct route to a candidate's email or name landing in a caller's log or
+error tracker (INV-4). This is the highest-probability PII leak in the application.
+**What to do:** the custom handler in `app/main.py` drops **both** `input` and `ctx`, keeping
+only `loc`, `type` and `msg`. Do not "simplify" it back to passing `exc.errors()` through.
+Three tests guard this with marker strings — top level, unknown field, and nested.
+
+### D-3 · Naive punctuation stripping merges C, C++ and C#
+The skill lookup key strips separators so `React.js` and `ReactJS` collapse. Stripping *all*
+punctuation would collapse `C++` and `C#` into `C` — three genuinely different skills becoming
+one, which would corrupt match scoring in Week 5.
+**What to do:** `_SKILL_LOOKUP_STRIP` deliberately preserves `+` and `#`. There is a test.
+Adding a language whose name carries punctuation needs the same care.
+
+### D-4 · `alembic check` is a cheap INV-1 guard
+It reports "No new upgrade operations detected" only when no model registers a table that the
+database lacks. With zero models it proves the operational database is empty.
+**What to do:** it runs in CI. Once real models exist (Week 3) it stops being an emptiness proof
+and becomes a drift check — still useful, but the personal-data guard then rests on the explicit
+`Base.metadata` assertion in CI and on QG-005.
+
+### D-5 · Grade normalization must clamp, not raise
+`normalize_profile` runs on profiles that `validate_profile` would flag — 8.2 on a 4-point scale,
+for instance. An out-of-range grade is reported as `GRADE_EXCEEDS_SCALE`, but normalization is a
+separate endpoint and must not crash on the same input.
+**What to do:** `normalize_grade` clamps the fraction to 1.0. The error is surfaced by
+validation, not by an exception in normalization.
+
+### D-6 · GitHub over HTTPS on this machine fails intermittently with `SEC_E_UNTRUSTED_ROOT`
+A `git push` failed with a schannel untrusted-root error, and `gh api` failed with x509
+simultaneously; an immediate retry of both succeeded with no configuration change. Suggests an
+intercepting proxy or AV TLS scanner that is occasionally slow to present its chain.
+**What to do:** retry once before investigating. **Do not** disable TLS verification
+(`http.sslVerify=false`) or add a CA to work around it — that is a real security downgrade in
+exchange for a transient failure.
+
+---
+
 ## Lessons
 
 *(Empty. Populate from real incidents — what broke, why, and what prevents a repeat. An entry

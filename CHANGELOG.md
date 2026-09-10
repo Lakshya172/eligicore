@@ -18,9 +18,58 @@ Nothing pending.
 
 ---
 
+## Checkpoint 1 — Week 1: Foundation and Candidate Profile Schema
+
+**Date:** 2026-09-10 · **Produced by:** PR #2 (`feature/week-1-foundation`) · **Tests:** 86 passing
+**Commit on `main`:** _recorded when PR #2 merges._ Until then this checkpoint is **pending**, not stable.
+
+First product implementation phase. A running FastAPI application, the operational database
+foundation, the universal candidate profile schema, and two stateless candidate endpoints.
+
+### Added
+
+- **Application foundation** — `app/config.py` (`ELIGICORE_`-prefixed settings via
+  pydantic-settings), `app/database.py` (engine, session factory, declarative `Base`),
+  `app/main.py` (application, request-context middleware, sanitized error handlers)
+- **Candidate profile schema** — `app/schemas/candidate.py`. Multiple education entries, each
+  carrying its own `GradeScale`. `UNKNOWN` is a first-class scale value, never inferred.
+- **Normalization service** — `app/services/candidate_normalizer.py`. Skill canonicalization,
+  scale-independent grade fractions, gap reporting. No web-framework dependency.
+- **Endpoints** — `POST /api/v1/candidates/validate`, `POST /api/v1/candidates/normalize`,
+  `GET /api/v1/health`
+- **Alembic** — environment initialized and wired to application settings. No migration, because
+  Week 1 creates no tables.
+- **Tests** — 86, including 9 privacy tests. The unknown-scale rule and the PII-echo guard were
+  mutation-verified: deliberately breaking each makes the relevant tests fail.
+- **CI** — GitHub Actions: install → import check → no-personal-data-table guard →
+  `alembic check` → `pytest`. Runs with no credentials configured.
+- **Repository** — `.gitattributes`, `.env.example`, `requirements.txt`, `pytest.ini`
+
+### Privacy
+
+- No `candidates`, `applications` or `evaluations` table exists or is registered, verified by test
+- The 422 handler drops Pydantic's `input` and `ctx`, which would otherwise echo submitted
+  candidate values back to the caller
+- Request logs carry request id, method, path, status and duration only
+
+### Fixed
+
+- `GradeScale` validator moved to `mode="before"` so an explicit `"scale": null` resolves to
+  `UNKNOWN` instead of raising a 422. Semantically identical to omitting the field.
+
+### Not included
+
+Resume parsing, AI providers, job ingestion, eligibility evaluation, matching, application
+preparation, frontend, authentication, deployment.
+
+---
+
 ## Checkpoint 0 — Phase 0: Engineering environment initialized
 
-**Date:** 2026-09-10 · **Branch:** `main`
+**Date:** 2026-09-10 · **Commit on `main`:** `e8c68b7` · **Status:** Stable
+Built over two commits (`7f7abbb`, then `e8c68b7`). The checkpoint is the end state,
+`e8c68b7` — a single commit, not the range. CI and tests read n/a: neither existed yet,
+because Phase 0 contained no product code.
 
 The AgentOS engineering layer, the repository standard, and the two architectural contradiction
 rulings. **No product code.**
