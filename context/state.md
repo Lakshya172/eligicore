@@ -12,15 +12,15 @@
 | Field | Value |
 |---|---|
 | **Date** | 2026-09-10 |
-| **Phase** | **Week 2 — Resume Parser and AI Service Layer · COMPLETE** |
-| **Roadmap position** | Weeks 1–2 complete and merged. **Week 3 NOT started.** |
-| **Health** | 🟢 GREEN — 203 tests passing on `main`, CI green, no open blockers |
+| **Phase** | **Week 3 — Job Schema, Adapters and Ingestion · implementation complete, PR open** |
+| **Roadmap position** | Weeks 1–2 merged. Week 3 implemented, awaiting review. **Week 4 NOT started.** |
+| **Health** | 🟢 GREEN — 318 tests passing, no open blockers |
 | **Stable branch** | `main` |
 | **Stable branch** | `main` |
 | **Current checkpoint** | **Checkpoint 2** — `91dd31d50e7749ad37acf14babd5d1ee90141abd` |
 | **Produced by** | PR #4, **MERGED** 2026-09-10 |
 | **Rollback target** | Checkpoint 2 first; Checkpoint 1 (`2e79454`) remains available |
-| **Next milestone** | Week 3: job schema, adapters and ingestion — **not started, not authorized** |
+| **Next milestone** | Week 4: eligibility engine — **not started, not authorized** |
 | **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
@@ -50,6 +50,13 @@
 | **Week 2 — endpoint** | `POST /api/v1/resumes/parse` — stateless, file deleted after processing on both paths |
 | **Week 2 — tests** | 117 new (203 total). Week 1's 86 unchanged and passing. Suite runs offline with no API key. |
 | **Week 2 — privacy fix** | pdfminer logged resume text at DEBUG; library loggers now pinned at WARNING with propagation off. Found by test, mutation-verified. |
+| **Week 3 design decisions** | `ADR-014` job status model, `ADR-015` ingestion state (closes D-4), `ADR-016` local store recorded-not-built. Four dossier tensions reconciled without overriding it (C-5..C-8). |
+| **Week 3 — operational models** | `app/models/job.py`, `app/models/ingestion_state.py` — the first tables. Migration `54a85d64881e`, verified upgrade/downgrade/re-upgrade with data. |
+| **Week 3 — adapters** | `JobSourceAdapter` interface (`is_authoritative` defaults False), `CuratedJobAdapter`, 5 synthetic curated jobs |
+| **Week 3 — normalization + hashing** | `app/services/job_normalizer.py` — canonicalized dedup per dossier §10.2, never raw text |
+| **Week 3 — ingestion** | `app/services/job_ingestion.py` — dedup, upsert, disappearance→CLOSED, one state row per source |
+| **Week 3 — jobs API** | `GET /api/v1/jobs`, `GET /api/v1/jobs/{id}` — minimal filters only |
+| **Week 3 — tests** | 115 new (318 total). Weeks 1–2's 203 unchanged. Three mutations verified. |
 | **QG-008** | New quality gate for resume processing and AI extraction |
 
 ## Partial
@@ -59,6 +66,7 @@
 | Skill alias map (`app/services/candidate_normalizer.py`) | A deliberate **seed** of ~60 common variants, not an ontology. Extend it as real resumes reveal real variants. Unknown skills pass through with their casing intact. |
 | Operational database | Foundation only — engine, session factory, `Base`. No models, no migrations. First table is the job catalogue in Week 3. |
 | `get_db()` dependency | Written and exercised by no endpoint. Week 1 and 2 endpoints are stateless by design; it exists so Week 3 has a session source. |
+| **Jobs API trigger for ingestion** | `POST /api/v1/jobs/ingest` is in dossier §11 but **not** in the approved Week 3 API scope. Ingestion is implemented and tested as a service; no trigger endpoint is exposed. Deferred, not dropped. |
 | **Gemini provider** | Implemented and fully tested through `httpx.MockTransport`, but **never executed against the live Gemini service** — no API key exists in this environment and the suite must run without one. The default model identifier is a configured default, not a verified one (ADR-013 § Unverified). First live use is an outstanding integration step. |
 | **Traceability checking** | Covers skills only. Free-text fields (job descriptions, project summaries) are legitimately paraphrased during extraction and cannot be verified by substring matching. Documented in the service docstring as a known limitation. |
 | **spaCy fallback** | Not implemented. The dossier lists it as a deterministic cost-saver for predictable fields (emails, phones, dates). Currently every parse makes an AI call. Deferred, not forgotten. |
@@ -67,9 +75,7 @@
 
 | Component | Roadmap week | Status |
 |---|---|---|
-| First Alembic **migration** (none needed yet — no tables until Week 3) | 3 | NOT STARTED |
 | spaCy deterministic fallback extraction (cost-saver, dossier §9) | 2 (deferred) | NOT STARTED |
-| Job model, base adapter, manual adapter, ingestion, dedup | 3 | NOT STARTED |
 | Eligibility engine (deterministic stage) | 4 | NOT STARTED |
 | Eligibility engine (AI ambiguity stage) | 4 | NOT STARTED |
 | Matching engine (skill normalization, TF-IDF, cosine) | 5 | NOT STARTED |
@@ -86,17 +92,17 @@ demoable. Weeks 7–10 are enhancement.
 
 ## Next approved phase
 
-**Week 3 — Job Schema, Adapters and Ingestion.** **Not started, and not authorized to start** —
-implementation begins only on explicit instruction.
+**Week 4 — Eligibility Engine.** **Not started, and not authorized to start.**
 
-Expected scope: `app/models/job.py` and `app/models/ingestion_state.py` (the first operational
-tables, and the first Alembic migration), `app/adapters/base_adapter.py` and
-`manual_adapter.py`, `app/data/curated_jobs.json`, and the `/api/v1/jobs` endpoints.
+This is the phase the whole project exists for, and the one with the least room for error:
+deterministic hard constraints evaluated first with final authority, AI only for genuine
+ambiguity, and `UNKNOWN`/`NEEDS_REVIEW` wherever evidence is absent (ADR-003, INV-2, INV-3).
 
-Open decision due at Week 3: **D-4** — whether `ingestion_state` needs its own deduplication
-hash ledger given `jobs.content_hash` is already the canonical dedup index (ADR-012).
+Week 3 deliberately left it the raw material rather than pre-empting it: `min_cgpa_scale` is
+stored exactly as a source states it and is never inferred, so a job with an unstated scale
+must resolve to `UNKNOWN` rather than an assumed 10-point comparison.
 
-Reviewers: architect + security + qa. Gates: QG-001, QG-004, QG-006.
+Gates: QG-001, QG-002 (no warning tier), QG-004. Reviewers: architect + ai + qa.
 
 **No implementation may begin without explicit human approval of the specific step.**
 
@@ -208,13 +214,14 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Await explicit instruction to begin Week 3.** No phase rolls into the next automatically.
-2. Before Week 3: settle **D-4** — whether `ingestion_state` needs its own deduplication hash
-   ledger given `jobs.content_hash` is already the canonical dedup index (ADR-012).
+1. **Human: review the Week 3 PR.** It must not be merged without explicit authorization,
+   regardless of CI status.
+2. On merge: verify `main`, then record **Checkpoint 3** with its exact commit SHA.
+3. **Await explicit instruction to begin Week 4.** No phase rolls into the next automatically.
 
 **Outstanding integration step, not blocking the PR:** the Gemini provider has never run
 against the live service. Confirm the model identifier and exercise one real call before
 relying on live extraction.
 
-**Weeks 3–10 have not started.** No Week 3 branch exists. No job ingestion, eligibility, matching, recommendations or
-application preparation code exists anywhere in the repository.
+**Weeks 4–10 have not started.** No Week 4 branch exists. No eligibility, matching, recommendations or application
+preparation code exists anywhere in the repository.

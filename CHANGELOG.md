@@ -12,9 +12,48 @@ dossier considers the system complete and demoable. No release is claimed before
 
 ---
 
-## [Unreleased]
+## [Unreleased] — Week 3: Job Schema, Adapters and Ingestion
 
-Nothing pending.
+**Branch:** `feature/week-3-jobs-ingestion` · **Tests:** 318 passing (203 from Weeks 1–2, unchanged)
+**Status:** implementation complete, PR open. **Not a checkpoint until merged and verified.**
+
+### Added
+
+- **Operational models** — `Job` and `IngestionState`, the first tables in the project
+- **Migration `54a85d64881e`** — the entire server-side schema; verified upgrade, downgrade,
+  re-upgrade, and upgrade against a database holding data
+- **Adapter layer** — `JobSourceAdapter` interface and `CuratedJobAdapter`, with 5 synthetic
+  curated jobs
+- **Normalization and canonical hashing** — `app/services/job_normalizer.py`, implementing the
+  dossier §10.2 deduplication rule over canonicalized fields rather than raw posting text
+- **Ingestion** — `app/services/job_ingestion.py`: dedup, upsert, authoritative-disappearance
+  handling, and one `ingestion_state` row per source
+- **Jobs API** — `GET /api/v1/jobs` and `GET /api/v1/jobs/{id}`, with only the filters Weeks 4–5
+  justify
+- 115 new tests
+
+### Decided
+
+- **ADR-014** Job status: the dossier's four-state enum is stored, `is_active` is derived
+- **ADR-015** `ingestion_state`: one row per source, no run log, no hash ledger (closes D-4)
+- **ADR-016** Phase 1 local personal-data store at `~/.eligicore/` — **recorded, not implemented**
+
+### Changed
+
+- Privacy guards moved from "zero tables" to an **allowlist**. The old assertion held only
+  because no table existed; an allowlist is stricter, catching a personal-data table under any
+  unanticipated name.
+
+### Known limitations
+
+- `POST /api/v1/jobs/ingest` is in the dossier but not in the approved Week 3 API scope.
+  Ingestion is implemented and tested as a service; no trigger endpoint is exposed.
+- No PostgreSQL run yet — the migration is portable by construction but verified only on SQLite.
+
+### Not included
+
+Eligibility, matching, recommendations, application preparation, export, frontend, scraping,
+authentication.
 
 ---
 
