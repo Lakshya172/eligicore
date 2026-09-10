@@ -203,6 +203,52 @@ documentation by the same PR that produces it — the SHA does not exist until t
 (`enforce_admins` is false) to push the record straight to `main` — the bypass existing is not a
 reason to use it.
 
+### D-9 · pdfminer logs the entire resume at DEBUG level
+Found in Week 2 by a privacy test, not by inspection. pdfminer — which pdfplumber sits on —
+logs the contents of every text-showing operator at DEBUG. That is the literal resume text,
+line by line.
+**Why it matters:** no application log statement is involved. Raising the root log level to
+DEBUG, in production or while chasing an unrelated bug, would dump candidate data into the
+logs. A direct INV-4 violation reachable with zero code changes.
+**What to do:** `app/services/resume_parser.py` pins `pdfminer`, `pdfplumber` and `docx`
+loggers at WARNING with `propagate = False`. Do not remove it. **Apply the same treatment to
+any future library that touches document or candidate content** — assume a third-party
+library logs its input until proven otherwise, and add a test rather than trusting it.
+
+### D-10 · `caplog.at_level("DEBUG")` with no logger argument captures everything
+The privacy test that caught D-9 only caught it because it captured *all* loggers rather than
+just `eligicore`.
+**Why it matters:** a privacy test scoped to your own logger proves only that *you* did not
+log the secret. The leak is usually somewhere else.
+**What to do:** privacy log tests stay unscoped. Scoping them to `eligicore` would have made
+the suite green and shipped the leak.
+
+### D-11 · Windows temp files must be closed before unlinking
+`NamedTemporaryFile(delete=True)` cannot be reopened by another library on Windows, and an
+open handle blocks deletion.
+**What to do:** `delete=False`, write, `close()`, read with the library, then `unlink` in a
+`finally`. Tested on both the success and the failure path (INV-11). Development is Windows
+and deployment is Linux, so this differs between the two and a success-path-only test would
+pass on both while leaking on neither reliably.
+
+### D-12 · Stripping all punctuation merges C, C++ and C# — and the same trap appears in skill traceability
+Already recorded as D-3 for skill normalization; Week 2's traceability check normalizes text
+the same way and hit it again.
+**What to do:** any comparison that strips punctuation from a technology name needs the same
+care. Preserve `+` and `#`.
+
+### D-13 · An httpx exception message can echo the request body
+`httpx.HTTPError` string representations may include the URL and, for some error types, the
+request content. The request content here is a prompt containing resume text.
+**What to do:** the Gemini provider never includes `str(exc)` in an error it raises — only
+`type(exc).__name__`. Same rule for Pydantic `ValidationError`, whose detail embeds the
+offending values; the provider reports `exc.error_count()` instead. Both have tests.
+
+### D-14 · FastAPI file uploads need `python-multipart` and fail at import time without it
+Not at request time — the app will not import at all.
+**What to do:** it is pinned in `requirements.txt`. Any future endpoint accepting `File` or
+`Form` depends on it.
+
 ---
 
 ## Lessons
