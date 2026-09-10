@@ -185,6 +185,24 @@ intercepting proxy or AV TLS scanner that is occasionally slow to present its ch
 (`http.sslVerify=false`) or add a CA to work around it — that is a real security downgrade in
 exchange for a transient failure.
 
+### D-7 · Verify a merge with the REST API, not `gh pr view --json merged`
+`gh` 2.97.0 rejects `merged` as a JSON field (`Unknown JSON field: "merged"`), and
+`gh pr merge` succeeds silently with no output. `gh pr view --json state` alone is not proof
+either — it returns `CLOSED` for both a merged and an abandoned PR.
+**Why it matters:** claiming "merged" on the strength of a local `git log` or a silent command
+is exactly the kind of unverified success this project's process exists to prevent.
+**What to do:** `gh api repos/OWNER/REPO/pulls/N` returns `merged`, `merged_at`, `merged_by` and
+`merge_commit_sha`. Confirm `merge_commit_sha` equals `main` HEAD after pulling.
+
+### D-8 · Recording a checkpoint SHA needs its own PR, by construction
+`main` is protected and requires a PR, so the merge commit's SHA cannot be written into the
+documentation by the same PR that produces it — the SHA does not exist until the merge happens.
+**Why it matters:** it is not a process failure, it is inherent. Expect one small follow-up
+`docs/checkpoint-N-record` PR after every phase merge.
+**What to do:** keep that PR to documentation only. Do not use the admin bypass
+(`enforce_admins` is false) to push the record straight to `main` — the bypass existing is not a
+reason to use it.
+
 ---
 
 ## Lessons
