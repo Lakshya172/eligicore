@@ -21,8 +21,8 @@ project:
   api_namespace: /api/v1
   env_prefix: ELIGICORE_
   database_name: eligicore
-  phase: "Week 4 — Eligibility Engine (PR 4A merged, Checkpoint 4A; PR 4B not started)"
-  next_approved_phase: "Week 4 PR 4B — AI field-relatedness stage (approved, not started)"
+  phase: "Week 4 — Eligibility Engine (PR 4A merged, Checkpoint 4A; PR 4B in review)"
+  next_approved_phase: "Week 4 PR 4B review and merge decision; then final Checkpoint 4"
   source_of_truth: EligiCore_Dossier_update.md
   ai_provider_phase_1: gemini-flash   # ADR-013. Concrete implementation, not a dependency.
   vcs:

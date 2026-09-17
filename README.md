@@ -51,8 +51,8 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 **Pre-release development. Week 4 of a 10-week solo build — in progress.**
 
 Current stable checkpoint: **Checkpoint 4A** (`4a5cb84`) — an intermediate checkpoint for Week 4's
-deterministic eligibility engine. The AI stage for ambiguous fields (PR 4B) has not started, and the
-final Week 4 checkpoint is not yet established.
+deterministic eligibility engine. The AI stage for ambiguous fields (PR 4B) is in review and not
+merged, and the final Week 4 checkpoint is not yet established.
 
 > **Not production-ready.** The Gemini Flash provider has not been exercised against the live
 > API — no key is configured and the test suite runs without one. The provider contract is
@@ -75,9 +75,9 @@ runs, and is tested. The authoritative, always-current state lives in
 - **`POST /api/v1/resumes/parse`** — parses a PDF or DOCX resume into a structured profile with per-field confidence. The uploaded file is deleted after processing, on both the success and failure paths.
 - **AI provider abstraction** — one interface, a mandatory deterministic mock, and a Google Gemini Flash implementation for Phase 1. Swapping providers is a configuration change.
 - **`GET /api/v1/jobs`, `GET /api/v1/jobs/{id}`** — the job catalogue, ingested from a pluggable source adapter with canonical deduplication. Closed postings are kept and stay retrievable with their reason, never deleted.
-- **`POST /api/v1/eligibility/check`** — evaluates a supplied profile against up to 50 catalogue jobs' stated requirements (minimum CGPA, graduation year window, backlog limit, minimum qualification level, permitted fields) and returns a verdict with a per-requirement breakdown. Deterministic only so far: a field of study that is not an exact match stays `UNKNOWN`. Nothing is stored.
+- **`POST /api/v1/eligibility/check`** — evaluates a supplied profile against up to 50 catalogue jobs' stated requirements (minimum CGPA, graduation year window, backlog limit, minimum qualification level, permitted fields) and returns a verdict with a per-requirement breakdown. A field of study that is not an exact match is judged by an AI provider — sent only the field and the permitted fields — and the result is labelled `ai_reasoning`, capped at MEDIUM confidence, and can never make a candidate `NOT_ELIGIBLE`. Nothing is stored.
 - **`GET /api/v1/health`** — liveness
-- **524 tests**, running offline with no credentials and no network
+- **615 tests**, running offline with no credentials and no network
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
 - Repository workflow: branching, conventional commits, PR standard, CI, checkpoint discipline
 
@@ -93,7 +93,7 @@ asserts none exists. Uploaded resumes exist only for the duration of processing.
 | 1 | Foundation, config, database base, candidate profile schema, stateless validate/normalize endpoints | **Complete** |
 | 2 | Resume parser and AI provider abstraction | **Complete** |
 | 3 | Job schema, source adapters, ingestion, deduplication | **Complete** |
-| 4 | Eligibility engine — deterministic rules plus AI for ambiguity | **In progress** — deterministic engine complete (PR #9, Checkpoint 4A); AI stage not started |
+| 4 | Eligibility engine — deterministic rules plus AI for ambiguity | **In progress** — deterministic engine complete (PR #9, Checkpoint 4A); AI stage in review (PR 4B) |
 | 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | Not started |
 | 6 | **Polish, Excel export, testing — complete demoable MVP** | Not started |
 | 7 | Application preparation with truthfulness validation | Not started |

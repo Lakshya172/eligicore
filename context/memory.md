@@ -336,6 +336,21 @@ Verified for migration `b3e8d2c61a47`: after upgrade the recreated `jobs` table 
 `jobstatus` and `jobtype`, and downgrade (drop constraint, then column) leaves both intact. Do not
 assume it for other batch operations — read `sqlite_master` after each new batch migration.
 
+### D-26 · A surviving mutant is either an equivalent mutant or an untested guard — decide which
+PR 4B's first mutation run left two survivors. One was equivalent: `UNCERTAIN` returns before the
+mutated line, so the mutant could not change behaviour — replace it with a mutation that can.
+The other was a real gap: the empty-permitted-fields guard in `ai_inputs` is unreachable through
+the engine, which never marks such a requirement ambiguous.
+**What to do:** never "fix" a survivor by deleting the mutation. Prove it equivalent, or test the
+guard on hand-built input the upstream code would never produce (see D-24).
+
+### D-27 · A lazy provider keeps misconfiguration from breaking requests that need no AI
+`get_ai_service()` builds the provider eagerly, and Gemini without a key raises at construction.
+For eligibility that would fail every request — including those with no ambiguous field.
+**What to do:** endpoints where AI is occasional use `get_lazy_ai_service()`; a build failure is
+remembered for the request and fails closed to `UNKNOWN`. Verified live with Gemini selected and
+no key: HTTP 200, the ambiguous entry `AI_ASSESSMENT_UNAVAILABLE`, deterministic verdicts intact.
+
 ---
 
 ## Lessons

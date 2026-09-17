@@ -1,8 +1,10 @@
 """Eligibility endpoint.
 
 HTTP concerns only (INV-7): validate the request, load the requested jobs from the public
-catalogue, call the engine, return its result. Every rule lives in
-:mod:`app.services.eligibility_engine`.
+catalogue, call the eligibility service, return its result. Every rule lives in
+:mod:`app.services.eligibility_engine`; the AI ambiguity stage lives in
+:mod:`app.services.eligibility_ai` and receives a lazily built AI service, so a request that
+needs no AI never constructs a provider (ADR-019).
 
 **Stateless** (ADR-002). The profile arrives in the body and leaves in nothing but the
 response. The database is read — the job catalogue is public operational data — and never
@@ -17,6 +19,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai.ai_service import AIService, get_lazy_ai_service
 from app.database import get_db
 from app.models.job import Job
 from app.schemas.eligibility import (
@@ -25,7 +28,7 @@ from app.schemas.eligibility import (
     EligibilityCheckResponse,
 )
 from app.schemas.job import JobRead
-from app.services.eligibility_engine import check_eligibility
+from app.services.eligibility_ai import check_eligibility_with_ai
 
 router = APIRouter(prefix="/eligibility", tags=["eligibility"])
 
@@ -43,6 +46,12 @@ router = APIRouter(prefix="/eligibility", tags=["eligibility"])
         "computed.\n\n"
         "Each requirement is `PASS`, `FAIL` or `UNKNOWN`. Missing or invalid data is "
         "`UNKNOWN` — never a failure. Grades are compared only on the same grading scale.\n\n"
+        "**AI is used for one thing only:** when a field of study is present but not an exact "
+        "match for a permitted field, and no deterministic requirement failed, an AI provider "
+        "judges whether the fields are related. Only the field of study and the permitted "
+        "fields are sent. Such entries carry `method: ai_reasoning` and at most MEDIUM "
+        "confidence. An AI judgement can make a verdict `LIKELY_ELIGIBLE` or `NEEDS_REVIEW`, "
+        "never `NOT_ELIGIBLE`; if the AI is unavailable the entry is `UNKNOWN`.\n\n"
         "Verdicts, in precedence order: any verified deterministic failure → `NOT_ELIGIBLE`; "
         "nothing verifiable → `UNKNOWN`; anything unresolved → `NEEDS_REVIEW`; all passed → "
         "`ELIGIBLE` (or `LIKELY_ELIGIBLE` once AI reasoning contributed).\n\n"
@@ -56,8 +65,11 @@ router = APIRouter(prefix="/eligibility", tags=["eligibility"])
 async def check(
     request: EligibilityCheckRequest,
     db: Annotated[Session, Depends(get_db)],
+    ai_service: Annotated[AIService, Depends(get_lazy_ai_service)],
 ) -> EligibilityCheckResponse:
-    """Load the requested jobs and delegate evaluation to the engine."""
+    """Load the requested jobs and delegate evaluation to the eligibility service."""
     jobs = db.execute(select(Job).where(Job.id.in_(request.job_ids))).scalars().all()
     jobs_by_id = {job.id: JobRead.model_validate(job) for job in jobs}
-    return check_eligibility(request.profile, request.job_ids, jobs_by_id)
+    return await check_eligibility_with_ai(
+        request.profile, request.job_ids, jobs_by_id, ai_service
+    )

@@ -14,7 +14,38 @@ dossier considers the system complete and demoable. No release is claimed before
 
 ## [Unreleased]
 
-Nothing pending. **Week 4 PR 4B (AI field-relatedness stage) is approved and not started.**
+### Week 4 — PR 4B: AI-assisted field relatedness *(in review, not merged)*
+
+#### Added
+
+- **`AIProvider.assess_field_relatedness(field_of_study, allowed_fields)`** returning a strictly
+  validated `FieldRelatednessAssessment` (`RELATED` / `NOT_RELATED` / `UNCERTAIN`, confidence,
+  reason). Implemented by the mock — `UNCERTAIN`/LOW by default — and by Gemini through the
+  existing httpx transport with a new prompt file.
+- **`app/services/eligibility_ai.py`** — the second stage. Consults AI only for a non-exact field
+  of study on a job with no verified hard failure; de-duplicates identical questions per request;
+  at most 4 concurrent calls. `POST /api/v1/eligibility/check` uses it; the API shape is unchanged.
+- **Lazy AI service** (`AIService(builder=...)`, `get_lazy_ai_service`) — requests needing no AI
+  never construct a provider.
+- Reason codes `AI_FIELD_RELATED`, `AI_FIELD_NOT_RELATED`, `AI_ASSESSMENT_INCONCLUSIVE`,
+  `AI_ASSESSMENT_UNAVAILABLE`.
+- **91 new tests** (615 total), including literal zero-call and zero-construction assertions and
+  captured-request privacy checks. 27 mutations, all caught.
+
+#### Changed
+
+- `ENGINE_VERSION` 1 → 2: an ambiguous field may now resolve to `LIKELY_ELIGIBLE` or
+  `NEEDS_REVIEW` with an AI-reasoned entry.
+
+#### Decided
+
+- **ADR-019** AI-assisted field relatedness. **C-14:** empty `allowed_fields` stays omitted.
+
+#### Known limitations
+
+- Gemini's relatedness call has not been exercised against the live service.
+- AI "related" judgements are the provider's interpretation; they are labelled `ai_reasoning`,
+  capped at MEDIUM, and never make a verdict `ELIGIBLE`.
 
 ---
 

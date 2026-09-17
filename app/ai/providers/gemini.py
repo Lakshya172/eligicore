@@ -14,9 +14,10 @@ ADR-013 § Sub-decision.
 the test suite runs without one, so the request shape follows the documented REST contract
 but has not been exercised end to end. See ADR-013 § Unverified.
 
-Privacy: the prompt sent to Gemini contains resume text, and the response contains candidate
-data. **Neither is ever logged** (INV-4). Logging in this module is confined to provider
-name, model, status category and timing.
+Privacy: the resume-extraction prompt contains resume text, and its response contains
+candidate data. The field-relatedness prompt contains only a field of study and a job's
+permitted fields (ADR-019). **No prompt or response is ever logged** (INV-4). Logging in
+this module is confined to provider name, model, status category and timing.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ from app.ai.errors import (
 )
 from app.ai.prompts import load_prompt
 from app.ai.providers.base import AIProvider
+from app.schemas.eligibility import FieldRelatednessAssessment
 from app.schemas.resume import ResumeExtraction
 
 logger = logging.getLogger("eligicore.ai.gemini")
@@ -96,8 +98,21 @@ _RESPONSE_SCHEMA: dict[str, Any] = {
 }
 
 
+#: Response schema for field relatedness. Three fields, each constrained; the reply is still
+#: validated against FieldRelatednessAssessment on arrival.
+_RELATEDNESS_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "result": {"type": "STRING", "enum": ["RELATED", "NOT_RELATED", "UNCERTAIN"]},
+        "confidence": {"type": "STRING", "enum": _CONFIDENCE_ENUM},
+        "reason": {"type": "STRING"},
+    },
+    "required": ["result", "confidence", "reason"],
+}
+
+
 class GeminiFlashProvider(AIProvider):
-    """Structured resume extraction via the Gemini API."""
+    """Structured resume extraction and field-relatedness assessment via the Gemini API."""
 
     name = "gemini"
 
@@ -135,7 +150,45 @@ class GeminiFlashProvider(AIProvider):
         raw = await self._post_with_retries(payload)
         return self._parse_response(raw)
 
+    async def assess_field_relatedness(
+        self, field_of_study: str, allowed_fields: list[str]
+    ) -> FieldRelatednessAssessment:
+        """Judge whether a field of study falls within a job's permitted fields."""
+        payload = self._build_relatedness_payload(field_of_study, allowed_fields)
+        raw = await self._post_with_retries(payload)
+        data = self._response_object(raw)
+        try:
+            return FieldRelatednessAssessment.model_validate(data)
+        except ValidationError as exc:
+            raise AIResponseInvalidError(
+                "Gemini relatedness response failed schema validation "
+                f"({exc.error_count()} error(s))."
+            ) from exc
+
     # -- request ------------------------------------------------------------------------
+
+    def _build_relatedness_payload(
+        self, field_of_study: str, allowed_fields: list[str]
+    ) -> dict[str, Any]:
+        """Build the relatedness request body.
+
+        The prompt carries exactly two values: the field of study and the permitted fields.
+        They are serialized as a JSON data block rather than spliced into the instructions,
+        so a field of study written as an instruction is read as data (ADR-019).
+        """
+        prompt = load_prompt("field_relatedness")
+        data = json.dumps(
+            {"candidate_field_of_study": field_of_study, "allowed_fields": list(allowed_fields)},
+            ensure_ascii=False,
+        )
+        return {
+            "contents": [{"parts": [{"text": f"{prompt}\n{data}\n"}]}],
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "responseSchema": _RELATEDNESS_SCHEMA,
+                "temperature": 0.0,
+            },
+        }
 
     def _build_payload(self, resume_text: str) -> dict[str, Any]:
         """Build the request body.
@@ -241,6 +294,21 @@ class GeminiFlashProvider(AIProvider):
         outcome — never a silent pass and never an unhandled crash
         (``standards/ai.md`` §4).
         """
+        data = self._response_object(raw)
+        try:
+            return ResumeExtraction.model_validate(data)
+        except ValidationError as exc:
+            # error_count only. Pydantic's error detail embeds the offending values, which
+            # here are candidate data (INV-4).
+            raise AIResponseInvalidError(
+                f"Gemini response failed schema validation ({exc.error_count()} error(s))."
+            ) from exc
+
+    def _response_object(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Extract the single JSON object from a Gemini reply, or raise.
+
+        Shared by every operation; each then validates the object against its own model.
+        """
         candidates = raw.get("candidates")
         if not isinstance(candidates, list) or not candidates:
             # A blocked prompt returns no candidates. The block reason is a category, not
@@ -268,12 +336,4 @@ class GeminiFlashProvider(AIProvider):
 
         if not isinstance(data, dict):
             raise AIResponseInvalidError("Gemini response JSON was not an object.")
-
-        try:
-            return ResumeExtraction.model_validate(data)
-        except ValidationError as exc:
-            # error_count only. Pydantic's error detail embeds the offending values, which
-            # here are candidate data (INV-4).
-            raise AIResponseInvalidError(
-                f"Gemini response failed schema validation ({exc.error_count()} error(s))."
-            ) from exc
+        return data

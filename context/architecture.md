@@ -156,6 +156,9 @@ Their meanings and exact precedence are ruled in **ADR-017**: any deterministic 
 structured requirement stated → `ELIGIBLE`. All deterministic checks always run; the AI stage is
 closed to any job with a verified failure. Requirement inputs — same-scale-only grades,
 single-qualification selection, `min_degree_level`, exact-match fields — are ruled in **ADR-018**.
+The AI stage (**ADR-019**, `app/services/eligibility_ai.py`) acts only on field-of-study entries
+released by `ambiguous_requirements()`, sends only the field and the permitted fields, caps
+confidence at MEDIUM, fails closed to `UNKNOWN`, and can never produce `NOT_ELIGIBLE`.
 Implementation: `app/services/eligibility_engine.py`.
 
 **Confidence is orthogonal to eligibility.** It measures how much the system trusts its own

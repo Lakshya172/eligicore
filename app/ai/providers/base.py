@@ -3,7 +3,8 @@
 Every provider implements this. Nothing above this layer knows which one is configured
 (ADR-004, INV-5).
 
-The interface is deliberately narrow — one method, one task. A wide interface leaks the
+The interface is deliberately narrow — one method per task, each taking only what that task
+needs. A wide interface leaks the
 capabilities of whichever provider was implemented first, and the point of the abstraction
 is that swapping providers is a configuration change rather than a refactor.
 
@@ -16,6 +17,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from app.schemas.eligibility import FieldRelatednessAssessment
 from app.schemas.resume import ResumeExtraction
 
 
@@ -59,4 +61,30 @@ class AIProvider(ABC):
             AIProviderUnavailableError: Transport failure, timeout, or a 5xx response.
             AIProviderRejectedError: The provider refused the request.
             AIResponseInvalidError: The reply could not be validated into the schema.
+        """
+
+    @abstractmethod
+    async def assess_field_relatedness(
+        self, field_of_study: str, allowed_fields: list[str]
+    ) -> FieldRelatednessAssessment:
+        """Judge whether a field of study falls within a job's permitted fields.
+
+        The **only** eligibility question AI may answer (ADR-019). The signature is the
+        privacy boundary: it takes a field-of-study string and the permitted-field list, and
+        nothing else — no candidate identifier, profile, grade, year, backlog count or job
+        record can reach a provider through it.
+
+        Called only for an exact-match miss on a job with no verified hard failure; the
+        eligibility engine decides that, never the provider.
+
+        Args:
+            field_of_study: The candidate's stated field. Never logged.
+            allowed_fields: The job's permitted fields, as the catalogue states them.
+
+        Returns:
+            A validated assessment. ``UNCERTAIN`` is always an acceptable answer.
+
+        Raises:
+            AIConfigurationError, AIProviderUnavailableError, AIProviderRejectedError,
+            AIResponseInvalidError: As for :meth:`extract_resume`.
         """

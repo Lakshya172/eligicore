@@ -26,6 +26,7 @@ from app.ai.errors import (
 )
 from app.ai.providers.base import AIProvider
 from app.schemas.candidate import Confidence, GradeScale
+from app.schemas.eligibility import FieldRelatedness, FieldRelatednessAssessment
 from app.schemas.resume import (
     ExtractedEducation,
     ResumeExtraction,
@@ -59,13 +60,21 @@ _SCALE_BY_MAXIMUM = {
 class MockAIProvider(AIProvider):
     """A deterministic provider for tests and for unconfigured local runs.
 
+    **Field relatedness is conservative by default.** Unless a test pins an answer, the mock
+    returns ``UNCERTAIN`` at LOW confidence — which the eligibility engine reports as
+    ``UNKNOWN``. The mock is the runtime default provider, so a mock that said "related"
+    would hand real users a fabricated ``LIKELY_ELIGIBLE`` from an unconfigured deployment
+    (ADR-019).
+
     Args:
-        fail_with: Raise this error instead of extracting. Lets tests exercise provider
-            failure handling without a live provider.
+        fail_with: Raise this error from either method. Lets tests exercise provider failure
+            handling without a live provider.
         return_extraction: Return this exact extraction, bypassing pattern matching. Lets a
             test pin the AI's output precisely.
-        raise_invalid_response: Raise :class:`AIResponseInvalidError`, simulating a reply
-            that failed schema validation.
+        raise_invalid_response: Raise :class:`AIResponseInvalidError` from either method,
+            simulating a reply that failed schema validation.
+        return_relatedness: Return this exact field-relatedness assessment instead of the
+            conservative default.
     """
 
     name = "mock"
@@ -76,14 +85,21 @@ class MockAIProvider(AIProvider):
         fail_with: AIError | None = None,
         return_extraction: ResumeExtraction | None = None,
         raise_invalid_response: bool = False,
+        return_relatedness: FieldRelatednessAssessment | None = None,
     ) -> None:
         self._fail_with = fail_with
         self._return_extraction = return_extraction
         self._raise_invalid_response = raise_invalid_response
+        self._return_relatedness = return_relatedness
         self.call_count = 0
         #: Lengths of the texts this provider was asked to process. Lengths only — never
         #: the text, so an assertion about calls can never itself leak resume content.
         self.received_text_lengths: list[int] = []
+        #: Literal count of field-relatedness calls. Tests assert on it to prove the AI
+        #: stage was, or was not, reached (INV-2).
+        self.relatedness_call_count = 0
+        #: Number of permitted fields per relatedness call — counts, never the strings.
+        self.received_allowed_field_counts: list[int] = []
 
     @property
     def model(self) -> str:
@@ -106,6 +122,28 @@ class MockAIProvider(AIProvider):
             return self._return_extraction
 
         return self._extract(resume_text)
+
+    async def assess_field_relatedness(
+        self, field_of_study: str, allowed_fields: list[str]
+    ) -> FieldRelatednessAssessment:
+        """Return the pinned assessment, or the conservative ``UNCERTAIN`` default."""
+        self.relatedness_call_count += 1
+        self.received_allowed_field_counts.append(len(allowed_fields))
+
+        if self._fail_with is not None:
+            raise self._fail_with
+        if self._raise_invalid_response:
+            raise AIResponseInvalidError(
+                "Mock provider returned a response that failed schema validation."
+            )
+        if self._return_relatedness is not None:
+            return self._return_relatedness
+
+        return FieldRelatednessAssessment(
+            result=FieldRelatedness.UNCERTAIN,
+            confidence=Confidence.LOW,
+            reason="The mock provider makes no relatedness judgement unless one is configured.",
+        )
 
     # -- internals ----------------------------------------------------------------------
 
