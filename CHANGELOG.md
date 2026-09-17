@@ -14,7 +14,18 @@ dossier considers the system complete and demoable. No release is claimed before
 
 ## [Unreleased]
 
-### Week 4 — PR 4A: Deterministic Eligibility Engine *(in review, not merged)*
+Nothing pending. **Week 4 PR 4B (AI field-relatedness stage) is approved and not started.**
+
+---
+
+## Checkpoint 4A — Week 4, PR 4A: Deterministic Eligibility Engine *(intermediate)*
+
+**Date:** 2026-09-17 · **Commit on `main`:** `4a5cb84` · **Status:** Stable — intermediate
+**Produced by:** PR #9 (`feature/week-4-eligibility-engine`, 6 commits)
+**Full SHA:** `4a5cb844d1aa4ca4aa3e0906481d0d91c8fc67d4` · **CI:** `test` success ·
+**Tests:** 524 passing from `main` (Weeks 1–3's 328 unchanged)
+
+This is **not Checkpoint 4**. Checkpoint 4 is reserved for Week 4 as a whole and follows PR 4B.
 
 #### Added
 
@@ -48,6 +59,8 @@ dossier considers the system complete and demoable. No release is claimed before
   requirements to `UNKNOWN` (ADR-018 accepted cost).
 - Free-text `requirements.notes` are disclosed as not evaluated, never interpreted.
 - Migration `b3e8d2c61a47` verified on SQLite only.
+- QG-002 item 4 (mock provider call count is zero after a hard failure) is deferred to PR 4B: no
+  AI call path exists yet. The structural guard is tested and mutation-verified.
 
 ---
 

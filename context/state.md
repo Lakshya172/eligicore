@@ -12,14 +12,14 @@
 | Field | Value |
 |---|---|
 | **Date** | 2026-09-17 |
-| **Phase** | **Week 4 — Eligibility Engine · IN PROGRESS** — PR 4A (deterministic engine) in review |
-| **Roadmap position** | Weeks 1–3 complete and merged. Week 4 PR 4A open on `feature/week-4-eligibility-engine`, **not merged**. PR 4B (AI stage) approved, **not started**. |
-| **Health** | 🟢 GREEN — 328 tests on `main`; 524 on the PR 4A branch; no open blockers |
+| **Phase** | **Week 4 — Eligibility Engine · IN PROGRESS** — PR 4A merged and verified; PR 4B not started |
+| **Roadmap position** | Weeks 1–3 complete. Week 4 PR 4A (deterministic engine) **merged and verified**. PR 4B (AI stage) approved, **not started**. |
+| **Health** | 🟢 GREEN — 524 tests passing on `main`, CI green, no open blockers |
 | **Stable branch** | `main` |
-| **Current checkpoint** | **Checkpoint 3** — `2cfd4f0276b60de393ec604afc10b3c52f483ca7` |
-| **Produced by** | PR #6 (`f538015`) + PR #7 (`2cfd4f0`), both **MERGED** 2026-09-10 |
-| **Rollback target** | Checkpoint 3 first; Checkpoints 2/1 remain available. Below Checkpoint 3 also needs `alembic downgrade base`. |
-| **Next milestone** | PR 4A external review and merge decision; then PR 4B. **Checkpoint 4 not created.** |
+| **Current checkpoint** | **Checkpoint 4A** (intermediate, deterministic) — `4a5cb844d1aa4ca4aa3e0906481d0d91c8fc67d4` |
+| **Produced by** | PR #9 (`feature/week-4-eligibility-engine`), **MERGED** 2026-09-17 |
+| **Rollback target** | Checkpoint 4A first, then Checkpoint 3 (needs `alembic downgrade 7c2f1a9b4d30`). Below Checkpoint 3 also needs `alembic downgrade base`. |
+| **Next milestone** | PR 4B — AI field-relatedness stage (approved, **not started**, awaiting instruction). **Checkpoint 4 not established.** |
 | **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
@@ -59,10 +59,10 @@
 | **Week 3 — enum enforcement** | Migration `7c2f1a9b4d30` adds DB-level CHECK constraints, so ADR-014's four states are a guarantee rather than a convention. Found during final verification; `f538015` lacked it. |
 | **QG-008** | New quality gate for resume processing and AI extraction |
 | **Week 4 design gate** | Rulings C-9..C-13, A-1..A-4, R-2, R-4 recorded as **ADR-017** (states and precedence) and **ADR-018** (requirement inputs). |
-| **Week 4 PR 4A — `min_degree_level`** *(branch, in review)* | Nullable typed column; additive migration `b3e8d2c61a47`; RawJob/NormalizedJob/JobRead/ingestion carry it; two curated jobs require BACHELORS. Merged migrations untouched. |
-| **Week 4 PR 4A — deterministic engine** *(branch, in review)* | `app/services/eligibility_engine.py` — MIN_CGPA (same scale only), GRAD_YEAR_WINDOW, MAX_BACKLOGS, MIN_DEGREE_LEVEL, ALLOWED_FIELDS exact match; single-qualification selection; five-state precedence; structural hard-failure guard for the future AI stage. |
-| **Week 4 PR 4A — endpoint** *(branch, in review)* | `POST /api/v1/eligibility/check` — stateless, at most 50 ids, de-duplicated, `not_found_job_ids`, read-only on the catalogue. |
-| **Week 4 PR 4A — tests** *(branch, in review)* | 196 new (524 total); 328 existing unchanged. 13 mutations verified caught. |
+| **Week 4 PR 4A — `min_degree_level`** *(merged, PR #9)* | Nullable typed column; additive migration `b3e8d2c61a47`; RawJob/NormalizedJob/JobRead/ingestion carry it; two curated jobs require BACHELORS. Merged migrations untouched. |
+| **Week 4 PR 4A — deterministic engine** *(merged, PR #9)* | `app/services/eligibility_engine.py` — MIN_CGPA (same scale only), GRAD_YEAR_WINDOW, MAX_BACKLOGS, MIN_DEGREE_LEVEL, ALLOWED_FIELDS exact match; single-qualification selection; five-state precedence; structural hard-failure guard for the future AI stage. |
+| **Week 4 PR 4A — endpoint** *(merged, PR #9)* | `POST /api/v1/eligibility/check` — stateless, at most 50 ids, de-duplicated, `not_found_job_ids`, read-only on the catalogue. |
+| **Week 4 PR 4A — tests** *(merged, PR #9)* | 196 new (524 total); 328 existing unchanged. 13 mutations verified caught. |
 
 ## Partial
 
@@ -81,11 +81,11 @@
 | Component | Roadmap week | Status |
 |---|---|---|
 | spaCy deterministic fallback extraction (cost-saver, dossier §9) | 2 (deferred) | NOT STARTED |
-| Eligibility engine (deterministic stage) | 4 | **IN REVIEW** — PR 4A, not merged |
+| Eligibility engine (deterministic stage) | 4 | **COMPLETE** — PR #9, Checkpoint 4A |
 | Eligibility engine (AI ambiguity stage) | 4 | NOT STARTED — PR 4B, approved; field-of-study relatedness only |
 | Matching engine (skill normalization, TF-IDF, cosine) | 5 | NOT STARTED |
 | Excel export (openpyxl) | 6 | NOT STARTED |
-| Deterministic **eligibility** test suite (boundary/missing/invalid per constraint) | 4 | **IN REVIEW** — PR 4A |
+| Deterministic **eligibility** test suite (boundary/missing/invalid per constraint) | 4 | **COMPLETE** — PR #9 |
 | Application preparation + truthfulness validator | 7 | NOT STARTED |
 | Caching, AI cost logging | 8 | NOT STARTED |
 | Deployment (Render/Railway), README, docs | 9 | NOT STARTED |
@@ -99,15 +99,18 @@ demoable. Weeks 7–10 are enhancement.
 
 **Week 4 — Eligibility Engine. Approved and in progress, in two PRs.**
 
-- **PR 4A — deterministic engine.** Implemented on `feature/week-4-eligibility-engine`, open
-  for external review. **Not merged.** Gates: QG-001, QG-002, QG-004, QG-005, QG-006.
-- **PR 4B — AI field-relatedness stage.** Approved (ruling A-3), **not started**. Starts only
-  after PR 4A is reviewed. Scope: `assess_field_relatedness` on the provider interface, mock
+- **PR 4A — deterministic engine.** **Merged** as PR #9 (`4a5cb84`) and verified post-merge;
+  recorded as intermediate **Checkpoint 4A**. Gates: QG-001, QG-002 (item 4 deferred to PR 4B),
+  QG-004, QG-005, QG-006.
+- **PR 4B — AI field-relatedness stage.** Approved (ruling A-3), **not started**, and not to start
+  without explicit instruction. It owes QG-002 item 4: a test asserting the mock provider's call
+  count is zero for a job with a verified hard failure. Scope: `assess_field_relatedness` on the provider interface, mock
   (uncertain by default) and Gemini implementations, validated response schema, prompt file.
   AI may assess *only* field-of-study relatedness, only for jobs `ambiguous_requirements()`
   returns, capped at MEDIUM confidence, and never alone producing `NOT_ELIGIBLE`. Adds QG-003.
 
-**Checkpoint 4 is not created** and will not be until Week 4 is merged and verified.
+**Checkpoint 4 is not established.** It is reserved for Week 4 as a whole, after PR 4B is merged
+and verified. Checkpoint 4A is intermediate and does not stand in for it.
 
 ---
 
@@ -193,11 +196,14 @@ governs; this is a summary.
 | **0** | Phase 0 — AgentOS engineering layer | `e8c68b7` | Direct commits before branch protection | **Stable** |
 | **1** | Week 1 — Foundation and Candidate Profile Schema | `2e79454` | PR #2, merged 2026-09-10 | **Stable** |
 | **2** | Week 2 — Resume Parser and Gemini Flash AI Service Layer | `91dd31d` | PR #4, merged 2026-09-10 | **Stable** |
-| **3** | Week 3 — Job Schema, Adapters and Ingestion | `2cfd4f0` | PR #6 + PR #7, merged 2026-09-10 | **Stable — current** |
+| **3** | Week 3 — Job Schema, Adapters and Ingestion | `2cfd4f0` | PR #6 + PR #7, merged 2026-09-10 | **Stable** |
+| **4A** | Week 4 — Deterministic Eligibility Engine (**intermediate**) | `4a5cb84` | PR #9, merged 2026-09-17 | **Stable — current** |
+| *4* | *Week 4 — final (PR 4A + PR 4B)* | — | *awaits PR 4B* | **Not established** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
 **Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
 **Checkpoint 3 full SHA:** `2cfd4f0276b60de393ec604afc10b3c52f483ca7`
+**Checkpoint 4A full SHA:** `4a5cb844d1aa4ca4aa3e0906481d0d91c8fc67d4`
 
 ```
 main
@@ -212,8 +218,11 @@ main
   |
   ├── f538015  PR #6 — Week 3 implementation (NOT a checkpoint: defects found after merge)
   |
-  └── 2cfd4f0  Checkpoint 3 — Week 3 Job Schema + Adapters + Ingestion  <- current
-                    ↑  PR #7  (verification repairs)
+  ├── 2cfd4f0  Checkpoint 3 — Week 3 Job Schema + Adapters + Ingestion
+  |                 ↑  PR #7  (verification repairs)
+  |
+  └── 4a5cb84  Checkpoint 4A — Week 4 deterministic eligibility engine (intermediate)  <- current
+                    ↑  PR #9  (feature/week-4-eligibility-engine, 6 commits)
 ```
 
 Checkpoint 0 is the single commit `e8c68b7` — the state of `main` at the end of Phase 0 — not the
@@ -221,9 +230,9 @@ two-commit range that built it. Each checkpoint is declared stable only after th
 state is verified: merge confirmed on GitHub, tree clean, full suite run from `main`, and CI
 green on the merged commit.
 
-**Checkpoint 2 is the current rollback target. Checkpoint 1 remains recoverable indefinitely**
-and is not superseded — a regression whose cause predates Week 2 needs a target older than the
-newest checkpoint.
+**Checkpoint 4A is the current rollback target; Checkpoint 3 is next.** Earlier checkpoints remain
+recoverable indefinitely and are not superseded — a regression whose cause predates the newest
+checkpoint needs an older target.
 
 Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: never rewrite
 `main` history, never `git reset --hard` as recovery, never roll back without human approval.
@@ -232,8 +241,8 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **PR 4A is open for external review.** Do not merge it, start PR 4B, or create Checkpoint 4
-   without explicit instruction.
+1. **Await explicit instruction to begin PR 4B.** Do not start the AI stage, and do not establish
+   Checkpoint 4, without it.
 2. Before deployment (Week 9 / QG-007): verify the migration chain against PostgreSQL.
    `batch_alter_table` has only ever run on SQLite.
 
@@ -241,6 +250,6 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 against the live service. Confirm the model identifier and exercise one real call before
 relying on live extraction.
 
-**Weeks 5–10 have not started.** The only Week 4 code is on `feature/week-4-eligibility-engine`
-(PR 4A, unmerged). No AI eligibility stage, matching, recommendations or application
-preparation code exists anywhere in the repository.
+**Weeks 5–10 have not started.** Week 4's deterministic engine is on `main` (PR #9). No AI
+eligibility stage, matching, recommendations or application preparation code exists anywhere in
+the repository.

@@ -156,11 +156,71 @@ the single commit on `main` where that phase's merge landed.
 | **0** | Phase 0 — AgentOS engineering layer | `e8c68b7` | Direct commits to `main` before branch protection (`7f7abbb` then `e8c68b7`) | n/a — CI did not exist yet | n/a — no product code | **Stable** |
 | **1** | Week 1 — Foundation and Candidate Profile Schema | `2e79454` | PR #2 (`feature/week-1-foundation`), merged 2026-09-10 | ✅ `test` success on `2e79454` | 86 passed | **Stable** |
 | **2** | Week 2 — Resume Parser and Gemini Flash AI Service Layer | `91dd31d` | PR #4 (`feature/week-2-resume-ai`), merged 2026-09-10 | ✅ `test` success on `91dd31d` | 203 passed | **Stable** |
-| **3** | Week 3 — Job Schema, Adapters and Ingestion | `2cfd4f0` | PR #6 (`f538015`) + PR #7 (`2cfd4f0`), merged 2026-09-10 | ✅ `test` success on `2cfd4f0` | 328 passed | **Stable — current** |
+| **3** | Week 3 — Job Schema, Adapters and Ingestion | `2cfd4f0` | PR #6 (`f538015`) + PR #7 (`2cfd4f0`), merged 2026-09-10 | ✅ `test` success on `2cfd4f0` | 328 passed | **Stable** |
+| **4A** | Week 4 — Deterministic Eligibility Engine (PR 4A) · **intermediate** | `4a5cb84` | PR #9 (`feature/week-4-eligibility-engine`), merged 2026-09-17 | ✅ `test` success on `4a5cb84` | 524 passed | **Stable — current** |
+| *4* | *Week 4 — Eligibility Engine, final (PR 4A + PR 4B)* | *— not yet established —* | *awaits PR 4B* | — | — | **Pending** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
 **Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
 **Checkpoint 3 full SHA:** `2cfd4f0276b60de393ec604afc10b3c52f483ca7`
+**Checkpoint 4A full SHA:** `4a5cb844d1aa4ca4aa3e0906481d0d91c8fc67d4`
+
+**Checkpoint 4A is intermediate, not Checkpoint 4.** Week 4 is delivered in two PRs. 4A marks the
+verified deterministic engine; **Checkpoint 4 is reserved for Week 4 as a whole** and is
+established only after PR 4B (the AI field-relatedness stage) is merged and verified. 4A does not
+replace or renumber any earlier checkpoint.
+
+### Checkpoint 4A — verification record (intermediate)
+
+**Phase:** Week 4, PR 4A — Deterministic Eligibility Engine
+**Commit on `main`:** `4a5cb84` — the PR #9 merge commit, parents `151dbf8` (previous `main`)
+and `924efcb` (branch head). Real merge; the six PR 4A commits are preserved.
+**Merged by:** `Lakshya172` on GitHub at 2026-09-17T10:02:49Z, after external architecture review,
+before the post-merge gate began. The gate confirmed the merged tree is identical to the reviewed
+branch head and verified that state rather than re-merging.
+
+| Check | Result |
+|---|---|
+| PR #9 merged on GitHub | `merged: true`, `merge_commit_sha` = `4a5cb844d1aa4ca4aa3e0906481d0d91c8fc67d4` |
+| Tree on `main` vs reviewed PR head `924efcb` | **Identical** (`git diff` empty) |
+| Scope | 26 files, 6 commits, all approved PR 4A work. No change to `app/ai`, adapters, resume parsing, candidate router, dependencies or CI. |
+| Working tree on `main` | Clean, in sync with `origin/main` |
+| Full suite from `main` | **524 passed**, 0 skipped, offline (no `ELIGICORE_*`, proxies to a dead port) |
+| Weeks 1–3 regression | **328 passed**; regression test files unmodified since `151dbf8` |
+| CI on `4a5cb84` | `test` completed, conclusion `success` (run `35208405213`) |
+| **Migration chain** | `<base>` → `54a85d64881e` → `7c2f1a9b4d30` → `b3e8d2c61a47` (head) |
+| Merged migrations unchanged | `54a85d64881e`, `7c2f1a9b4d30` byte-identical to Checkpoint 3 (sha256) |
+| Fresh upgrade / downgrade→base / re-upgrade / `alembic check` | ✅ all clean; `alembic_version` only after base |
+| Upgrade over existing data | Rows at `7c2f1a9b4d30` preserved; `min_degree_level` NULL; downgrade and re-upgrade preserve rows |
+| `min_degree_level` | Nullable `VARCHAR(20)`; all 7 `DegreeLevel` members + NULL accepted; `PHD` and `bachelors` rejected by CHECK `degreelevel` |
+| Existing constraints | `status='NOT_A_STATE'` and `job_type='PART_TIME'` still rejected |
+| `is_active` a DB column | **No** — derived (ADR-014) |
+| Personal-data tables | **None.** Tables: `jobs`, `ingestion_state` (+ `alembic_version`) |
+| **Deterministic rules** | 50/50 independent rule checks match the approved contract (CGPA, graduation year, backlogs, degree level, fields, qualification selection, verdicts) |
+| Mutation re-run on `main` | 13/13 deliberate breakages caught |
+| **API (live uvicorn)** | 1–50 ids (0 and 51 → 422); duplicates removed in first-seen order; unknown ids in `not_found_job_ids`; CLOSED job evaluated; invalid bodies → 422 with no echo; `GET` → 405; only `POST /api/v1/eligibility/check`; no `/jobs/ingest` |
+| Response | No profile, no `match_score`/score/rank; only explanatory `candidate_value`s |
+| **Privacy (live)** | 11 planted markers, 0 hits in a DEBUG server log; database dump byte-identical before and after all requests; log line carries counts and timing only |
+| Performance | 50-job engine check: mean 0.87 ms, p95 0.85 ms over 500 runs; one `IN` query |
+
+**Supported requirements:** `MIN_CGPA` (same scale only) · `GRAD_YEAR_WINDOW` (inclusive) ·
+`MAX_BACKLOGS` · `MIN_DEGREE_LEVEL` · `ALLOWED_FIELDS` (exact normalized match; never FAIL).
+
+**Verdict semantics (ADR-017):** zero structured requirements → `ELIGIBLE` · deterministic FAIL →
+`NOT_ELIGIBLE` · all UNKNOWN → `UNKNOWN` · any UNKNOWN or AI FAIL → `NEEDS_REVIEW` · all PASS with
+AI → `LIKELY_ELIGIBLE` · all PASS deterministically → `ELIGIBLE`. No AI exists at this checkpoint,
+so `LIKELY_ELIGIBLE` is unreachable in practice and AI composition is covered only by hand-built
+entries in unit tests.
+
+**Gates:** QG-001 PASS · QG-002 PASS for the deterministic scope, **item 4 (mock provider
+call-count assertion) deferred to PR 4B** — no AI call path exists to count; the structural
+equivalent is tested · QG-004 PASS · QG-005 PASS · QG-006 PASS (SQLite) · QG-003 N/A · QG-007 N/A.
+
+**Known limitations:** no AI stage (non-exact fields stay `UNKNOWN`); multi-entry profiles with
+unset levels resolve per-qualification requirements to `UNKNOWN`; free-text notes disclosed, not
+evaluated; migrations verified on SQLite only; 5 synthetic curated jobs.
+
+**PR 4B has not started. Checkpoint 4 is not established.**
 
 ### Checkpoint 3 — verification record
 
@@ -210,9 +270,7 @@ CHECK constraints are not autogenerate-detected, so a future enum member needs a
 migration; `EXPIRED` and `UNKNOWN` are modelled but unset by any code path; and
 `POST /api/v1/jobs/ingest` remains deferred.
 
-**Week 4 has not started.**
-
-### Checkpoint 2 — verification record
+**Week 4 had not started at this checkpoint.**
 
 ### Checkpoint 2 — verification record
 
@@ -277,10 +335,15 @@ Notes that remove the ambiguities this registry exists to close:
 
 | Priority | Checkpoint | Commit | Role |
 |---|---|---|---|
-| **1st** | Checkpoint 3 — Week 3 | `2cfd4f0` | **Current stable point.** If Week 4 introduces a regression, this is the immediate rollback reference. |
-| **2nd** | Checkpoint 2 — Week 2 | `91dd31d` | Previous known-good state. |
-| **3rd** | Checkpoint 1 — Week 1 | `2e79454` | Remains available indefinitely as a historical recovery point. |
-| **4th** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
+| **1st** | Checkpoint 4A — Week 4 deterministic engine | `4a5cb84` | **Current stable point.** If PR 4B introduces a regression, this is the immediate rollback reference. |
+| **2nd** | Checkpoint 3 — Week 3 | `2cfd4f0` | Last state before any eligibility code. |
+| **3rd** | Checkpoint 2 — Week 2 | `91dd31d` | Known-good state before the job catalogue. |
+| **4th** | Checkpoint 1 — Week 1 | `2e79454` | Remains available indefinitely as a historical recovery point. |
+| **5th** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
+
+**Recovering from Checkpoint 4A to Checkpoint 3 requires `alembic downgrade 7c2f1a9b4d30`**,
+which drops only `jobs.min_degree_level` (verified with existing rows preserved and the existing
+CHECK constraints intact).
 
 **Recovering past Checkpoint 3 requires a database step.** Checkpoints 0–2 predate any table,
 so reverting to them is code-only. Checkpoint 3 introduced the schema, so a rollback below it
