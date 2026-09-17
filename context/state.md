@@ -12,14 +12,14 @@
 | Field | Value |
 |---|---|
 | **Date** | 2026-09-17 |
-| **Phase** | **Week 4 — Eligibility Engine · IN PROGRESS** — PR 4A merged and verified; PR 4B not started |
-| **Roadmap position** | Weeks 1–3 complete. Week 4 PR 4A (deterministic engine) **merged and verified**. PR 4B (AI stage) approved, **not started**. |
-| **Health** | 🟢 GREEN — 524 tests passing on `main`, CI green, no open blockers |
+| **Phase** | **Week 4 — Eligibility Engine · IN PROGRESS** — PR 4A merged and verified; PR 4B (AI stage) implemented, **in review, not merged** |
+| **Roadmap position** | Weeks 1–3 complete. Week 4 PR 4A (deterministic engine) **merged and verified**. PR 4B open on `feature/week-4-eligibility-ai`, **not merged**. |
+| **Health** | 🟢 GREEN — 524 tests on `main`; 615 on the PR 4B branch; no open blockers |
 | **Stable branch** | `main` |
 | **Current checkpoint** | **Checkpoint 4A** (intermediate, deterministic) — `4a5cb844d1aa4ca4aa3e0906481d0d91c8fc67d4` |
 | **Produced by** | PR #9 (`feature/week-4-eligibility-engine`), **MERGED** 2026-09-17 |
 | **Rollback target** | Checkpoint 4A first, then Checkpoint 3 (needs `alembic downgrade 7c2f1a9b4d30`). Below Checkpoint 3 also needs `alembic downgrade base`. |
-| **Next milestone** | PR 4B — AI field-relatedness stage (approved, **not started**, awaiting instruction). **Checkpoint 4 not established.** |
+| **Next milestone** | PR 4B external review and merge decision. **Checkpoint 4 not established.** |
 | **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
@@ -82,7 +82,7 @@
 |---|---|---|
 | spaCy deterministic fallback extraction (cost-saver, dossier §9) | 2 (deferred) | NOT STARTED |
 | Eligibility engine (deterministic stage) | 4 | **COMPLETE** — PR #9, Checkpoint 4A |
-| Eligibility engine (AI ambiguity stage) | 4 | NOT STARTED — PR 4B, approved; field-of-study relatedness only |
+| Eligibility engine (AI ambiguity stage) | 4 | **IN REVIEW** — PR 4B, not merged; field-of-study relatedness only (ADR-019) |
 | Matching engine (skill normalization, TF-IDF, cosine) | 5 | NOT STARTED |
 | Excel export (openpyxl) | 6 | NOT STARTED |
 | Deterministic **eligibility** test suite (boundary/missing/invalid per constraint) | 4 | **COMPLETE** — PR #9 |
@@ -102,9 +102,12 @@ demoable. Weeks 7–10 are enhancement.
 - **PR 4A — deterministic engine.** **Merged** as PR #9 (`4a5cb84`) and verified post-merge;
   recorded as intermediate **Checkpoint 4A**. Gates: QG-001, QG-002 (item 4 deferred to PR 4B),
   QG-004, QG-005, QG-006.
-- **PR 4B — AI field-relatedness stage.** Approved (ruling A-3), **not started**, and not to start
-  without explicit instruction. It owes QG-002 item 4: a test asserting the mock provider's call
-  count is zero for a job with a verified hard failure. Scope: `assess_field_relatedness` on the provider interface, mock
+- **PR 4B — AI field-relatedness stage.** Implemented on `feature/week-4-eligibility-ai`, open for
+  external review, **not merged**. `AIProvider.assess_field_relatedness` (mock conservative by
+  default, Gemini via the existing transport), `app/services/eligibility_ai.py` as the second
+  stage, lazy provider construction, request-scoped de-duplication, `ENGINE_VERSION` 2. Recorded
+  as **ADR-019**. QG-002 item 4 is now evidenced by literal zero-call tests. Empty
+  `allowed_fields` stays omitted (ruling C-14). Scope: `assess_field_relatedness` on the provider interface, mock
   (uncertain by default) and Gemini implementations, validated response schema, prompt file.
   AI may assess *only* field-of-study relatedness, only for jobs `ambiguous_requirements()`
   returns, capped at MEDIUM confidence, and never alone producing `NOT_ELIGIBLE`. Adds QG-003.
@@ -162,6 +165,7 @@ never silently fixed. These are internal to the dossier.
 | **C-11** | §11's sample eligibility response includes `match_score` and skill overlap. | dossier §11 vs §7/§15 | **RULED 2026-09-17.** Excluded from Week 4; matching is Week 5. |
 | **C-12** | The Week 1 `NormalizedGrade` docstring claimed a linear fraction enabled cross-scale comparison; `standards/eligibility.md` §4 requires a defined conversion. | repo vs standard | **RULED 2026-09-17 — ADR-018.** Same-scale comparison only; docstring corrected. |
 | **C-13** | §12.1 "evaluation stops" after a hard failure — the whole job, or only AI? | dossier §12.1 | **RULED 2026-09-17 — ADR-017.** Deterministic evaluation continues; AI stops. |
+| **C-14** | The PR 4B brief said empty `allowed_fields` → `UNKNOWN`; merged ruling A-2 omits the requirement, and R-4 depends on it. | PR 4B brief vs ADR-018 | **RULED 2026-09-17.** A-2 stands: empty means no field restriction — omitted, never `UNKNOWN`, never sent to AI. |
 
 ### Still open — not to be resolved without instruction
 
@@ -178,6 +182,7 @@ Full index in `context/decisions.md`.
 
 | ADR | Title | Date |
 |---|---|---|
+| ADR-019 | AI-assisted field-of-study relatedness (A-3, R-2, C-14) | 2026-09-17 |
 | ADR-018 | Eligibility requirement inputs (rules on C-10, C-12, A-1, A-2, A-4) | 2026-09-17 |
 | ADR-017 | Eligibility states and verdict precedence (rules on C-9, C-13, R-2, R-4) | 2026-09-17 |
 | ADR-012 | `ingestion_state` as an operational model (ruling on C-2) | 2026-09-10 |
@@ -241,15 +246,17 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Await explicit instruction to begin PR 4B.** Do not start the AI stage, and do not establish
-   Checkpoint 4, without it.
-2. Before deployment (Week 9 / QG-007): verify the migration chain against PostgreSQL.
+1. **PR 4B is open for external review.** Do not merge it, establish Checkpoint 4, or start
+   Week 5 without explicit instruction.
+2. Before relying on live AI: exercise Gemini's `assess_field_relatedness` (and
+   `extract_resume`) against the real service once, and confirm the model identifier.
+3. Before deployment (Week 9 / QG-007): verify the migration chain against PostgreSQL.
    `batch_alter_table` has only ever run on SQLite.
 
 **Outstanding integration step, not blocking the PR:** the Gemini provider has never run
 against the live service. Confirm the model identifier and exercise one real call before
 relying on live extraction.
 
-**Weeks 5–10 have not started.** Week 4's deterministic engine is on `main` (PR #9). No AI
-eligibility stage, matching, recommendations or application preparation code exists anywhere in
-the repository.
+**Weeks 5–10 have not started.** Week 4's deterministic engine is on `main` (PR #9); the AI
+eligibility stage exists only on `feature/week-4-eligibility-ai` (PR 4B, unmerged). No matching,
+recommendations or application preparation code exists anywhere in the repository.
