@@ -31,6 +31,7 @@ from app.schemas.eligibility import (
     FieldRelatednessAssessment,
     JobEligibility,
     ReasonCode,
+    RequirementResult,
     RequirementStatus,
     RequirementType,
 )
@@ -235,6 +236,29 @@ async def test_empty_allowed_fields_is_omitted_with_zero_ai_calls(allowed: list[
     assert results["open"].requirement_breakdown == []
     assert results["open"].eligibility_state is E.ELIGIBLE
     assert provider.relatedness_call_count == 0
+
+
+def test_ai_input_guards_hold_on_hand_built_breakdowns() -> None:
+    """Each defensive guard in ai_inputs is tested on input the engine would never produce.
+
+    The engine already keeps missing fields and empty permitted lists out of the ambiguous
+    set, which would mask a broken guard here (memory D-24).
+    """
+    ambiguous = RequirementResult(
+        requirement_type=RequirementType.ALLOWED_FIELDS, requirement="Field of study",
+        candidate_value=IT, status=U, confidence=Confidence.LOW,
+        method=EvaluationMethod.DETERMINISTIC, reason_code=ReasonCode.FIELD_NOT_EXACT_MATCH,
+        note="synthetic",
+    )
+    job = make_job(allowed_fields=CS_FIELDS)
+    assert list(ai_inputs(job, [ambiguous])) == [(0, IT, CS_FIELDS)]
+
+    for allowed in ([], ["", "   "]):
+        assert list(ai_inputs(make_job(allowed_fields=allowed), [ambiguous])) == []
+    for blank in (None, "", "   "):
+        assert list(ai_inputs(job, [ambiguous.model_copy(update={"candidate_value": blank})])) == []
+    wrong_type = ambiguous.model_copy(update={"requirement_type": RequirementType.MIN_CGPA})
+    assert list(ai_inputs(job, [wrong_type])) == []
 
 
 @pytest.mark.anyio
