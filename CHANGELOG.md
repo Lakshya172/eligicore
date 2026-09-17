@@ -60,12 +60,17 @@ candidate data beyond the field string. Checkpoint 4A below records the determin
 
 #### Known limitations
 
-- Gemini's relatedness call has not been exercised against the live service.
+- Gemini's relatedness call has not been exercised against the live service, and the Gemini model
+  identifier is unconfirmed.
+- The default mock provider stays conservative (`UNCERTAIN`/LOW), so ambiguous fields remain `UNKNOWN`.
 - AI "related" judgements are the provider's interpretation; they are labelled `ai_reasoning`,
   capped at MEDIUM, and never make a verdict `ELIGIBLE`.
 - PostgreSQL has not been verified; migrations have run on SQLite only.
-- The OpenAPI "Current status" text in `app/main.py` still describes the AI stage as not yet
-  implemented.
+
+#### Documentation
+
+- The OpenAPI "Current status" text in `app/main.py`, stale at `f56d7df`, now describes the Week 4
+  implementation. Description string only; no behaviour change.
 
 ---
 

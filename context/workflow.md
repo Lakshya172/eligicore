@@ -221,8 +221,9 @@ QG-004 PASS · QG-005 PASS · QG-006 N/A (no schema change in PR 4B; chain re-ve
 - With the default mock provider, ambiguous fields stay `UNKNOWN` (`AI_ASSESSMENT_INCONCLUSIVE`).
 - AI relatedness is an interpretation: labelled `ai_reasoning`, capped at MEDIUM, never `ELIGIBLE`
   or `NOT_ELIGIBLE`. Prompt injection is mitigated (JSON data block, constrained schema), not eliminated.
-- The OpenAPI "Current status" text in `app/main.py` still describes the AI stage as not yet
-  implemented — stale published description, corrected in a later change.
+- At `f56d7df` the OpenAPI "Current status" text in `app/main.py` still described the AI stage as
+  not yet implemented. Corrected by the docs-only Checkpoint 4 record PR (description string only;
+  no route, schema, handler, dependency or behaviour change).
 - Five synthetic curated jobs; multi-entry profiles with unset levels resolve per-qualification
   requirements to `UNKNOWN` (ADR-018).
 

@@ -260,6 +260,6 @@ relying on live extraction.
 **Weeks 5–10 have not started.** No Week 5 branch exists. No matching, recommendations or
 application preparation code exists anywhere in the repository.
 
-**Known doc drift in code:** the OpenAPI "Current status" string in `app/main.py` still says the AI
-field-relatedness stage is not yet implemented. It is implemented; correct the string in the next
-change that touches `app/main.py`.
+**Doc drift corrected:** the OpenAPI "Current status" string in `app/main.py` said the AI
+field-relatedness stage was not yet implemented. The docs-only Checkpoint 4 record PR corrected the
+description string; no route, schema, handler or behaviour changed.
