@@ -12,14 +12,14 @@
 | Field | Value |
 |---|---|
 | **Date** | 2026-09-17 |
-| **Phase** | **Week 4 — Eligibility Engine · IN PROGRESS** — PR 4A merged and verified; PR 4B (AI stage) implemented, **in review, not merged** |
-| **Roadmap position** | Weeks 1–3 complete. Week 4 PR 4A (deterministic engine) **merged and verified**. PR 4B open on `feature/week-4-eligibility-ai`, **not merged**. |
-| **Health** | 🟢 GREEN — 524 tests on `main`; 615 on the PR 4B branch; no open blockers |
+| **Phase** | **Week 4 — Eligibility Intelligence · COMPLETE** |
+| **Roadmap position** | Weeks 1–4 complete and merged. **Week 5 NOT started.** |
+| **Health** | 🟢 GREEN — 615 tests passing on `main`, 27/27 mutations caught, CI green, no open blockers |
 | **Stable branch** | `main` |
-| **Current checkpoint** | **Checkpoint 4A** (intermediate, deterministic) — `4a5cb844d1aa4ca4aa3e0906481d0d91c8fc67d4` |
-| **Produced by** | PR #9 (`feature/week-4-eligibility-engine`), **MERGED** 2026-09-17 |
-| **Rollback target** | Checkpoint 4A first, then Checkpoint 3 (needs `alembic downgrade 7c2f1a9b4d30`). Below Checkpoint 3 also needs `alembic downgrade base`. |
-| **Next milestone** | PR 4B external review and merge decision. **Checkpoint 4 not established.** |
+| **Current checkpoint** | **Checkpoint 4** — `f56d7dfabeeb8a7addac693d2c7552b0c1fc4e76` |
+| **Produced by** | PR #9 (`4a5cb84`, deterministic engine) + PR #11 (`f56d7df`, AI stage), both **MERGED** 2026-09-17 |
+| **Rollback target** | Checkpoint 4 first; Checkpoint 4A by reverting PR #11 (no database step); Checkpoint 3 also needs `alembic downgrade 7c2f1a9b4d30`; below Checkpoint 3 also needs `alembic downgrade base`. |
+| **Next milestone** | Week 5: matching engine — **not started, not authorized** |
 | **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
@@ -63,6 +63,9 @@
 | **Week 4 PR 4A — deterministic engine** *(merged, PR #9)* | `app/services/eligibility_engine.py` — MIN_CGPA (same scale only), GRAD_YEAR_WINDOW, MAX_BACKLOGS, MIN_DEGREE_LEVEL, ALLOWED_FIELDS exact match; single-qualification selection; five-state precedence; structural hard-failure guard for the future AI stage. |
 | **Week 4 PR 4A — endpoint** *(merged, PR #9)* | `POST /api/v1/eligibility/check` — stateless, at most 50 ids, de-duplicated, `not_found_job_ids`, read-only on the catalogue. |
 | **Week 4 PR 4A — tests** *(merged, PR #9)* | 196 new (524 total); 328 existing unchanged. 13 mutations verified caught. |
+| **Week 4 PR 4B — AI field relatedness** *(merged, PR #11)* | `AIProvider.assess_field_relatedness`; conservative mock (UNCERTAIN/LOW default); Gemini via the existing transport and a prompt file; `app/services/eligibility_ai.py` as the second stage; lazy provider construction; request-scoped de-duplication; fail-closed `UNKNOWN`; confidence capped at MEDIUM; `ENGINE_VERSION` 2. ADR-019. |
+| **Week 4 PR 4B — tests** *(merged, PR #11)* | 91 new (615 total). Literal zero-call and zero-build assertions; captured-request privacy checks. 27/27 mutations caught. |
+| **Checkpoint 4** | Final Week 4 checkpoint at `f56d7df`, verified post-merge (see `context/workflow.md`). |
 
 ## Partial
 
@@ -82,7 +85,7 @@
 |---|---|---|
 | spaCy deterministic fallback extraction (cost-saver, dossier §9) | 2 (deferred) | NOT STARTED |
 | Eligibility engine (deterministic stage) | 4 | **COMPLETE** — PR #9, Checkpoint 4A |
-| Eligibility engine (AI ambiguity stage) | 4 | **IN REVIEW** — PR 4B, not merged; field-of-study relatedness only (ADR-019) |
+| Eligibility engine (AI ambiguity stage) | 4 | **COMPLETE** — PR #11, Checkpoint 4; field-of-study relatedness only (ADR-019) |
 | Matching engine (skill normalization, TF-IDF, cosine) | 5 | NOT STARTED |
 | Excel export (openpyxl) | 6 | NOT STARTED |
 | Deterministic **eligibility** test suite (boundary/missing/invalid per constraint) | 4 | **COMPLETE** — PR #9 |
@@ -97,23 +100,17 @@ demoable. Weeks 7–10 are enhancement.
 
 ## Next approved phase
 
-**Week 4 — Eligibility Engine. Approved and in progress, in two PRs.**
+**Week 5 — Matching Engine.** **Not started, and not authorized to start.**
 
-- **PR 4A — deterministic engine.** **Merged** as PR #9 (`4a5cb84`) and verified post-merge;
-  recorded as intermediate **Checkpoint 4A**. Gates: QG-001, QG-002 (item 4 deferred to PR 4B),
-  QG-004, QG-005, QG-006.
-- **PR 4B — AI field-relatedness stage.** Implemented on `feature/week-4-eligibility-ai`, open for
-  external review, **not merged**. `AIProvider.assess_field_relatedness` (mock conservative by
-  default, Gemini via the existing transport), `app/services/eligibility_ai.py` as the second
-  stage, lazy provider construction, request-scoped de-duplication, `ENGINE_VERSION` 2. Recorded
-  as **ADR-019**. QG-002 item 4 is now evidenced by literal zero-call tests. Empty
-  `allowed_fields` stays omitted (ruling C-14). Scope: `assess_field_relatedness` on the provider interface, mock
-  (uncertain by default) and Gemini implementations, validated response schema, prompt file.
-  AI may assess *only* field-of-study relatedness, only for jobs `ambiguous_requirements()`
-  returns, capped at MEDIUM confidence, and never alone producing `NOT_ELIGIBLE`. Adds QG-003.
+Dossier §12.2 and §15: skill normalization, TF-IDF vectorization, cosine similarity, and ranked,
+explained recommendations. Eligibility and matching stay separate: matching must consume Week 4
+verdicts without changing them, and a `NOT_ELIGIBLE` job is excluded from ranking but remains
+retrievable with its reason (ADR-006).
 
-**Checkpoint 4 is not established.** It is reserved for Week 4 as a whole, after PR 4B is merged
-and verified. Checkpoint 4A is intermediate and does not stand in for it.
+Week 4 is complete: the deterministic engine (PR #9, Checkpoint 4A) and the AI field-relatedness
+stage (PR #11, ADR-019) are merged and verified as **Checkpoint 4**.
+
+**No implementation may begin without explicit human approval of the specific step.**
 
 ---
 
@@ -202,13 +199,14 @@ governs; this is a summary.
 | **1** | Week 1 — Foundation and Candidate Profile Schema | `2e79454` | PR #2, merged 2026-09-10 | **Stable** |
 | **2** | Week 2 — Resume Parser and Gemini Flash AI Service Layer | `91dd31d` | PR #4, merged 2026-09-10 | **Stable** |
 | **3** | Week 3 — Job Schema, Adapters and Ingestion | `2cfd4f0` | PR #6 + PR #7, merged 2026-09-10 | **Stable** |
-| **4A** | Week 4 — Deterministic Eligibility Engine (**intermediate**) | `4a5cb84` | PR #9, merged 2026-09-17 | **Stable — current** |
-| *4* | *Week 4 — final (PR 4A + PR 4B)* | — | *awaits PR 4B* | **Not established** |
+| **4A** | Week 4 — Deterministic Eligibility Engine (**intermediate**) | `4a5cb84` | PR #9, merged 2026-09-17 | **Stable** |
+| **4** | Week 4 — Eligibility Intelligence (final) | `f56d7df` | PR #9 + PR #11, merged 2026-09-17 | **Stable — current** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
 **Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
 **Checkpoint 3 full SHA:** `2cfd4f0276b60de393ec604afc10b3c52f483ca7`
 **Checkpoint 4A full SHA:** `4a5cb844d1aa4ca4aa3e0906481d0d91c8fc67d4`
+**Checkpoint 4 full SHA:** `f56d7dfabeeb8a7addac693d2c7552b0c1fc4e76`
 
 ```
 main
@@ -226,8 +224,11 @@ main
   ├── 2cfd4f0  Checkpoint 3 — Week 3 Job Schema + Adapters + Ingestion
   |                 ↑  PR #7  (verification repairs)
   |
-  └── 4a5cb84  Checkpoint 4A — Week 4 deterministic eligibility engine (intermediate)  <- current
-                    ↑  PR #9  (feature/week-4-eligibility-engine, 6 commits)
+  ├── 4a5cb84  Checkpoint 4A — Week 4 deterministic eligibility engine (intermediate)
+  |                 ↑  PR #9  (feature/week-4-eligibility-engine, 6 commits)
+  |
+  └── f56d7df  Checkpoint 4 — Week 4 Eligibility Intelligence (final)  <- current
+                    ↑  PR #11 (feature/week-4-eligibility-ai, 6 commits)
 ```
 
 Checkpoint 0 is the single commit `e8c68b7` — the state of `main` at the end of Phase 0 — not the
@@ -235,7 +236,7 @@ two-commit range that built it. Each checkpoint is declared stable only after th
 state is verified: merge confirmed on GitHub, tree clean, full suite run from `main`, and CI
 green on the merged commit.
 
-**Checkpoint 4A is the current rollback target; Checkpoint 3 is next.** Earlier checkpoints remain
+**Checkpoint 4 is the current rollback target; Checkpoint 4A is next.** Earlier checkpoints remain
 recoverable indefinitely and are not superseded — a regression whose cause predates the newest
 checkpoint needs an older target.
 
@@ -246,17 +247,19 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **PR 4B is open for external review.** Do not merge it, establish Checkpoint 4, or start
-   Week 5 without explicit instruction.
+1. **Await explicit instruction to begin Week 5.** No phase rolls into the next automatically.
 2. Before relying on live AI: exercise Gemini's `assess_field_relatedness` (and
    `extract_resume`) against the real service once, and confirm the model identifier.
 3. Before deployment (Week 9 / QG-007): verify the migration chain against PostgreSQL.
    `batch_alter_table` has only ever run on SQLite.
 
-**Outstanding integration step, not blocking the PR:** the Gemini provider has never run
-against the live service. Confirm the model identifier and exercise one real call before
+**Outstanding integration step:** the Gemini provider — resume extraction and field relatedness —
+has never run against the live service. Confirm the model identifier and exercise one real call before
 relying on live extraction.
 
-**Weeks 5–10 have not started.** Week 4's deterministic engine is on `main` (PR #9); the AI
-eligibility stage exists only on `feature/week-4-eligibility-ai` (PR 4B, unmerged). No matching,
-recommendations or application preparation code exists anywhere in the repository.
+**Weeks 5–10 have not started.** No Week 5 branch exists. No matching, recommendations or
+application preparation code exists anywhere in the repository.
+
+**Doc drift corrected:** the OpenAPI "Current status" string in `app/main.py` said the AI
+field-relatedness stage was not yet implemented. The docs-only Checkpoint 4 record PR corrected the
+description string; no route, schema, handler or behaviour changed.

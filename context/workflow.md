@@ -157,18 +157,75 @@ the single commit on `main` where that phase's merge landed.
 | **1** | Week 1 — Foundation and Candidate Profile Schema | `2e79454` | PR #2 (`feature/week-1-foundation`), merged 2026-09-10 | ✅ `test` success on `2e79454` | 86 passed | **Stable** |
 | **2** | Week 2 — Resume Parser and Gemini Flash AI Service Layer | `91dd31d` | PR #4 (`feature/week-2-resume-ai`), merged 2026-09-10 | ✅ `test` success on `91dd31d` | 203 passed | **Stable** |
 | **3** | Week 3 — Job Schema, Adapters and Ingestion | `2cfd4f0` | PR #6 (`f538015`) + PR #7 (`2cfd4f0`), merged 2026-09-10 | ✅ `test` success on `2cfd4f0` | 328 passed | **Stable** |
-| **4A** | Week 4 — Deterministic Eligibility Engine (PR 4A) · **intermediate** | `4a5cb84` | PR #9 (`feature/week-4-eligibility-engine`), merged 2026-09-17 | ✅ `test` success on `4a5cb84` | 524 passed | **Stable — current** |
-| *4* | *Week 4 — Eligibility Engine, final (PR 4A + PR 4B)* | *— not yet established —* | *awaits PR 4B* | — | — | **Pending** |
+| **4A** | Week 4 — Deterministic Eligibility Engine (PR 4A) · **intermediate** | `4a5cb84` | PR #9 (`feature/week-4-eligibility-engine`), merged 2026-09-17 | ✅ `test` success on `4a5cb84` | 524 passed | **Stable** |
+| **4** | Week 4 — Eligibility Intelligence (final: PR 4A + PR 4B) | `f56d7df` | PR #9 (`4a5cb84`) + PR #11 (`feature/week-4-eligibility-ai`), merged 2026-09-17 | ✅ `test` success on `f56d7df` | 615 passed | **Stable — current** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
 **Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
 **Checkpoint 3 full SHA:** `2cfd4f0276b60de393ec604afc10b3c52f483ca7`
 **Checkpoint 4A full SHA:** `4a5cb844d1aa4ca4aa3e0906481d0d91c8fc67d4`
+**Checkpoint 4 full SHA:** `f56d7dfabeeb8a7addac693d2c7552b0c1fc4e76`
 
 **Checkpoint 4A is intermediate, not Checkpoint 4.** Week 4 is delivered in two PRs. 4A marks the
 verified deterministic engine; **Checkpoint 4 is reserved for Week 4 as a whole** and is
 established only after PR 4B (the AI field-relatedness stage) is merged and verified. 4A does not
 replace or renumber any earlier checkpoint.
+
+**Checkpoint 4 established 2026-09-17** at `f56d7df`, after PR 4B was merged and verified. 4A remains
+recorded as the intermediate deterministic checkpoint.
+
+### Checkpoint 4 — verification record (final Week 4)
+
+**Phase:** Week 4 — Eligibility Intelligence
+**Commit on `main`:** `f56d7df` — the PR #11 merge commit, parents `d739783` (previous `main`,
+the Checkpoint 4A record) and `9e3007a` (PR 4B branch head). Real merge; the six PR 4B commits
+are preserved.
+**Merged by:** `Lakshya172` on GitHub at 2026-09-17T11:03:02Z, after the PR 4B audit was approved and
+before the post-merge gate began. The gate confirmed the merged tree is identical to the reviewed
+head `9e3007a` and verified that state rather than re-merging.
+
+**Week 4 capability at this checkpoint:** deterministic eligibility engine · typed
+`min_degree_level` · five-state verdict · deterministic hard-failure authority · AI-assisted
+ambiguous field relatedness · provider abstraction with a Gemini implementation · conservative
+mock provider · AI fail-closed behaviour · request-scoped AI de-duplication · AI privacy boundary
+· no candidate or evaluation persistence · `POST /api/v1/eligibility/check`.
+
+| Check | Result |
+|---|---|
+| PR #11 merged on GitHub | `merged: true`, `merge_commit_sha` = `f56d7dfabeeb8a7addac693d2c7552b0c1fc4e76` |
+| Tree on `main` vs reviewed PR head `9e3007a` | **Identical** |
+| Scope | 20 files, 6 commits: AI contract, mock, Gemini, AI stage, router wiring, tests, docs. No migration, model, adapter, dependency or CI change. |
+| Working tree / `origin/main` | Clean; local `main` = `origin/main` = `f56d7df` |
+| Full suite from `main` | **615 passed**, 0 skipped, offline (no `ELIGICORE_*`, proxies to a dead port) |
+| Regression groups | Weeks 1–3 **328**; PR 4A deterministic **196** |
+| CI on `f56d7df` | `test` completed, conclusion `success` |
+| Mutation testing from `main` | **27/27 caught** — 13 deterministic-engine + 14 AI-boundary |
+| Migration chain | `<base>` → `54a85d64881e` → `7c2f1a9b4d30` → `b3e8d2c61a47` (head); no PR 4B migration; all three files byte-identical to the checkpoints that introduced them |
+| Upgrade / downgrade→base / re-upgrade / `alembic check` | ✅ clean; existing row preserved across up/down/up |
+| Constraints | `min_degree_level='PHD'`, `status='NOT_A_STATE'`, `job_type='PART_TIME'` rejected |
+| Tables / registered models | Exactly `jobs`, `ingestion_state` (+ `alembic_version`); no candidate, evaluation, application, AI-result, prompt or cache table; `is_active` not a column |
+| **Post-merge AI-boundary checks** | **61/61** independent checks match the approved contract: hard FAIL (CGPA, year, backlogs, degree) → `NOT_ELIGIBLE` with 0 AI calls, 0 provider builds, no AI input; exact match and missing field → 0 calls; empty `allowed_fields` omitted, 0 calls, no build; RELATED → AI PASS, `LIKELY_ELIGIBLE`; NOT_RELATED → FAIL, `NEEDS_REVIEW` (never `NOT_ELIGIBLE`); invalid, error, LOW, UNCERTAIN, default mock, no provider → `UNKNOWN` with no error text exposed; identical questions → 1 call, no cross-request cache |
+| **AI privacy (captured Gemini request)** | Only the prompt file plus `{candidate_field_of_study, allowed_fields}`; no candidate id, name, email, phone, resume, CGPA, degree, degree level, graduation year, backlogs, institution, skills, job id, description, company, notes or role; key not in body |
+| **Logs** | No prompt, AI reason, AI result value, AI inputs, candidate values, provider/config error text or key; only metadata and counts |
+| **Live API (uvicorn, Gemini to a dead port)** | HTTP 200; ambiguous job → `AI_ASSESSMENT_UNAVAILABLE`, `NEEDS_REVIEW`; 50 ids 200, 51 and 0 → 422; 422 does not echo; `GET` → 405; only `POST /api/v1/eligibility/check` (no AI route, no `/jobs/ingest`); 14 log markers, 0 hits; database dump identical |
+| Final gate | No secrets, PII, resume files or local databases tracked; no frontend, auto-submit, browser automation, CAPTCHA/OTP bypass or Week 5 code |
+
+**Gates:** QG-001 PASS · QG-002 PASS (item 4 evidenced by literal zero-call tests) · QG-003 PASS ·
+QG-004 PASS · QG-005 PASS · QG-006 N/A (no schema change in PR 4B; chain re-verified) · QG-007 N/A
+(deployment) · QG-008 N/A.
+
+**Known limitations:**
+- **Gemini's live relatedness call remains unverified** — exercised only through `httpx.MockTransport`;
+  the model identifier is still unconfirmed against the live service (ADR-013 § Unverified).
+- PostgreSQL has not been verified; migrations have run on SQLite only.
+- With the default mock provider, ambiguous fields stay `UNKNOWN` (`AI_ASSESSMENT_INCONCLUSIVE`).
+- AI relatedness is an interpretation: labelled `ai_reasoning`, capped at MEDIUM, never `ELIGIBLE`
+  or `NOT_ELIGIBLE`. Prompt injection is mitigated (JSON data block, constrained schema), not eliminated.
+- At `f56d7df` the OpenAPI "Current status" text in `app/main.py` still described the AI stage as
+  not yet implemented. Corrected by the docs-only Checkpoint 4 record PR (description string only;
+  no route, schema, handler, dependency or behaviour change).
+- Five synthetic curated jobs; multi-entry profiles with unset levels resolve per-qualification
+  requirements to `UNKNOWN` (ADR-018).
 
 ### Checkpoint 4A — verification record (intermediate)
 
@@ -335,11 +392,12 @@ Notes that remove the ambiguities this registry exists to close:
 
 | Priority | Checkpoint | Commit | Role |
 |---|---|---|---|
-| **1st** | Checkpoint 4A — Week 4 deterministic engine | `4a5cb84` | **Current stable point.** If PR 4B introduces a regression, this is the immediate rollback reference. |
-| **2nd** | Checkpoint 3 — Week 3 | `2cfd4f0` | Last state before any eligibility code. |
-| **3rd** | Checkpoint 2 — Week 2 | `91dd31d` | Known-good state before the job catalogue. |
-| **4th** | Checkpoint 1 — Week 1 | `2e79454` | Remains available indefinitely as a historical recovery point. |
-| **5th** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
+| **1st** | Checkpoint 4 — Week 4 Eligibility Intelligence | `f56d7df` | **Current stable point.** If Week 5 introduces a regression, this is the immediate rollback reference. |
+| **2nd** | Checkpoint 4A — Week 4 deterministic engine | `4a5cb84` | Deterministic eligibility without the AI stage. Reached by reverting the PR #11 merge; no database step. |
+| **3rd** | Checkpoint 3 — Week 3 | `2cfd4f0` | Last state before any eligibility code. |
+| **4th** | Checkpoint 2 — Week 2 | `91dd31d` | Known-good state before the job catalogue. |
+| **5th** | Checkpoint 1 — Week 1 | `2e79454` | Remains available indefinitely as a historical recovery point. |
+| **6th** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
 
 **Recovering from Checkpoint 4A to Checkpoint 3 requires `alembic downgrade 7c2f1a9b4d30`**,
 which drops only `jobs.min_degree_level` (verified with existing rows preserved and the existing
