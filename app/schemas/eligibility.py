@@ -120,6 +120,44 @@ class ReasonCode(str, Enum):
     FIELD_NOT_EXACT_MATCH = "FIELD_NOT_EXACT_MATCH"
     SKIPPED_AFTER_HARD_FAILURE = "SKIPPED_AFTER_HARD_FAILURE"
 
+    # --- AI field-relatedness stage (ADR-019) --------------------------------------------
+    AI_FIELD_RELATED = "AI_FIELD_RELATED"
+    AI_FIELD_NOT_RELATED = "AI_FIELD_NOT_RELATED"
+    AI_ASSESSMENT_INCONCLUSIVE = "AI_ASSESSMENT_INCONCLUSIVE"
+    AI_ASSESSMENT_UNAVAILABLE = "AI_ASSESSMENT_UNAVAILABLE"
+
+
+class FieldRelatedness(str, Enum):
+    """An AI provider's judgement on whether a field of study falls within permitted fields.
+
+    ``UNCERTAIN`` is a legitimate answer and the conservative default (ADR-019).
+    """
+
+    RELATED = "RELATED"
+    NOT_RELATED = "NOT_RELATED"
+    UNCERTAIN = "UNCERTAIN"
+
+
+class FieldRelatednessAssessment(BaseModel):
+    """The validated result of ``AIProvider.assess_field_relatedness``.
+
+    Provider output is untrusted input (``standards/ai.md`` §4): a reply is only usable once
+    it validates against this model, and anything else is reported as an invalid response.
+    Never persisted and never logged.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    result: FieldRelatedness
+    confidence: Confidence = Field(
+        description="The provider's own confidence. The engine caps it and never raises it."
+    )
+    reason: str = Field(
+        min_length=1,
+        max_length=500,
+        description="Short explanation of the judgement, returned to the caller as a note.",
+    )
+
 
 class RequirementResult(BaseModel):
     """One requirement's evaluation."""
