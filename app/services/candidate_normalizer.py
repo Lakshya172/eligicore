@@ -74,6 +74,9 @@ _SKILL_ALIASES: dict[str, str] = {
     "cpp": "C++",
     "cplusplus": "C++",
     "csharp": "C#",
+    # ".NET" loses its dot to the lookup key, so "NET", ".net" and "dotnet" all key here.
+    "net": ".NET",
+    "dotnet": ".NET",
     "java": "Java",
     "golang": "Go",
     "go": "Go",
@@ -123,6 +126,10 @@ _SKILL_ALIASES: dict[str, str] = {
 _WHITESPACE = re.compile(r"\s+")
 _SKILL_LOOKUP_STRIP = re.compile(r"[^a-z0-9+#]")
 
+#: Punctuation trimmed from both ends of a skill. A dot is deliberately absent: it is trimmed
+#: from the end only, because a leading dot is part of names such as ".NET".
+_SKILL_OUTER_PUNCTUATION = " ,;:/|"
+
 
 def _collapse_whitespace(value: str) -> str:
     """Trim and collapse internal whitespace runs to single spaces."""
@@ -145,11 +152,32 @@ def normalize_skill(skill: str) -> str:
     Known variants map through :data:`_SKILL_ALIASES`. Unknown skills keep their original
     casing — inventing a capitalization convention for an unrecognized technology would
     mangle names like ``pandas`` or ``iOS`` more often than it would help.
+
+    A trailing dot is trimmed ("Python." is "Python"); a leading dot is kept, because it is
+    part of the name in ".NET". Trimming it used to turn ".NET" into "NET" (ADR-021).
     """
-    cleaned = _collapse_whitespace(skill).strip(" .,;:/|")
+    cleaned = (
+        _collapse_whitespace(skill)
+        .strip(_SKILL_OUTER_PUNCTUATION)
+        .rstrip(".")
+        .strip(_SKILL_OUTER_PUNCTUATION)
+    )
     if not cleaned:
         return ""
     return _SKILL_ALIASES.get(_skill_lookup_key(cleaned), cleaned)
+
+
+def skill_comparison_key(skill: str) -> str:
+    """Return the key two skills are compared by: the lookup key of the canonical form.
+
+    Canonicalizing first means every alias of a skill shares one key ("JS" and "JavaScript"
+    both give ``javascript``). The lookup key then makes the comparison case- and
+    separator-insensitive ("Spring Boot", "spring-boot" and "SpringBoot" all give
+    ``springboot``) while keeping ``+`` and ``#``, so C, C++ and C# stay three skills.
+
+    Returns an empty string for a blank skill. Used by the matching engine (ADR-021).
+    """
+    return _skill_lookup_key(normalize_skill(skill))
 
 
 def normalize_skills(skills: list[str]) -> list[str]:

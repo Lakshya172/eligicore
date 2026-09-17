@@ -1,7 +1,7 @@
 # EligiCore — dependencies
 #
 # Only what the implemented phases actually need. The remainder of the dossier's stack
-# (spaCy, scikit-learn, openpyxl) arrives with the phases that use it.
+# (spaCy, openpyxl) arrives with the phases that use it.
 #
 # No AI vendor SDK is listed: the Gemini provider calls the official REST API through
 # httpx, which the dossier §9 already names for exactly this purpose (ADR-013).
@@ -28,6 +28,12 @@ alembic==1.14.0
 # python-docx for Word documents.
 pdfplumber==0.11.4
 python-docx==1.1.2
+
+# --- Matching (Week 5) ---
+# Named in the dossier's approved stack (§9) for TF-IDF and cosine similarity. Pinned exactly:
+# its ENGLISH_STOP_WORDS list is part of the scoring definition (ADR-020), so a different
+# version could change scores. Brings numpy, scipy, joblib and threadpoolctl with it.
+scikit-learn==1.7.2
 
 # --- Testing ---
 pytest==8.3.4

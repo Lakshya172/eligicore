@@ -14,7 +14,33 @@ dossier considers the system complete and demoable. No release is claimed before
 
 ## [Unreleased]
 
-Nothing pending. **Week 5 has not started.**
+### Week 5 — PR 5A: Deterministic matching foundation *(in review, not merged)*
+
+#### Added
+
+- **`app/services/matching_engine.py`** — service only, no endpoint. Narrow inputs (candidate
+  skills plus experience titles and descriptions; job role title, description and required
+  skills), skill comparison by canonical key, a custom tokenizer, TF-IDF fitted on the whole
+  catalogue and never on the candidate, cosine similarity reported as a 0–100 score with one
+  decimal or `null` when there is nothing to compare, separate skill coverage, the top five
+  shared terms, deterministic template explanations and a score/null/job-id ordering key.
+  `MATCHING_VERSION` 1.
+- `skill_comparison_key` in the candidate normalizer.
+- **`scikit-learn==1.7.2`** (approved stack, §9), pinned exactly.
+- **121 new tests** (736 total) and a 36-mutation run, all caught.
+
+#### Fixed
+
+- `normalize_skill(".NET")` returned `"NET"`. A dot is now trimmed from the end only, and
+  `NET`/`dotnet` canonicalize to `.NET`, so `POST /api/v1/candidates/normalize` returns `.NET`.
+
+#### Decided
+
+- **ADR-020** match scoring · **ADR-021** skill comparison for matching.
+
+#### Not in this change
+
+- No recommendation endpoint, no `/matching/score`, no eligibility, AI or database change.
 
 ---
 
