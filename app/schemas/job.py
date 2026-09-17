@@ -23,7 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # Reused rather than redefined. A second JobType with the same members would drift from
 # this one the first time either changed.
-from app.schemas.candidate import JobType
+from app.schemas.candidate import DegreeLevel, JobType
 
 
 class JobStatusSchema(str, Enum):
@@ -77,6 +77,13 @@ class RawJob(BaseModel):
         ),
     )
     allowed_fields: list[str] = Field(default_factory=list)
+    min_degree_level: DegreeLevel | None = Field(
+        default=None,
+        description=(
+            "Minimum qualification level the posting requires. Null when the posting states "
+            "none — which means no requirement, not an unknown one."
+        ),
+    )
     max_backlogs: int | None = Field(default=None, ge=0)
     min_grad_year: int | None = Field(default=None, ge=1950, le=2100)
     max_grad_year: int | None = Field(default=None, ge=1950, le=2100)
@@ -110,6 +117,7 @@ class NormalizedJob(BaseModel):
     min_cgpa: float | None
     min_cgpa_scale: str | None
     allowed_fields: list[str]
+    min_degree_level: DegreeLevel | None = None
     max_backlogs: int | None
     min_grad_year: int | None
     max_grad_year: int | None
@@ -151,6 +159,10 @@ class JobRead(BaseModel):
         ),
     )
     allowed_fields: list[str]
+    min_degree_level: DegreeLevel | None = Field(
+        default=None,
+        description="Minimum qualification level required. Null means the posting states none.",
+    )
     max_backlogs: int | None
     min_grad_year: int | None
     max_grad_year: int | None

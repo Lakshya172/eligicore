@@ -38,7 +38,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
 from app.database import Base
-from app.schemas.candidate import JobType
+from app.schemas.candidate import DegreeLevel, JobType
 
 
 class JobStatus(str, enum.Enum):
@@ -108,6 +108,14 @@ class Job(Base):
     #: so Week 4 owns the comparison semantics rather than Week 3 pre-empting them.
     min_cgpa_scale: Mapped[str | None] = mapped_column(String(20), nullable=True)
     allowed_fields: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    #: Minimum qualification level a posting requires (dossier §12.1 names degree level as a
+    #: hard constraint; §10.2's field table had no column for it — contradiction C-10,
+    #: ruled in ADR-018). Nullable: most postings state no level, and absence means "not a
+    #: requirement", never "any level". Added by migration ``b3e8d2c61a47``.
+    min_degree_level: Mapped[DegreeLevel | None] = mapped_column(
+        SAEnum(DegreeLevel, native_enum=False, length=20, create_constraint=True),
+        nullable=True,
+    )
     max_backlogs: Mapped[int | None] = mapped_column(Integer, nullable=True)
     min_grad_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     max_grad_year: Mapped[int | None] = mapped_column(Integer, nullable=True)

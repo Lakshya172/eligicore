@@ -14,7 +14,40 @@ dossier considers the system complete and demoable. No release is claimed before
 
 ## [Unreleased]
 
-Nothing pending.
+### Week 4 — PR 4A: Deterministic Eligibility Engine *(in review, not merged)*
+
+#### Added
+
+- **`POST /api/v1/eligibility/check`** — evaluates a supplied profile against up to 50 catalogue
+  jobs and returns, per job, a five-state verdict with a per-requirement breakdown and a summary.
+  Stateless: the catalogue is read, nothing is written, the profile is not echoed.
+- **Deterministic engine** — `app/services/eligibility_engine.py`. `MIN_CGPA` (same scale only),
+  `GRAD_YEAR_WINDOW` (inclusive), `MAX_BACKLOGS`, `MIN_DEGREE_LEVEL`, and the exact-match portion
+  of `ALLOWED_FIELDS`. Missing or invalid data is `UNKNOWN`, never `FAIL`, never defaulted.
+- **`jobs.min_degree_level`** — nullable, typed with `DegreeLevel`; additive migration
+  `b3e8d2c61a47` with a CHECK constraint. Two curated jobs now require `BACHELORS`.
+- **196 new tests** (524 total; the existing 328 unchanged), mutation-verified against 13
+  deliberate breakages.
+
+#### Decided
+
+- **ADR-017** Eligibility states and verdict precedence (C-9, C-13, R-2, R-4)
+- **ADR-018** Requirement inputs: same-scale grades, qualification selection, degree level,
+  exact-match fields, batch cap (C-10, C-12, A-1, A-2, A-4)
+
+#### Fixed
+
+- The Week 1 `NormalizedGrade` docstring claimed a linear `cgpa / max` fraction made
+  cross-scale grade comparison possible. It does not; the docstring is corrected (C-12).
+
+#### Known limitations
+
+- No AI stage yet: a field of study that is not an exact match stays `UNKNOWN`, so such jobs
+  resolve to `NEEDS_REVIEW` at best. PR 4B is approved and not started.
+- Multi-entry profiles whose education levels were never set resolve per-qualification
+  requirements to `UNKNOWN` (ADR-018 accepted cost).
+- Free-text `requirements.notes` are disclosed as not evaluated, never interpreted.
+- Migration `b3e8d2c61a47` verified on SQLite only.
 
 ---
 

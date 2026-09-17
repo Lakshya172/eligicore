@@ -150,6 +150,14 @@ not evidence of ineligibility.
 
 **States:** `ELIGIBLE` · `LIKELY_ELIGIBLE` · `NEEDS_REVIEW` · `NOT_ELIGIBLE` · `UNKNOWN`
 
+Their meanings and exact precedence are ruled in **ADR-017**: any deterministic FAIL →
+`NOT_ELIGIBLE`; nothing verifiable → `UNKNOWN`; anything unresolved or an AI FAIL →
+`NEEDS_REVIEW`; all pass with AI help → `LIKELY_ELIGIBLE`; all pass deterministically, or no
+structured requirement stated → `ELIGIBLE`. All deterministic checks always run; the AI stage is
+closed to any job with a verified failure. Requirement inputs — same-scale-only grades,
+single-qualification selection, `min_degree_level`, exact-match fields — are ruled in **ADR-018**.
+Implementation: `app/services/eligibility_engine.py`.
+
 **Confidence is orthogonal to eligibility.** It measures how much the system trusts its own
 determination, not how good the news is. A deterministic hard failure is a HIGH-confidence
 `NOT_ELIGIBLE`. An AI reading of "or related field" may be a MEDIUM-confidence `ELIGIBLE`.

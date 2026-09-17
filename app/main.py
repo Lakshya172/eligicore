@@ -32,7 +32,7 @@ from app.config import get_settings
 # Registers operational models on Base.metadata. Import for the side effect: without
 # it, Alembic and the privacy guards see an empty schema.
 import app.models  # noqa: F401
-from app.routers import candidates, jobs, resumes
+from app.routers import candidates, eligibility, jobs, resumes
 
 settings = get_settings()
 
@@ -104,9 +104,10 @@ app = FastAPI(
         "table. `candidate_id` is a client-generated correlation identifier, not a "
         "server-side key.\n\n"
         "### Current status\n"
-        "Week 1 of a 10-week build. Only the candidate profile endpoints exist. Resume "
-        "parsing, job ingestion, eligibility evaluation and matching are not yet "
-        "implemented."
+        "Week 4 of a 10-week build. Candidate profile, resume parsing, job catalogue and "
+        "deterministic eligibility endpoints exist. The AI stage for ambiguous "
+        "field-of-study requirements, matching, recommendations, application preparation "
+        "and export are not yet implemented."
     ),
     openapi_tags=[
         {
@@ -125,6 +126,13 @@ app = FastAPI(
             "description": (
                 "The job catalogue. Public data - these endpoints handle no personal "
                 "data and take no candidate parameter."
+            ),
+        },
+        {
+            "name": "eligibility",
+            "description": (
+                "Stateless eligibility evaluation against the job catalogue. The profile "
+                "is evaluated and returned with explained verdicts; nothing is stored."
             ),
         },
         {"name": "system", "description": "Operational endpoints."},
@@ -282,3 +290,4 @@ async def health() -> HealthResponse:
 app.include_router(candidates.router, prefix=settings.api_v1_prefix)
 app.include_router(resumes.router, prefix=settings.api_v1_prefix)
 app.include_router(jobs.router, prefix=settings.api_v1_prefix)
+app.include_router(eligibility.router, prefix=settings.api_v1_prefix)

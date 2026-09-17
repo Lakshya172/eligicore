@@ -198,6 +198,7 @@ def normalize_job(raw: RawJob, source: str) -> NormalizedJob:
         # grade with no stated scale stays UNKNOWN (standards/eligibility.md §4).
         min_cgpa_scale=normalize_display_text(raw.min_cgpa_scale),
         allowed_fields=normalize_skill_list(raw.allowed_fields),
+        min_degree_level=raw.min_degree_level,
         max_backlogs=raw.max_backlogs,
         min_grad_year=raw.min_grad_year,
         max_grad_year=raw.max_grad_year,

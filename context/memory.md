@@ -317,6 +317,25 @@ previous report — `gh api repos/OWNER/REPO/pulls/N` for `merged`/`merge_commit
 compare `origin/main` against the SHA the report claimed. A checkpoint should be recorded at
 the commit that was actually verified, not the one that happened to merge first.
 
+### D-23 · A privacy marker can legitimately appear in public catalogue data
+The first "no candidate data in the database" test planted a distinctive field-of-study marker
+in the profile — and the seeded job listed the same string in `allowed_fields`, so the marker
+was in the database before the request ran. The test failed on public data, not on a leak.
+**What to do:** for "nothing was written", compare a full database dump **before and after**
+the request; marker scans are a second line, and only for values that exist nowhere else.
+
+### D-24 · A layered guard needs a test per layer
+The INV-2 guard exists twice: `_skip_ambiguity_after_hard_failure` re-labels ambiguous entries,
+and `ambiguous_requirements` refuses a job with a hard failure. Removing the second guard was
+caught by only **one** test, because the first masks it on every real breakdown.
+**What to do:** when a safety property is enforced in two places, test each place on input the
+other does not cover — here, a hand-built breakdown that was never re-labelled.
+
+### D-25 · SQLite batch `add_column` + `create_check_constraint` keeps existing CHECKs
+Verified for migration `b3e8d2c61a47`: after upgrade the recreated `jobs` table still carries
+`jobstatus` and `jobtype`, and downgrade (drop constraint, then column) leaves both intact. Do not
+assume it for other batch operations — read `sqlite_master` after each new batch migration.
+
 ---
 
 ## Lessons

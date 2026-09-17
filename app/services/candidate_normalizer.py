@@ -13,7 +13,7 @@ and the caller is required not to record payloads.
 
 **This module contains no eligibility logic.** It does not decide whether a candidate meets
 any requirement; it only puts the profile into a shape a later stage can reason about. The
-eligibility engine arrives in Week 4.
+eligibility engine is ``app.services.eligibility_engine``.
 """
 
 from __future__ import annotations

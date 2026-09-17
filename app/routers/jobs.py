@@ -53,6 +53,7 @@ def _to_read(job: Job) -> JobRead:
         min_cgpa=job.min_cgpa,
         min_cgpa_scale=job.min_cgpa_scale,
         allowed_fields=job.allowed_fields,
+        min_degree_level=job.min_degree_level,
         max_backlogs=job.max_backlogs,
         min_grad_year=job.min_grad_year,
         max_grad_year=job.max_grad_year,

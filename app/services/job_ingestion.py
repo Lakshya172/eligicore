@@ -48,6 +48,7 @@ _UPDATABLE_FIELDS = (
     "min_cgpa",
     "min_cgpa_scale",
     "allowed_fields",
+    "min_degree_level",
     "max_backlogs",
     "min_grad_year",
     "max_grad_year",
