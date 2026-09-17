@@ -180,6 +180,13 @@ The `method` field is not cosmetic — it is how a reader knows which stage prod
 4. **Ranking** — eligible jobs ranked by score; borderline jobs in a separate flagged group;
    ineligible jobs excluded from ranking but retrievable with their rejection reason.
 
+Scoring is ruled in **ADR-020** and skill comparison in **ADR-021**
+(`app/services/matching_engine.py`): narrow inputs, `skill:<key>` terms separate from prose
+tokens, TF-IDF fitted on the whole catalogue and never on the candidate, a 0–100 cosine score or
+`null` when there is nothing to compare, and skill coverage reported beside the score, never
+combined with it. The engine imports no eligibility, AI, framework or database code; eligibility
+never imports matching.
+
 TF-IDF rather than embeddings because it needs no training data, costs nothing, runs locally,
 and — decisively — is explainable. The system can state which terms drove a score. For a tool
 whose value proposition is transparency, an unexplainable score is self-defeating. Embeddings

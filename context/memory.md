@@ -351,6 +351,22 @@ For eligibility that would fail every request — including those with no ambigu
 remembered for the request and fails closed to `UNKNOWN`. Verified live with Gemini selected and
 no key: HTTP 200, the ambiguous entry `AI_ASSESSMENT_UNAVAILABLE`, deterministic verdicts intact.
 
+### D-28 · scikit-learn's default token pattern silently deletes technical terms
+`TfidfVectorizer`'s default `token_pattern` is `\b\w\w+\b`: "c" and "r" are too short, and
+"c++"/"c#" lose their symbols and then their only letter. D-3 again, inside a library default.
+**What to do:** matching builds its own terms and passes `analyzer=<callable>` with
+`token_pattern=None` — leaving the default pattern set beside a callable analyzer emits an
+unused-parameter warning. `ENGLISH_STOP_WORDS` contains "go", so a skill must never pass
+through the stop-word filter; skills live in their own `skill:` namespace.
+
+### D-29 · Test inputs can be too clean to exercise a setting
+PR 5A's first mutation run left two survivors. `sublinear_tf=True` changed nothing because every
+fixture used each term once; putting the job id into the job document changed nothing because
+every fixture id was one character, which the tokenizer drops.
+**What to do:** when a setting only matters above a threshold (term frequency > 1, token
+length ≥ 2), give at least one test an input above it. Compute expected TF-IDF values from the
+formula in the test, never by hand in a literal.
+
 ---
 
 ## Lessons

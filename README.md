@@ -53,6 +53,9 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 Current stable checkpoint: **Checkpoint 4** (`f56d7df`) — Week 4 Eligibility Intelligence: the
 deterministic eligibility engine plus AI-assisted resolution of ambiguous fields of study.
 
+Week 5 is in progress: the deterministic matching engine (PR 5A, service only) is in review and
+not merged. No recommendation endpoint exists yet.
+
 > **Not production-ready.** The Gemini Flash provider has not been exercised against the live
 > API — no key is configured and the test suite runs without one. The provider contract is
 > covered through a mocked transport; a live smoke test remains pending.
@@ -93,7 +96,7 @@ asserts none exists. Uploaded resumes exist only for the duration of processing.
 | 2 | Resume parser and AI provider abstraction | **Complete** |
 | 3 | Job schema, source adapters, ingestion, deduplication | **Complete** |
 | 4 | Eligibility engine — deterministic rules plus AI for ambiguity | **Complete** — deterministic engine (PR #9) + AI field relatedness (PR #11), Checkpoint 4 |
-| 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | Not started |
+| 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | **In progress** — matching engine service in review (PR 5A); recommendations endpoint not started |
 | 6 | **Polish, Excel export, testing — complete demoable MVP** | Not started |
 | 7 | Application preparation with truthfulness validation | Not started |
 | 8 | Caching and AI cost logging | Not started |

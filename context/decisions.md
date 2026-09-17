@@ -28,6 +28,8 @@
 | [ADR-016](../artifacts/decisions/ADR-016-local-personal-data-store.md) | Phase 1 local personal-data store at `~/.eligicore/` — **recorded, not implemented** | §8.1a, §10.1 | Accepted 2026-09-10 |
 | [ADR-017](../artifacts/decisions/ADR-017-eligibility-states-and-verdict-precedence.md) | Eligibility states and verdict precedence — **rules on C-9, C-13, R-2, R-4** | §7, §10.1, §12.1 | Accepted 2026-09-17 |
 | [ADR-019](../artifacts/decisions/ADR-019-ai-assisted-field-relatedness.md) | AI-assisted field-of-study relatedness — the only AI eligibility stage; cannot produce `NOT_ELIGIBLE`; fails closed; minimum input — **implements A-3, R-2; applies C-14** | §7, §12.1 | Accepted 2026-09-17 |
+| [ADR-020](../artifacts/decisions/ADR-020-match-scoring.md) | Match scoring — narrow inputs, skill/text namespaces, custom tokenizer, TF-IDF fitted on the whole catalogue (never the candidate), cosine 0–100 or null, separate skill coverage, template explanations, `MATCHING_VERSION` 1 | §7, §9, §12.2 | Accepted 2026-09-17 |
+| [ADR-021](../artifacts/decisions/ADR-021-skill-comparison-for-matching.md) | Skill comparison for matching — canonical lookup key, alias table only, aliases on skill lists never prose, no splitting, `.NET` correction | §12.2 | Accepted 2026-09-17 |
 | [ADR-018](../artifacts/decisions/ADR-018-eligibility-requirement-inputs.md) | Eligibility requirement inputs: same-scale grades, qualification selection, `min_degree_level`, exact-match fields — **rules on C-10, C-12, A-1, A-2, A-4** | §10.2, §12.1, §17 | Accepted 2026-09-17 |
 
 > **ADR-011 and ADR-012 are contradiction rulings.** They resolve internal inconsistencies in
