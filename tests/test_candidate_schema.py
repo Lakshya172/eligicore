@@ -24,6 +24,7 @@ from app.services.candidate_normalizer import (
     normalize_profile,
     normalize_skill,
     normalize_skills,
+    skill_comparison_key,
     validate_profile,
 )
 
@@ -280,6 +281,35 @@ def test_c_variants_are_not_conflated() -> None:
     assert normalize_skill("C++") == "C++"
     assert normalize_skill("C#") == "C#"
     assert len({normalize_skill(s) for s in ("C", "C++", "C#")}) == 3
+
+
+@pytest.mark.parametrize(
+    "raw", [".NET", ".net", "NET", "net", "dotnet", "DotNet", " .NET ", ".NET.", ".NET ,"]
+)
+def test_dotnet_keeps_its_leading_dot(raw: str) -> None:
+    """Regression (ADR-021): a leading dot is part of ".NET" and used to be trimmed to "NET"."""
+    assert normalize_skill(raw) == ".NET"
+
+
+def test_dotnet_family_is_not_merged() -> None:
+    """ASP.NET and .NET Core are distinct skills from .NET; only the outer dot rule changed."""
+    assert normalize_skill("ASP.NET") == "ASP.NET"
+    assert normalize_skill(".NET Core") == ".NET Core"
+    assert len({normalize_skill(s) for s in (".NET", "ASP.NET", ".NET Core")}) == 3
+
+
+@pytest.mark.parametrize(("raw", "expected"), [("Python.", "Python"), ("Python ., ", "Python")])
+def test_trailing_dot_is_still_trimmed(raw: str, expected: str) -> None:
+    assert normalize_skill(raw) == expected
+
+
+def test_skill_comparison_key_is_shared_by_aliases_and_keeps_plus_and_hash() -> None:
+    assert skill_comparison_key("JS") == skill_comparison_key("JavaScript") == "javascript"
+    assert skill_comparison_key(".NET") == skill_comparison_key("NET") == "net"
+    assert skill_comparison_key("Spring Boot") == skill_comparison_key("spring-boot") == "springboot"
+    assert len({skill_comparison_key(s) for s in ("C", "C++", "C#")}) == 3
+    assert skill_comparison_key("c++") == skill_comparison_key("cpp") == "c++"
+    assert skill_comparison_key("   ") == ""
 
 
 def test_unknown_skill_keeps_its_original_casing() -> None:
