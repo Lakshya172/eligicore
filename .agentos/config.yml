@@ -21,14 +21,14 @@ project:
   api_namespace: /api/v1
   env_prefix: ELIGICORE_
   database_name: eligicore
-  phase: "Week 2 — Resume Parser and AI Service Layer (in review)"
-  next_approved_phase: "Week 3 — Job Schema, Adapters and Ingestion (not started)"
+  phase: "Week 4 — Eligibility Engine (PR 4A deterministic engine in review)"
+  next_approved_phase: "Week 4 PR 4B — AI field-relatedness stage (approved, not started)"
   source_of_truth: EligiCore_Dossier_update.md
   ai_provider_phase_1: gemini-flash   # ADR-013. Concrete implementation, not a dependency.
   vcs:
     remote: https://github.com/Lakshya172/eligicore
     default_branch: main
-    last_stable_checkpoint: "Checkpoint 1 — 2e79454f787019ff29af39fcfd285aee59c8bc77"
+    last_stable_checkpoint: "Checkpoint 3 — 2cfd4f0276b60de393ec604afc10b3c52f483ca7"
 
 # Read at the start of every session, without exception.
 context:

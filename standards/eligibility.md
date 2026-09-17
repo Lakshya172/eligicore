@@ -83,6 +83,11 @@ Every AI-produced verdict is marked `method: "ai_reasoning"` and carries a confi
 
 States: `ELIGIBLE` · `LIKELY_ELIGIBLE` · `NEEDS_REVIEW` · `NOT_ELIGIBLE` · `UNKNOWN`
 
+State meanings and precedence: **ADR-017**. Requirement inputs, scales and qualification
+selection: **ADR-018**. The implemented contract (`app/schemas/eligibility.py`) adds
+`requirement_type` and a stable `reason_code` to each entry, and makes `note` mandatory on every
+entry rather than only on AI-reasoned ones.
+
 Every verdict carries a per-requirement breakdown. Each entry:
 
 ```json

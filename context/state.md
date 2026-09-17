@@ -11,16 +11,15 @@
 
 | Field | Value |
 |---|---|
-| **Date** | 2026-09-10 |
-| **Phase** | **Week 3 — Job Schema, Adapters and Ingestion · COMPLETE** |
-| **Roadmap position** | Weeks 1–3 complete and merged. **Week 4 NOT started.** |
-| **Health** | 🟢 GREEN — 328 tests passing on `main`, CI green, no open blockers |
-| **Stable branch** | `main` |
+| **Date** | 2026-09-17 |
+| **Phase** | **Week 4 — Eligibility Engine · IN PROGRESS** — PR 4A (deterministic engine) in review |
+| **Roadmap position** | Weeks 1–3 complete and merged. Week 4 PR 4A open on `feature/week-4-eligibility-engine`, **not merged**. PR 4B (AI stage) approved, **not started**. |
+| **Health** | 🟢 GREEN — 328 tests on `main`; 524 on the PR 4A branch; no open blockers |
 | **Stable branch** | `main` |
 | **Current checkpoint** | **Checkpoint 3** — `2cfd4f0276b60de393ec604afc10b3c52f483ca7` |
 | **Produced by** | PR #6 (`f538015`) + PR #7 (`2cfd4f0`), both **MERGED** 2026-09-10 |
 | **Rollback target** | Checkpoint 3 first; Checkpoints 2/1 remain available. Below Checkpoint 3 also needs `alembic downgrade base`. |
-| **Next milestone** | Week 4: eligibility engine — **not started, not authorized** |
+| **Next milestone** | PR 4A external review and merge decision; then PR 4B. **Checkpoint 4 not created.** |
 | **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
@@ -59,6 +58,11 @@
 | **Week 3 — tests** | 125 new (328 total). Weeks 1–2's 203 unchanged. Four mutations verified. |
 | **Week 3 — enum enforcement** | Migration `7c2f1a9b4d30` adds DB-level CHECK constraints, so ADR-014's four states are a guarantee rather than a convention. Found during final verification; `f538015` lacked it. |
 | **QG-008** | New quality gate for resume processing and AI extraction |
+| **Week 4 design gate** | Rulings C-9..C-13, A-1..A-4, R-2, R-4 recorded as **ADR-017** (states and precedence) and **ADR-018** (requirement inputs). |
+| **Week 4 PR 4A — `min_degree_level`** *(branch, in review)* | Nullable typed column; additive migration `b3e8d2c61a47`; RawJob/NormalizedJob/JobRead/ingestion carry it; two curated jobs require BACHELORS. Merged migrations untouched. |
+| **Week 4 PR 4A — deterministic engine** *(branch, in review)* | `app/services/eligibility_engine.py` — MIN_CGPA (same scale only), GRAD_YEAR_WINDOW, MAX_BACKLOGS, MIN_DEGREE_LEVEL, ALLOWED_FIELDS exact match; single-qualification selection; five-state precedence; structural hard-failure guard for the future AI stage. |
+| **Week 4 PR 4A — endpoint** *(branch, in review)* | `POST /api/v1/eligibility/check` — stateless, at most 50 ids, de-duplicated, `not_found_job_ids`, read-only on the catalogue. |
+| **Week 4 PR 4A — tests** *(branch, in review)* | 196 new (524 total); 328 existing unchanged. 13 mutations verified caught. |
 
 ## Partial
 
@@ -77,11 +81,11 @@
 | Component | Roadmap week | Status |
 |---|---|---|
 | spaCy deterministic fallback extraction (cost-saver, dossier §9) | 2 (deferred) | NOT STARTED |
-| Eligibility engine (deterministic stage) | 4 | NOT STARTED |
-| Eligibility engine (AI ambiguity stage) | 4 | NOT STARTED |
+| Eligibility engine (deterministic stage) | 4 | **IN REVIEW** — PR 4A, not merged |
+| Eligibility engine (AI ambiguity stage) | 4 | NOT STARTED — PR 4B, approved; field-of-study relatedness only |
 | Matching engine (skill normalization, TF-IDF, cosine) | 5 | NOT STARTED |
 | Excel export (openpyxl) | 6 | NOT STARTED |
-| Deterministic **eligibility** test suite (boundary/missing/invalid per constraint) | 4 | NOT STARTED |
+| Deterministic **eligibility** test suite (boundary/missing/invalid per constraint) | 4 | **IN REVIEW** — PR 4A |
 | Application preparation + truthfulness validator | 7 | NOT STARTED |
 | Caching, AI cost logging | 8 | NOT STARTED |
 | Deployment (Render/Railway), README, docs | 9 | NOT STARTED |
@@ -93,19 +97,17 @@ demoable. Weeks 7–10 are enhancement.
 
 ## Next approved phase
 
-**Week 4 — Eligibility Engine.** **Not started, and not authorized to start.**
+**Week 4 — Eligibility Engine. Approved and in progress, in two PRs.**
 
-This is the phase the whole project exists for, and the one with the least room for error:
-deterministic hard constraints evaluated first with final authority, AI only for genuine
-ambiguity, and `UNKNOWN`/`NEEDS_REVIEW` wherever evidence is absent (ADR-003, INV-2, INV-3).
+- **PR 4A — deterministic engine.** Implemented on `feature/week-4-eligibility-engine`, open
+  for external review. **Not merged.** Gates: QG-001, QG-002, QG-004, QG-005, QG-006.
+- **PR 4B — AI field-relatedness stage.** Approved (ruling A-3), **not started**. Starts only
+  after PR 4A is reviewed. Scope: `assess_field_relatedness` on the provider interface, mock
+  (uncertain by default) and Gemini implementations, validated response schema, prompt file.
+  AI may assess *only* field-of-study relatedness, only for jobs `ambiguous_requirements()`
+  returns, capped at MEDIUM confidence, and never alone producing `NOT_ELIGIBLE`. Adds QG-003.
 
-Week 3 deliberately left it the raw material rather than pre-empting it: `min_cgpa_scale` is
-stored exactly as a source states it and is never inferred, so a job with an unstated scale
-must resolve to `UNKNOWN` rather than an assumed 10-point comparison.
-
-Gates: QG-001, QG-002 (no warning tier), QG-004. Reviewers: architect + ai + qa.
-
-**No implementation may begin without explicit human approval of the specific step.**
+**Checkpoint 4 is not created** and will not be until Week 4 is merged and verified.
 
 ---
 
@@ -152,6 +154,12 @@ never silently fixed. These are internal to the dossier.
 | **C-7** | Dossier §10.2's dedup canonicalization inputs include "Normalized location", but the `jobs` table in the same section lists no `location` column. | dossier §10.2, internal | **RESOLVED 2026-09-10 — a `location` column is required to implement the dossier's own deduplication spec.** Added; not speculative. |
 | **C-8** | The approved Phase 1 local store is `~/.eligicore/`; dossier §8.1a/§10.1 names IndexedDB. | approved decision vs dossier §8.1a | **NOT A CONTRADICTION — [ADR-016](../artifacts/decisions/ADR-016-local-personal-data-store.md).** Two mechanisms for one commitment: personal data rests on the user's own device. IndexedDB presupposes the Phase 2 browser client; a Phase 1 non-browser client needs a filesystem equivalent. Recorded; **not implemented**. |
 
+| **C-9** | §7 lists four verdict states; §10.1 lists five; UNKNOWN vs NEEDS_REVIEW and the role of LIKELY_ELIGIBLE were undefined. | dossier §7 vs §10.1 vs §12.1 | **RULED 2026-09-17 — [ADR-017](../artifacts/decisions/ADR-017-eligibility-states-and-verdict-precedence.md).** Five states with defined meanings and exact precedence. |
+| **C-10** | Degree level is a named hard constraint (§12.1, §17) but `jobs` had no field for it. | dossier §12.1/§17 vs §10.2 | **RULED 2026-09-17 — [ADR-018](../artifacts/decisions/ADR-018-eligibility-requirement-inputs.md).** Nullable typed `min_degree_level`, additive migration `b3e8d2c61a47`. |
+| **C-11** | §11's sample eligibility response includes `match_score` and skill overlap. | dossier §11 vs §7/§15 | **RULED 2026-09-17.** Excluded from Week 4; matching is Week 5. |
+| **C-12** | The Week 1 `NormalizedGrade` docstring claimed a linear fraction enabled cross-scale comparison; `standards/eligibility.md` §4 requires a defined conversion. | repo vs standard | **RULED 2026-09-17 — ADR-018.** Same-scale comparison only; docstring corrected. |
+| **C-13** | §12.1 "evaluation stops" after a hard failure — the whole job, or only AI? | dossier §12.1 | **RULED 2026-09-17 — ADR-017.** Deterministic evaluation continues; AI stops. |
+
 ### Still open — not to be resolved without instruction
 
 | # | Contradiction | Where | Status |
@@ -167,6 +175,8 @@ Full index in `context/decisions.md`.
 
 | ADR | Title | Date |
 |---|---|---|
+| ADR-018 | Eligibility requirement inputs (rules on C-10, C-12, A-1, A-2, A-4) | 2026-09-17 |
+| ADR-017 | Eligibility states and verdict precedence (rules on C-9, C-13, R-2, R-4) | 2026-09-17 |
 | ADR-012 | `ingestion_state` as an operational model (ruling on C-2) | 2026-09-10 |
 | ADR-011 | No server-side candidate or application persistence (ruling on C-1) | 2026-09-10 |
 | ADR-001 | Local-first personal data | 2026-09-10 (recorded; decided in dossier) |
@@ -222,7 +232,8 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Await explicit instruction to begin Week 4.** No phase rolls into the next automatically.
+1. **PR 4A is open for external review.** Do not merge it, start PR 4B, or create Checkpoint 4
+   without explicit instruction.
 2. Before deployment (Week 9 / QG-007): verify the migration chain against PostgreSQL.
    `batch_alter_table` has only ever run on SQLite.
 
@@ -230,5 +241,6 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 against the live service. Confirm the model identifier and exercise one real call before
 relying on live extraction.
 
-**Weeks 4–10 have not started.** No Week 4 branch exists. No eligibility, matching, recommendations or application
+**Weeks 5–10 have not started.** The only Week 4 code is on `feature/week-4-eligibility-engine`
+(PR 4A, unmerged). No AI eligibility stage, matching, recommendations or application
 preparation code exists anywhere in the repository.
