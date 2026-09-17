@@ -91,7 +91,7 @@ class Confidence(str, Enum):
     """How much the system trusts a determination — not how good the news is.
 
     Independent of eligibility, per ADR-003. Used here for per-field parsing confidence
-    (dossier §10.1 ``field_confidence``); reused by the eligibility engine in Week 4.
+    (dossier §10.1 ``field_confidence``), and by the eligibility engine per requirement.
     """
 
     HIGH = "HIGH"
@@ -121,8 +121,8 @@ class EducationEntry(BaseModel):
 
     Education is a list rather than flat columns because candidates hold multiple
     qualifications and education systems differ (dossier §10.1 design note). Keeping
-    ``cgpa`` and ``scale`` together on the same entry is what makes cross-system
-    comparison possible later.
+    ``cgpa`` and ``scale`` together on the same entry is what lets a later stage tell
+    whether two grades are comparable at all.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -358,15 +358,19 @@ class CandidateNormalizationResponse(BaseModel):
 
 
 class NormalizedGrade(BaseModel):
-    """A grade expressed as a scale-independent fraction, when that is possible at all.
+    """A grade expressed as a fraction of its scale's maximum, when the scale is known.
 
-    ``fraction`` is ``cgpa / scale_maximum`` — so 8.2/10 and 3.28/4 both yield 0.82, which
-    is what makes cross-system comparison possible in Week 4.
+    ``fraction`` is ``cgpa / scale_maximum``. It is a **descriptive** view for the client,
+    and it is **not an eligibility comparison basis**: 8.2/10 and 3.28/4 both yield 0.82,
+    but that does not make them equivalent grades. Real conversions between 4-point,
+    10-point and percentage systems are institution-specific and non-linear, so the
+    eligibility engine compares grades on the same scale only and reports a mismatched
+    scale as ``UNKNOWN`` (ruling C-12, ADR-018). This docstring previously claimed the
+    linear fraction made cross-system comparison possible; that was wrong.
 
-    When the scale is UNKNOWN, ``fraction`` is ``None``. That is the whole point: an
-    unknown scale stays unknown rather than being silently treated as a 10-point scale
-    (``standards/eligibility.md`` §4). Week 4 maps a null fraction to ``UNKNOWN``, never to
-    a failure (INV-3).
+    When the scale is UNKNOWN, ``fraction`` is ``None``: an unknown scale stays unknown
+    rather than being silently treated as a 10-point scale (``standards/eligibility.md``
+    §4, INV-3).
     """
 
     model_config = ConfigDict(extra="forbid")
