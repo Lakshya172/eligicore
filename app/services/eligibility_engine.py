@@ -18,8 +18,9 @@ Evaluation order (dossier §12.1, ADR-003, ADR-017):
    it lives in control flow — :func:`ambiguous_requirements` returns nothing for such a job.
 4. Compose the final state from the breakdown (:func:`compose_verdict`).
 
-The AI ambiguity stage is not part of this module yet (PR 4B). Until it exists, an
-ambiguous requirement stays ``UNKNOWN``.
+The AI ambiguity stage is deliberately **not** part of this module: it lives in
+:mod:`app.services.eligibility_ai`, which may only act on what :func:`ambiguous_requirements`
+releases (ADR-019). Without it, an ambiguous requirement stays ``UNKNOWN``.
 
 **Absence of evidence is not evidence of ineligibility.** No missing value is ever replaced
 with a comparable one: a missing CGPA is not 0.0, missing backlogs are not 0, and a missing
@@ -58,7 +59,9 @@ logger = logging.getLogger("eligicore.eligibility")
 
 #: Version of the rule set. Bump it whenever a rule, a reason code's meaning, or the verdict
 #: precedence changes, so clients holding stored verdicts know to re-evaluate.
-ENGINE_VERSION = "1"
+#: 2 — the AI field-relatedness stage (ADR-019) can resolve a non-exact field of study, so a
+#: verdict computed under version 1 may now differ.
+ENGINE_VERSION = "2"
 
 #: Orderable qualification levels (ADR-018). ``OTHER`` and ``UNKNOWN`` are deliberately
 #: absent: neither can be placed on this ladder, so neither can pass or fail a comparison.
@@ -128,7 +131,7 @@ def _format_number(value: float) -> str:
     return str(float(value))
 
 
-def _normalize_text(value: str) -> str:
+def normalize_field_name(value: str) -> str:
     """Trim, collapse whitespace and casefold — nothing more (ruling A-2).
 
     No stemming, no abbreviation expansion, no synonym table: any of those would be a field
@@ -458,7 +461,7 @@ def evaluate_allowed_fields(
         )
 
     candidate_value = " ".join(field.split())
-    if _normalize_text(field) in {_normalize_text(option) for option in allowed}:
+    if normalize_field_name(field) in {normalize_field_name(option) for option in allowed}:
         return _result(
             kind, requirement, RequirementStatus.PASS, ReasonCode.EXACT_FIELD_MATCH,
             "The field of study exactly matches a permitted field.",
@@ -656,8 +659,18 @@ def evaluate_requirements(
 
 
 def evaluate_job(profile: CandidateProfile, job: JobRead) -> JobEligibility:
-    """Produce the full, explained verdict for one candidate-job pair."""
-    results = evaluate_requirements(profile, job)
+    """Produce the full, explained deterministic verdict for one candidate-job pair."""
+    return assemble_job_eligibility(job, evaluate_requirements(profile, job))
+
+
+def assemble_job_eligibility(
+    job: JobRead, results: list[RequirementResult]
+) -> JobEligibility:
+    """Compose the verdict and summary for a finished breakdown.
+
+    The single place a verdict is composed, whether or not the AI stage contributed to the
+    breakdown, so both paths share one precedence (ADR-017).
+    """
     state = compose_verdict(results)
     return JobEligibility(
         job_id=job.id,
@@ -697,10 +710,30 @@ def check_eligibility(
         else:
             results.append(evaluate_job(profile, job))
 
+    return build_check_response(profile, job_ids, results, not_found, started)
+
+
+def build_check_response(
+    profile: CandidateProfile,
+    job_ids: list[str],
+    results: list[JobEligibility],
+    not_found: list[str],
+    started: float,
+    *,
+    ai_assessments: int = 0,
+    ai_unavailable: int = 0,
+) -> EligibilityCheckResponse:
+    """Log the request's safe counts and build the response.
+
+    Shared by the deterministic path and the AI-assisted path. The log line carries counts
+    and timing only — never the profile, any candidate value, ``candidate_id``, or any AI
+    input, output or reason (INV-4).
+    """
     counts = Counter(result.eligibility_state for result in results)
     logger.info(
         "eligibility_check jobs_requested=%d jobs_found=%d not_found=%d eligible=%d "
-        "likely_eligible=%d needs_review=%d unknown=%d not_eligible=%d duration_ms=%.1f",
+        "likely_eligible=%d needs_review=%d unknown=%d not_eligible=%d ai_assessments=%d "
+        "ai_unavailable=%d duration_ms=%.1f",
         len(job_ids),
         len(results),
         len(not_found),
@@ -709,6 +742,8 @@ def check_eligibility(
         counts[EligibilityState.NEEDS_REVIEW],
         counts[EligibilityState.UNKNOWN],
         counts[EligibilityState.NOT_ELIGIBLE],
+        ai_assessments,
+        ai_unavailable,
         (time.perf_counter() - started) * 1000,
     )
 

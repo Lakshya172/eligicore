@@ -26,6 +26,7 @@ from app.main import app
 from app.models.job import Job
 from app.schemas.candidate import DegreeLevel, JobType
 from app.schemas.eligibility import MAX_JOB_IDS
+from app.services.eligibility_engine import ENGINE_VERSION
 from app.services.job_ingestion import ingest_source
 from tests.conftest import ALLOWED_OPERATIONAL_TABLES, FORBIDDEN_TABLES
 from tests.test_job_ingestion import FakeAdapter, make_raw
@@ -200,7 +201,7 @@ def test_check_returns_explained_verdicts(catalogue: Catalogue) -> None:
         "candidate_id", "engine_version", "evaluated_at", "results", "not_found_job_ids",
     }
     assert body["candidate_id"] == CANDIDATE_ID
-    assert body["engine_version"] == "1"
+    assert body["engine_version"] == ENGINE_VERSION == "2"
     assert body["not_found_job_ids"] == []
 
     (result,) = body["results"]
