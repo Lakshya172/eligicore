@@ -48,13 +48,12 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 
 ## Project status
 
-**Pre-release development. Weeks 1–4 of a 10-week solo build complete.**
+**Pre-release development. Weeks 1–4 of a 10-week solo build complete; Week 5 in progress.**
 
-Current stable checkpoint: **Checkpoint 4** (`f56d7df`) — Week 4 Eligibility Intelligence: the
-deterministic eligibility engine plus AI-assisted resolution of ambiguous fields of study.
-
-Week 5 is in progress: the deterministic matching engine (PR 5A, service only) is in review and
-not merged. No recommendation endpoint exists yet.
+Current stable checkpoint: **Checkpoint 5A** (`05534af`) — an intermediate checkpoint for Week 5's
+deterministic matching engine, a service with no endpoint yet. The recommendations endpoint
+(PR 5B) has not started. The last full-week checkpoint is **Checkpoint 4** (`f56d7df`) — Week 4
+Eligibility Intelligence.
 
 > **Not production-ready.** The Gemini Flash provider has not been exercised against the live
 > API — no key is configured and the test suite runs without one. The provider contract is
@@ -79,7 +78,8 @@ runs, and is tested. The authoritative, always-current state lives in
 - **`GET /api/v1/jobs`, `GET /api/v1/jobs/{id}`** — the job catalogue, ingested from a pluggable source adapter with canonical deduplication. Closed postings are kept and stay retrievable with their reason, never deleted.
 - **`POST /api/v1/eligibility/check`** — evaluates a supplied profile against up to 50 catalogue jobs' stated requirements (minimum CGPA, graduation year window, backlog limit, minimum qualification level, permitted fields) and returns a verdict with a per-requirement breakdown. A field of study that is not an exact match is judged by an AI provider — sent only the field and the permitted fields — and the result is labelled `ai_reasoning`, capped at MEDIUM confidence, and can never make a candidate `NOT_ELIGIBLE`. Nothing is stored.
 - **`GET /api/v1/health`** — liveness
-- **615 tests**, running offline with no credentials and no network
+- **Matching engine (service only, no endpoint yet)** — deterministic TF-IDF cosine similarity between a candidate's skills and experience and the job catalogue, with skill coverage, the shared terms behind each score and a template explanation. It reads no eligibility data and stores nothing.
+- **736 tests**, running offline with no credentials and no network
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
 - Repository workflow: branching, conventional commits, PR standard, CI, checkpoint discipline
 
@@ -96,7 +96,7 @@ asserts none exists. Uploaded resumes exist only for the duration of processing.
 | 2 | Resume parser and AI provider abstraction | **Complete** |
 | 3 | Job schema, source adapters, ingestion, deduplication | **Complete** |
 | 4 | Eligibility engine — deterministic rules plus AI for ambiguity | **Complete** — deterministic engine (PR #9) + AI field relatedness (PR #11), Checkpoint 4 |
-| 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | **In progress** — matching engine service in review (PR 5A); recommendations endpoint not started |
+| 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | **In progress** — matching engine service complete (PR #13, Checkpoint 5A); recommendations endpoint not started |
 | 6 | **Polish, Excel export, testing — complete demoable MVP** | Not started |
 | 7 | Application preparation with truthfulness validation | Not started |
 | 8 | Caching and AI cost logging | Not started |
