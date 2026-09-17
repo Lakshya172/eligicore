@@ -14,7 +14,18 @@ dossier considers the system complete and demoable. No release is claimed before
 
 ## [Unreleased]
 
-### Week 5 — PR 5A: Deterministic matching foundation *(in review, not merged)*
+Nothing pending. **Week 5 PR 5B (recommendations) has not started.**
+
+---
+
+## Checkpoint 5A — Week 5, PR 5A: Deterministic Matching Engine *(intermediate)*
+
+**Date:** 2026-09-17 · **Commit on `main`:** `05534af` · **Status:** Stable — intermediate
+**Produced by:** PR #13 (`feature/week-5-matching-engine`, 5 commits)
+**Full SHA:** `05534affced482f6bc5e188ac465144dd425f9a7` · **CI:** `test` success ·
+**Tests:** 736 passing from `main` (the existing 615 unchanged) · **Mutations:** 36/36 caught
+
+This is **not Checkpoint 5**. Checkpoint 5 is reserved for Week 5 as a whole and follows PR 5B.
 
 #### Added
 
@@ -41,6 +52,13 @@ dossier considers the system complete and demoable. No release is claimed before
 #### Not in this change
 
 - No recommendation endpoint, no `/matching/score`, no eligibility, AI or database change.
+
+#### Known limitations
+
+- Service only: no endpoint uses the engine yet.
+- Coarse IDF with a 5-job catalogue; scores change when the catalogue changes.
+- English stop words only and no stemming; an all-out-of-vocabulary candidate scores `null`.
+- Gemini's live calls and model identifier, and PostgreSQL, remain unverified (from Checkpoint 4).
 
 ---
 

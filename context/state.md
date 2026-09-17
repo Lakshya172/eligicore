@@ -12,14 +12,14 @@
 | Field | Value |
 |---|---|
 | **Date** | 2026-09-17 |
-| **Phase** | **Week 5 — Matching Engine · IN PROGRESS** — PR 5A (deterministic matching foundation) implemented, **in review, not merged** |
-| **Roadmap position** | Weeks 1–4 complete and merged. Week 5 PR 5A open on `feature/week-5-matching-engine`, **not merged**. PR 5B (recommendations) **not started**. |
-| **Health** | 🟢 GREEN — 615 tests on `main`; 736 on the PR 5A branch; no open blockers |
+| **Phase** | **Week 5 — Matching Engine · IN PROGRESS** — PR 5A (deterministic matching engine) merged and verified; PR 5B not started |
+| **Roadmap position** | Weeks 1–4 complete and merged. Week 5 PR 5A **merged and verified** (Checkpoint 5A). PR 5B (recommendations) **not started, not authorized**. |
+| **Health** | 🟢 GREEN — 736 tests passing on `main`, 36/36 matching mutations caught, CI green, no open blockers |
 | **Stable branch** | `main` |
-| **Current checkpoint** | **Checkpoint 4** — `f56d7dfabeeb8a7addac693d2c7552b0c1fc4e76` |
-| **Produced by** | PR #9 (`4a5cb84`, deterministic engine) + PR #11 (`f56d7df`, AI stage), both **MERGED** 2026-09-17 |
-| **Rollback target** | Checkpoint 4 first; Checkpoint 4A by reverting PR #11 (no database step); Checkpoint 3 also needs `alembic downgrade 7c2f1a9b4d30`; below Checkpoint 3 also needs `alembic downgrade base`. |
-| **Next milestone** | PR 5A external review and merge decision. PR 5B not authorized. **Checkpoint 5 not established.** |
+| **Current checkpoint** | **Checkpoint 5A** (intermediate, matching engine) — `05534affced482f6bc5e188ac465144dd425f9a7` |
+| **Produced by** | PR #13 (`feature/week-5-matching-engine`), **MERGED** 2026-09-17 |
+| **Rollback target** | Checkpoint 5A first; Checkpoint 4 by reverting PR #13 (no database step); Checkpoint 4A by also reverting PR #11; Checkpoint 3 also needs `alembic downgrade 7c2f1a9b4d30`; below Checkpoint 3 also needs `alembic downgrade base`. |
+| **Next milestone** | PR 5B — recommendations — **not started, not authorized**. **Checkpoint 5 not established.** |
 | **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
@@ -66,6 +66,10 @@
 | **Week 4 PR 4B — AI field relatedness** *(merged, PR #11)* | `AIProvider.assess_field_relatedness`; conservative mock (UNCERTAIN/LOW default); Gemini via the existing transport and a prompt file; `app/services/eligibility_ai.py` as the second stage; lazy provider construction; request-scoped de-duplication; fail-closed `UNKNOWN`; confidence capped at MEDIUM; `ENGINE_VERSION` 2. ADR-019. |
 | **Week 4 PR 4B — tests** *(merged, PR #11)* | 91 new (615 total). Literal zero-call and zero-build assertions; captured-request privacy checks. 27/27 mutations caught. |
 | **Checkpoint 4** | Final Week 4 checkpoint at `f56d7df`, verified post-merge (see `context/workflow.md`). |
+| **Week 5 design gate** | Approved 2026-09-17; rulings C-17, C-18 recorded as **ADR-020** (match scoring) and **ADR-021** (skill comparison). Split into PR 5A and PR 5B. |
+| **Week 5 PR 5A — matching engine** *(merged, PR #13)* | `app/services/matching_engine.py` — narrow inputs, skill comparison, custom tokenizer, `skill:` namespace, TF-IDF fitted on the whole catalogue (never the candidate), cosine 0–100 or `null`, skill coverage, top terms, template explanations, ordering key; `scikit-learn==1.7.2`; `.NET` normalizer correction. Service only. |
+| **Week 5 PR 5A — tests** *(merged, PR #13)* | 121 new (736 total); 615 existing unchanged. 36/36 mutations caught. |
+| **Checkpoint 5A** | Intermediate Week 5 checkpoint at `05534af`, verified post-merge (see `context/workflow.md`). |
 
 ## Partial
 
@@ -86,7 +90,7 @@
 | spaCy deterministic fallback extraction (cost-saver, dossier §9) | 2 (deferred) | NOT STARTED |
 | Eligibility engine (deterministic stage) | 4 | **COMPLETE** — PR #9, Checkpoint 4A |
 | Eligibility engine (AI ambiguity stage) | 4 | **COMPLETE** — PR #11, Checkpoint 4; field-of-study relatedness only (ADR-019) |
-| Matching engine (skill normalization, TF-IDF, cosine) | 5 | **IN REVIEW** — PR 5A, service only, not merged (ADR-020, ADR-021) |
+| Matching engine (skill normalization, TF-IDF, cosine) | 5 | **COMPLETE** — PR #13, Checkpoint 5A; service only (ADR-020, ADR-021) |
 | Recommendations (eligibility + matching, `POST /api/v1/recommendations`) | 5 | NOT STARTED — PR 5B, not authorized |
 | Excel export (openpyxl) | 6 | NOT STARTED |
 | Deterministic **eligibility** test suite (boundary/missing/invalid per constraint) | 4 | **COMPLETE** — PR #9 |
@@ -103,8 +107,8 @@ demoable. Weeks 7–10 are enhancement.
 
 **Week 5 — Matching Engine.** Design gate approved 2026-09-17; split into PR 5A and PR 5B.
 
-- **PR 5A — deterministic matching foundation.** Implemented on `feature/week-5-matching-engine`,
-  open for external review, **not merged**. Service only: `app/services/matching_engine.py`
+- **PR 5A — deterministic matching foundation.** **Merged** as PR #13 (`05534af`) and verified
+  post-merge; recorded as intermediate **Checkpoint 5A**. Service only: `app/services/matching_engine.py`
   (narrow inputs, skill comparison, custom tokenizer, TF-IDF fitted on the whole catalogue,
   cosine 0–100 or null, skill coverage, top terms, template explanations, ordering key),
   `scikit-learn==1.7.2`, the `.NET` normalizer correction, ADR-020 and ADR-021. No router, no
@@ -215,13 +219,15 @@ governs; this is a summary.
 | **2** | Week 2 — Resume Parser and Gemini Flash AI Service Layer | `91dd31d` | PR #4, merged 2026-09-10 | **Stable** |
 | **3** | Week 3 — Job Schema, Adapters and Ingestion | `2cfd4f0` | PR #6 + PR #7, merged 2026-09-10 | **Stable** |
 | **4A** | Week 4 — Deterministic Eligibility Engine (**intermediate**) | `4a5cb84` | PR #9, merged 2026-09-17 | **Stable** |
-| **4** | Week 4 — Eligibility Intelligence (final) | `f56d7df` | PR #9 + PR #11, merged 2026-09-17 | **Stable — current** |
+| **4** | Week 4 — Eligibility Intelligence (final) | `f56d7df` | PR #9 + PR #11, merged 2026-09-17 | **Stable** |
+| **5A** | Week 5 — Deterministic Matching Engine (**intermediate**) | `05534af` | PR #13, merged 2026-09-17 | **Stable — current** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
 **Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
 **Checkpoint 3 full SHA:** `2cfd4f0276b60de393ec604afc10b3c52f483ca7`
 **Checkpoint 4A full SHA:** `4a5cb844d1aa4ca4aa3e0906481d0d91c8fc67d4`
 **Checkpoint 4 full SHA:** `f56d7dfabeeb8a7addac693d2c7552b0c1fc4e76`
+**Checkpoint 5A full SHA:** `05534affced482f6bc5e188ac465144dd425f9a7`
 
 ```
 main
@@ -242,8 +248,11 @@ main
   ├── 4a5cb84  Checkpoint 4A — Week 4 deterministic eligibility engine (intermediate)
   |                 ↑  PR #9  (feature/week-4-eligibility-engine, 6 commits)
   |
-  └── f56d7df  Checkpoint 4 — Week 4 Eligibility Intelligence (final)  <- current
-                    ↑  PR #11 (feature/week-4-eligibility-ai, 6 commits)
+  ├── f56d7df  Checkpoint 4 — Week 4 Eligibility Intelligence (final)
+  |                 ↑  PR #11 (feature/week-4-eligibility-ai, 6 commits)
+  |
+  └── 05534af  Checkpoint 5A — Week 5 deterministic matching engine (intermediate)  <- current
+                    ↑  PR #13 (feature/week-5-matching-engine, 5 commits)
 ```
 
 Checkpoint 0 is the single commit `e8c68b7` — the state of `main` at the end of Phase 0 — not the
@@ -251,7 +260,7 @@ two-commit range that built it. Each checkpoint is declared stable only after th
 state is verified: merge confirmed on GitHub, tree clean, full suite run from `main`, and CI
 green on the merged commit.
 
-**Checkpoint 4 is the current rollback target; Checkpoint 4A is next.** Earlier checkpoints remain
+**Checkpoint 5A is the current rollback target; Checkpoint 4 is next.** Earlier checkpoints remain
 recoverable indefinitely and are not superseded — a regression whose cause predates the newest
 checkpoint needs an older target.
 
@@ -262,8 +271,7 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **PR 5A awaits external review.** Do not merge it, and do not start PR 5B, without explicit
-   instruction.
+1. **Await explicit instruction before starting PR 5B.** No step rolls into the next automatically.
 2. Before relying on live AI: exercise Gemini's `assess_field_relatedness` (and
    `extract_resume`) against the real service once, and confirm the model identifier.
 3. Before deployment (Week 9 / QG-007): verify the migration chain against PostgreSQL.
@@ -274,7 +282,7 @@ has never run against the live service. Confirm the model identifier and exercis
 relying on live extraction.
 
 **Week 5 is in progress; Weeks 6–10 have not started.** PR 5A (matching engine, service only) is
-in review on `feature/week-5-matching-engine`. No recommendations, `/matching/score` or
+merged as Checkpoint 5A. **PR 5B has not started.** No recommendations, `/matching/score` or
 application preparation code exists anywhere in the repository.
 
 **Doc drift corrected:** the OpenAPI "Current status" string in `app/main.py` said the AI
