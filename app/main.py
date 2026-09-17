@@ -104,10 +104,12 @@ app = FastAPI(
         "table. `candidate_id` is a client-generated correlation identifier, not a "
         "server-side key.\n\n"
         "### Current status\n"
-        "Week 4 of a 10-week build. Candidate profile, resume parsing, job catalogue and "
-        "deterministic eligibility endpoints exist. The AI stage for ambiguous "
-        "field-of-study requirements, matching, recommendations, application preparation "
-        "and export are not yet implemented."
+        "Week 4 of a 10-week build is complete. Candidate profile, resume parsing, job "
+        "catalogue and eligibility endpoints exist. Eligibility requirements are checked "
+        "deterministically; a field of study that is not an exact match for a permitted "
+        "field may be assessed by an AI second stage, which cannot override a deterministic "
+        "failure. No candidate data or evaluation result is stored. Matching, "
+        "recommendations, application preparation and export are not yet implemented."
     ),
     openapi_tags=[
         {
