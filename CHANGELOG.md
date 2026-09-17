@@ -14,7 +14,24 @@ dossier considers the system complete and demoable. No release is claimed before
 
 ## [Unreleased]
 
-### Week 4 — PR 4B: AI-assisted field relatedness *(in review, not merged)*
+Nothing pending. **Week 5 has not started.**
+
+---
+
+## Checkpoint 4 — Week 4: Eligibility Intelligence
+
+**Date:** 2026-09-17 · **Commit on `main`:** `f56d7df` · **Status:** Stable
+**Produced by:** PR #9 (`4a5cb84`, deterministic engine — see Checkpoint 4A) + PR #11 (`f56d7df`,
+AI-assisted field relatedness)
+**Full SHA:** `f56d7dfabeeb8a7addac693d2c7552b0c1fc4e76` · **CI:** `test` success ·
+**Tests:** 615 passing from `main` (Weeks 1–3's 328 and PR 4A's 196 unchanged) · **Mutations:** 27/27 caught
+
+Week 4 as a whole: deterministic eligibility with final authority, a typed degree-level
+requirement, five-state verdicts, and an AI stage that may only resolve an ambiguous field of
+study — failing closed, never producing `NOT_ELIGIBLE`, and never receiving or persisting
+candidate data beyond the field string. Checkpoint 4A below records the deterministic half.
+
+### PR 4B — AI-assisted field relatedness
 
 #### Added
 
@@ -46,6 +63,9 @@ dossier considers the system complete and demoable. No release is claimed before
 - Gemini's relatedness call has not been exercised against the live service.
 - AI "related" judgements are the provider's interpretation; they are labelled `ai_reasoning`,
   capped at MEDIUM, and never make a verdict `ELIGIBLE`.
+- PostgreSQL has not been verified; migrations have run on SQLite only.
+- The OpenAPI "Current status" text in `app/main.py` still describes the AI stage as not yet
+  implemented.
 
 ---
 
