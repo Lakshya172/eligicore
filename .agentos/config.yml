@@ -21,14 +21,14 @@ project:
   api_namespace: /api/v1
   env_prefix: ELIGICORE_
   database_name: eligicore
-  phase: "Week 4 — Eligibility Engine (PR 4A merged, Checkpoint 4A; PR 4B in review)"
-  next_approved_phase: "Week 4 PR 4B review and merge decision; then final Checkpoint 4"
+  phase: "Week 4 — Eligibility Intelligence (COMPLETE, Checkpoint 4)"
+  next_approved_phase: "Week 5 — Matching Engine (not started)"
   source_of_truth: EligiCore_Dossier_update.md
   ai_provider_phase_1: gemini-flash   # ADR-013. Concrete implementation, not a dependency.
   vcs:
     remote: https://github.com/Lakshya172/eligicore
     default_branch: main
-    last_stable_checkpoint: "Checkpoint 4A (intermediate) — 4a5cb844d1aa4ca4aa3e0906481d0d91c8fc67d4"
+    last_stable_checkpoint: "Checkpoint 4 — f56d7dfabeeb8a7addac693d2c7552b0c1fc4e76"
 
 # Read at the start of every session, without exception.
 context:
