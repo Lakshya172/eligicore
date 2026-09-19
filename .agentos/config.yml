@@ -21,8 +21,8 @@ project:
   api_namespace: /api/v1
   env_prefix: ELIGICORE_
   database_name: eligicore
-  phase: "Week 5 — Matching Engine (COMPLETE, Checkpoint 5)"
-  next_approved_phase: "Week 6 — Polish, Excel export, testing (not started, not authorized); Week 5C not started"
+  phase: "Week 6 — Polish, Excel export, testing (IN PROGRESS — PR 6A open, not merged)"
+  next_approved_phase: "PR 6B — Week 6 polish (not started; only after Checkpoint 6A). /matching/score and /jobs/ingest deferred (ADR-023)"
   source_of_truth: EligiCore_Dossier_update.md
   ai_provider_phase_1: gemini-flash   # ADR-013. Concrete implementation, not a dependency.
   vcs:

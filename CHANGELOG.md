@@ -14,7 +14,28 @@ dossier considers the system complete and demoable. No release is claimed before
 
 ## [Unreleased]
 
-Nothing pending. **Week 5C and Week 6 have not started.**
+### Week 6 — PR 6A: Excel tracker export (in review, not merged)
+
+#### Added
+
+- **`POST /api/v1/applications/export`** — renders application-tracking rows supplied by the
+  client as an `.xlsx` workbook: sheet `Tracker` (one row per record, request order) and, when
+  breakdowns are supplied, sheet `Requirements`. 1–500 rows, unique `job_id`. A null
+  `match_score` is an empty cell, never 0; dates are real Excel dates. Text that could run as a
+  formula is prefixed with an apostrophe and stored as text. Fixed filename
+  `eligicore-tracker.xlsx`, `Cache-Control: no-store`. Built entirely in memory; nothing stored.
+- `ApplicationStatus`: `NOT_APPLIED`, `APPLIED`, `INTERVIEW`, `REJECTED`, `OFFER`.
+- **ADR-023** tracker export contract (C-23..C-29).
+- Dependencies: `openpyxl==3.1.5`, `et-xmlfile==2.0.0`.
+
+#### Fixed
+
+- The OpenAPI description no longer says Week 5 is in progress (C-29).
+
+#### Not included
+
+- No `/matching/score` or `/jobs/ingest` (deferred, C-25), no database change, no AI, no Week 6B
+  polish. **PR 6B has not started.**
 
 ---
 

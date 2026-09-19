@@ -128,6 +128,10 @@ candidate record.
 - No `GET`/`PATCH` on a candidate resource — they would imply a server-held record.
 - No application-status endpoint — status transitions are written to IndexedDB by the client.
 - `/recommendations` is `POST`, not `GET`, because the profile travels in the body.
+- `/applications/export` is the **only binary response** (ADR-023 §8, C-23): a successful
+  export returns the `.xlsx` file; its request and every error stay Pydantic/JSON.
+- `/matching/score` and `/jobs/ingest` are listed by the dossier but **deferred** (ADR-023 §11,
+  C-25). Neither route exists.
 
 ---
 
@@ -261,6 +265,15 @@ confidently invent plausible experience; in a job-application context that misre
 person to a real employer.
 
 Auto-submit is out of scope — see `ADR-008`.
+
+### Tracker export (ADR-023)
+
+`POST /api/v1/applications/export` → `app/services/tracker_export.py`: a pure renderer from
+client-supplied `TrackerRecord`s to `.xlsx` bytes. It reads no database, calls no eligibility,
+matching, recommendation or AI code, and never corrects a row. The workbook is built and saved
+in memory — including each worksheet, which stock openpyxl would spool through a temporary
+file. Every string is neutralised against formula injection and pinned to the text type.
+Application status stays on the client (ADR-002); the export only renders it.
 
 ---
 
