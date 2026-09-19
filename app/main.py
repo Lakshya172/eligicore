@@ -104,15 +104,17 @@ app = FastAPI(
         "table. `candidate_id` is a client-generated correlation identifier, not a "
         "server-side key.\n\n"
         "### Current status\n"
-        "Week 5 of a 10-week build is in progress. Candidate profile, resume parsing, job "
-        "catalogue, eligibility and recommendation endpoints exist. Eligibility requirements "
+        "Weeks 1–5 of a 10-week build are complete and Week 6 is underway. Candidate "
+        "profile, resume parsing, job catalogue, eligibility, recommendation and tracker "
+        "export endpoints exist. Eligibility requirements "
         "are checked deterministically; a field of study that is not an exact match for a "
         "permitted field may be assessed by an AI second stage, which cannot override a "
         "deterministic failure. Recommendations group jobs by that eligibility verdict and "
         "order them within a group by a deterministic TF-IDF relevance score; the two are "
-        "never combined. No candidate data, evaluation or recommendation is stored. "
-        "Single-pair match scoring, application preparation and export are not yet "
-        "implemented."
+        "never combined. The tracker export renders client-supplied tracking rows as an "
+        "Excel workbook. No candidate data, evaluation, recommendation or tracking row is "
+        "stored. Single-pair match scoring, HTTP-triggered job ingestion and application "
+        "preparation are not implemented."
     ),
     openapi_tags=[
         {
