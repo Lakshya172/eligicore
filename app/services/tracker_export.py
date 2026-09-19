@@ -5,7 +5,9 @@ database, calls no eligibility, matching, recommendation or AI code, and never c
 enriches a row. What the client sends is what the workbook says.
 
 **Nothing leaves memory.** The workbook is built and saved into a ``BytesIO`` buffer — no
-temporary file, no cache — and the only log line carries counts (INV-1, INV-4).
+temporary file, no cache — and the only log line carries counts (INV-1, INV-4). openpyxl's own
+``save`` spools every worksheet through a named temporary file on disk even when the target is a
+buffer; :class:`_InMemoryExcelWriter` hands its worksheet serialiser a buffer instead.
 
 **No cell can execute.** Every string goes through :func:`_write_text`, which neutralises a
 leading formula character and pins the cell type to text (ADR-023 §6).
@@ -21,12 +23,16 @@ from collections.abc import Callable, Sequence
 from datetime import date, datetime, timezone
 from enum import Enum
 from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from openpyxl import Workbook
 from openpyxl.cell.cell import Cell
+from openpyxl.drawing.spreadsheet_drawing import SpreadsheetDrawing
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet._writer import WorksheetWriter
 from openpyxl.worksheet.worksheet import Worksheet
+from openpyxl.writer.excel import ExcelWriter
 
 from app.schemas.eligibility import RequirementResult
 from app.schemas.tracker import TrackerRecord
@@ -184,6 +190,36 @@ def build_workbook(records: Sequence[TrackerRecord]) -> Workbook:
     return workbook
 
 
+class _InMemoryExcelWriter(ExcelWriter):
+    """openpyxl's workbook writer, with worksheets serialised in memory.
+
+    The stock ``ExcelWriter.write_worksheet`` gives each ``WorksheetWriter`` a named temporary
+    file and copies it into the archive by path. This override passes the writer a ``BytesIO``
+    — a mode ``WorksheetWriter`` supports — and adds the bytes with ``writestr``. Everything
+    else is openpyxl's own code. Tied to the pinned openpyxl version; the no-file tests fail if
+    an upgrade changes this path.
+    """
+
+    def write_worksheet(self, ws: Worksheet) -> None:
+        ws._drawing = SpreadsheetDrawing()
+        ws._drawing.charts = ws._charts
+        ws._drawing.images = ws._images
+        writer = WorksheetWriter(ws, out=BytesIO())
+        writer.write()
+        ws._rels = writer._rels
+        self._archive.writestr(ws.path[1:], writer.read())
+        self.manifest.append(ws)
+
+
+def _save(workbook: Workbook) -> bytes:
+    """Serialise ``workbook`` to ``.xlsx`` bytes without touching the filesystem."""
+    buffer = BytesIO()
+    with ZipFile(buffer, "w", ZIP_DEFLATED, allowZip64=True) as archive:
+        workbook.properties.modified = datetime.now(timezone.utc).replace(tzinfo=None)
+        _InMemoryExcelWriter(workbook, archive).write_data()
+    return buffer.getvalue()
+
+
 def export_tracker(records: Sequence[TrackerRecord]) -> bytes:
     """Render tracker rows as ``.xlsx`` bytes, entirely in memory.
 
@@ -191,10 +227,7 @@ def export_tracker(records: Sequence[TrackerRecord]) -> bytes:
     requirement, score or any candidate value.
     """
     started = time.perf_counter()
-    workbook = build_workbook(records)
-    buffer = BytesIO()
-    workbook.save(buffer)
-    content = buffer.getvalue()
+    content = _save(build_workbook(records))
 
     logger.info(
         "tracker_export rows=%d requirement_rows=%d bytes=%d duration_ms=%.1f",

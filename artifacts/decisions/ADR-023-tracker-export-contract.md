@@ -146,6 +146,14 @@ No other endpoint may cite this exception; a future binary response needs its ow
 ### 9. Privacy
 
 - Stateless. No model, table, migration, cache or file. The router takes no database session.
+- **Not even a temporary file.** openpyxl's `Workbook.save` spools every worksheet through a
+  named temporary file on disk (`openpyxl.worksheet._writer.create_temporary_file`), even when
+  saving to a buffer — found by the no-file test during PR 6A. The service therefore saves through
+  a small `ExcelWriter` subclass that gives openpyxl's own `WorksheetWriter` a `BytesIO` (a mode it
+  supports) and adds each sheet to the archive with `writestr`. The file is otherwise byte-for-byte
+  what `save` produces, apart from the document timestamp; a test asserts that. The override
+  touches a private openpyxl module, which is why openpyxl is pinned exactly and why the no-file
+  tests run on every build.
 - One log line, counts only: `tracker_export rows=… requirement_rows=… bytes=… duration_ms=…`.
   Never job ids, companies, roles, links, reasons, notes, requirement text, scores or any
   candidate value.
