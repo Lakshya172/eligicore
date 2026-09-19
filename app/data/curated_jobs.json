@@ -139,5 +139,920 @@
     "apply_link": "https://careers.example.com/roles/frontend-intern",
     "deadline": null,
     "source_job_id": "EX-INT-005"
+  },
+  {
+    "company_name": "Sample Systems Ltd.",
+    "role_title": "Backend Engineering Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Pune, India",
+    "description": "Build and test REST services for an internal order platform using Python and FastAPI, backed by PostgreSQL and packaged with Docker.",
+    "requirements": {
+      "notes": "Pre-final and final year students."
+    },
+    "min_cgpa": 7.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology"
+    ],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": 0,
+    "min_grad_year": 2026,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "Python",
+      "FastAPI",
+      "PostgreSQL",
+      "Docker"
+    ],
+    "apply_link": "https://careers.example.com/roles/backend-intern",
+    "deadline": "2027-01-31",
+    "source_job_id": "EX-INT-006"
+  },
+  {
+    "company_name": "Example Web Studio",
+    "role_title": "Full Stack Developer",
+    "job_type": "FULL_TIME",
+    "location": "Remote",
+    "description": "Ship features across a React.js front end and a Node.js API. Write SQL for reporting and review pull requests.",
+    "requirements": {},
+    "min_cgpa": null,
+    "min_cgpa_scale": null,
+    "allowed_fields": [],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": null,
+    "min_grad_year": null,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "JavaScript",
+      "React.js",
+      "Node.js",
+      "SQL"
+    ],
+    "apply_link": "https://careers.example.com/roles/full-stack-developer",
+    "deadline": null,
+    "source_job_id": "EX-FT-007"
+  },
+  {
+    "company_name": "Sample Insights Co.",
+    "role_title": "Data Analyst Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Hyderabad, India",
+    "description": "Clean and analyse sales data, build dashboards in Tableau and write SQL queries for weekly business reviews.",
+    "requirements": {
+      "notes": "Quantitative background preferred."
+    },
+    "min_cgpa": 7.5,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Statistics",
+      "Mathematics",
+      "Economics"
+    ],
+    "min_degree_level": null,
+    "max_backlogs": 2,
+    "min_grad_year": 2027,
+    "max_grad_year": 2028,
+    "required_skills": [
+      "SQL",
+      "Excel",
+      "Python",
+      "Tableau"
+    ],
+    "apply_link": "https://careers.example.com/roles/data-analyst-intern",
+    "deadline": "2027-02-15",
+    "source_job_id": "EX-INT-008"
+  },
+  {
+    "company_name": "Example AI Labs",
+    "role_title": "Machine Learning Research Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Bengaluru, India",
+    "description": "Research internship on model evaluation. Implement experiments in PyTorch and report results to the research team.",
+    "requirements": {
+      "notes": "Postgraduate students only."
+    },
+    "min_cgpa": 8.5,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Data Science"
+    ],
+    "min_degree_level": "MASTERS",
+    "max_backlogs": 0,
+    "min_grad_year": 2026,
+    "max_grad_year": 2028,
+    "required_skills": [
+      "Python",
+      "PyTorch",
+      "Machine Learning"
+    ],
+    "apply_link": "https://careers.example.com/roles/ml-research-intern",
+    "deadline": "2027-01-15",
+    "source_job_id": "EX-INT-009"
+  },
+  {
+    "company_name": "Sample Cloud Ops",
+    "role_title": "DevOps Engineer",
+    "job_type": "FULL_TIME",
+    "location": "Chennai, India",
+    "description": "Operate container platforms. Maintain Docker images, Kubernetes deployments and Linux hosts on AWS with Git-based workflows.",
+    "requirements": {},
+    "min_cgpa": 6.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology",
+      "Electronics"
+    ],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": 0,
+    "min_grad_year": 2025,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "Docker",
+      "Kubernetes",
+      "Linux",
+      "AWS",
+      "Git"
+    ],
+    "apply_link": "https://careers.example.com/roles/devops-engineer",
+    "deadline": "2027-03-01",
+    "source_job_id": "EX-FT-010"
+  },
+  {
+    "company_name": "Example Quality Co.",
+    "role_title": "QA Automation Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Noida, India",
+    "description": "Write automated browser tests with Selenium and Python, and triage regressions in the Git workflow.",
+    "requirements": {},
+    "min_cgpa": 6.5,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [],
+    "min_degree_level": null,
+    "max_backlogs": 2,
+    "min_grad_year": 2027,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "Python",
+      "Selenium",
+      "Git"
+    ],
+    "apply_link": "https://careers.example.com/roles/qa-automation-intern",
+    "deadline": null,
+    "source_job_id": "EX-INT-011"
+  },
+  {
+    "company_name": "Sample SecureNet",
+    "role_title": "Security Analyst",
+    "job_type": "FULL_TIME",
+    "location": "Gurugram, India",
+    "description": "Monitor alerts, investigate incidents on Linux servers and automate triage scripts in Python.",
+    "requirements": {
+      "notes": "Security certifications are a plus, not a requirement."
+    },
+    "min_cgpa": 7.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology",
+      "Cyber Security"
+    ],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": 0,
+    "min_grad_year": 2025,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "Linux",
+      "Python",
+      "Networking"
+    ],
+    "apply_link": "https://careers.example.com/roles/security-analyst",
+    "deadline": "2027-02-28",
+    "source_job_id": "EX-FT-012"
+  },
+  {
+    "company_name": "Example Devices",
+    "role_title": "Embedded Systems Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Bengaluru, India",
+    "description": "Write firmware in C and C++ for sensor boards and test drivers on real hardware.",
+    "requirements": {},
+    "min_cgpa": 7.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Electronics",
+      "Electrical Engineering",
+      "Instrumentation"
+    ],
+    "min_degree_level": null,
+    "max_backlogs": 0,
+    "min_grad_year": 2027,
+    "max_grad_year": 2028,
+    "required_skills": [
+      "C",
+      "C++",
+      "Embedded C"
+    ],
+    "apply_link": "https://careers.example.com/roles/embedded-intern",
+    "deadline": "2027-01-31",
+    "source_job_id": "EX-INT-013"
+  },
+  {
+    "company_name": "Sample Motors",
+    "role_title": "Mechanical Design Engineer",
+    "job_type": "FULL_TIME",
+    "location": "Chennai, India",
+    "description": "Design drivetrain components in SolidWorks, produce AutoCAD drawings and run MATLAB tolerance studies.",
+    "requirements": {},
+    "min_cgpa": 3.0,
+    "min_cgpa_scale": "SCALE_4",
+    "allowed_fields": [
+      "Mechanical Engineering"
+    ],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": 2,
+    "min_grad_year": 2025,
+    "max_grad_year": 2026,
+    "required_skills": [
+      "SolidWorks",
+      "AutoCAD",
+      "MATLAB"
+    ],
+    "apply_link": "https://careers.example.com/roles/mechanical-design-engineer",
+    "deadline": "2027-03-31",
+    "source_job_id": "EX-FT-014"
+  },
+  {
+    "company_name": "Example Power Grid",
+    "role_title": "Electrical Engineering Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Ahmedabad, India",
+    "description": "Support substation projects: PLC programming, MATLAB load studies and AutoCAD single-line diagrams.",
+    "requirements": {},
+    "min_cgpa": 65.0,
+    "min_cgpa_scale": "PERCENTAGE",
+    "allowed_fields": [
+      "Electrical Engineering",
+      "Electronics"
+    ],
+    "min_degree_level": null,
+    "max_backlogs": 0,
+    "min_grad_year": 2026,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "MATLAB",
+      "PLC",
+      "AutoCAD"
+    ],
+    "apply_link": "https://careers.example.com/roles/electrical-intern",
+    "deadline": "2027-02-10",
+    "source_job_id": "EX-INT-015"
+  },
+  {
+    "company_name": "Sample Capital Partners",
+    "role_title": "Financial Analyst",
+    "job_type": "FULL_TIME",
+    "location": "Mumbai, India",
+    "description": "Build financial models in Excel, prepare variance reports and query ledgers with SQL.",
+    "requirements": {},
+    "min_cgpa": null,
+    "min_cgpa_scale": null,
+    "allowed_fields": [
+      "Finance",
+      "Economics",
+      "Commerce"
+    ],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": null,
+    "min_grad_year": 2025,
+    "max_grad_year": null,
+    "required_skills": [
+      "Excel",
+      "Financial Modeling",
+      "SQL"
+    ],
+    "apply_link": "https://careers.example.com/roles/financial-analyst",
+    "deadline": null,
+    "source_job_id": "EX-FT-016"
+  },
+  {
+    "company_name": "Example Pixel Works",
+    "role_title": "Frontend Developer Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Remote",
+    "description": "Build accessible UI components in React.js and TypeScript with modern CSS.",
+    "requirements": {},
+    "min_cgpa": null,
+    "min_cgpa_scale": null,
+    "allowed_fields": [],
+    "min_degree_level": null,
+    "max_backlogs": null,
+    "min_grad_year": 2027,
+    "max_grad_year": 2028,
+    "required_skills": [
+      "JavaScript",
+      "TypeScript",
+      "React.js",
+      "CSS"
+    ],
+    "apply_link": "https://careers.example.com/roles/frontend-developer-intern",
+    "deadline": null,
+    "source_job_id": "EX-INT-017"
+  },
+  {
+    "company_name": "Sample Data Foundry",
+    "role_title": "Data Engineer",
+    "job_type": "FULL_TIME",
+    "location": "Hyderabad, India",
+    "description": "Build batch pipelines in Python and SQL, schedule them with Airflow and process large datasets with Spark.",
+    "requirements": {},
+    "min_cgpa": 7.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology"
+    ],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": 0,
+    "min_grad_year": 2026,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "Python",
+      "SQL",
+      "Spark",
+      "Airflow"
+    ],
+    "apply_link": "https://careers.example.com/roles/data-engineer",
+    "deadline": "2027-03-15",
+    "source_job_id": "EX-FT-018"
+  },
+  {
+    "company_name": "Example Consulting Group",
+    "role_title": "Business Analyst Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Mumbai, India",
+    "description": "Gather requirements, analyse processes in Excel and SQL, and present findings in PowerPoint.",
+    "requirements": {},
+    "min_cgpa": 60.0,
+    "min_cgpa_scale": "PERCENTAGE",
+    "allowed_fields": [],
+    "min_degree_level": null,
+    "max_backlogs": 2,
+    "min_grad_year": 2027,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "Excel",
+      "SQL",
+      "PowerPoint"
+    ],
+    "apply_link": "https://careers.example.com/roles/business-analyst-intern",
+    "deadline": "2027-01-20",
+    "source_job_id": "EX-INT-019"
+  },
+  {
+    "company_name": "Sample Enterprise Software",
+    "role_title": ".NET Developer",
+    "job_type": "FULL_TIME",
+    "location": "Pune, India",
+    "description": "Develop line-of-business services in C# on .NET, with SQL Server data access and Azure deployment.",
+    "requirements": {},
+    "min_cgpa": 6.5,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology"
+    ],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": 0,
+    "min_grad_year": 2025,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "C#",
+      ".NET",
+      "SQL",
+      "Azure"
+    ],
+    "apply_link": "https://careers.example.com/roles/dotnet-developer",
+    "deadline": "2027-02-28",
+    "source_job_id": "EX-FT-020"
+  },
+  {
+    "company_name": "Example Trading Tech",
+    "role_title": "C++ Systems Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Mumbai, India",
+    "description": "Optimise low-latency C++ services on Linux and write Python tooling for benchmarks.",
+    "requirements": {
+      "notes": "Strong algorithms background."
+    },
+    "min_cgpa": 8.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science"
+    ],
+    "min_degree_level": null,
+    "max_backlogs": 0,
+    "min_grad_year": 2027,
+    "max_grad_year": 2028,
+    "required_skills": [
+      "C++",
+      "Linux",
+      "Python"
+    ],
+    "apply_link": "https://careers.example.com/roles/cpp-systems-intern",
+    "deadline": "2027-01-10",
+    "source_job_id": "EX-INT-021"
+  },
+  {
+    "company_name": "Sample Payments",
+    "role_title": "Java Backend Engineer",
+    "job_type": "FULL_TIME",
+    "location": "Bengaluru, India",
+    "description": "Build payment APIs in Java with Spring Boot and SQL, with strong focus on reliability.",
+    "requirements": {},
+    "min_cgpa": 7.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology"
+    ],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": 0,
+    "min_grad_year": 2025,
+    "max_grad_year": 2026,
+    "required_skills": [
+      "Java",
+      "Spring Boot",
+      "SQL"
+    ],
+    "apply_link": "https://careers.example.com/roles/java-backend-engineer",
+    "deadline": "2026-12-31",
+    "source_job_id": "EX-FT-022"
+  },
+  {
+    "company_name": "Example Hosting",
+    "role_title": "Cloud Support Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Remote",
+    "description": "Help customers troubleshoot AWS workloads, Linux servers and networking issues.",
+    "requirements": {},
+    "min_cgpa": 6.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [],
+    "min_degree_level": null,
+    "max_backlogs": null,
+    "min_grad_year": 2026,
+    "max_grad_year": null,
+    "required_skills": [
+      "AWS",
+      "Linux",
+      "Networking"
+    ],
+    "apply_link": "https://careers.example.com/roles/cloud-support-intern",
+    "deadline": null,
+    "source_job_id": "EX-INT-023"
+  },
+  {
+    "company_name": "Sample Uptime",
+    "role_title": "Site Reliability Engineer",
+    "job_type": "FULL_TIME",
+    "location": "Bengaluru, India",
+    "description": "Own service reliability: Kubernetes operations, Go tooling and Prometheus alerting.",
+    "requirements": {
+      "notes": "Postgraduate degree required."
+    },
+    "min_cgpa": 7.5,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science"
+    ],
+    "min_degree_level": "MASTERS",
+    "max_backlogs": 0,
+    "min_grad_year": 2025,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "Kubernetes",
+      "Go",
+      "Prometheus"
+    ],
+    "apply_link": "https://careers.example.com/roles/site-reliability-engineer",
+    "deadline": "2027-03-31",
+    "source_job_id": "EX-FT-024"
+  },
+  {
+    "company_name": "Example Apps",
+    "role_title": "Mobile App Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Kochi, India",
+    "description": "Build Android features in Kotlin and Java and ship them through a Git review process.",
+    "requirements": {
+      "notes": "Minimum CGPA 7.0 as stated by the employer."
+    },
+    "min_cgpa": 7.0,
+    "min_cgpa_scale": null,
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology"
+    ],
+    "min_degree_level": null,
+    "max_backlogs": 0,
+    "min_grad_year": 2027,
+    "max_grad_year": 2028,
+    "required_skills": [
+      "Kotlin",
+      "Java",
+      "Git"
+    ],
+    "apply_link": "https://careers.example.com/roles/mobile-app-intern",
+    "deadline": "2027-02-01",
+    "source_job_id": "EX-INT-025"
+  },
+  {
+    "company_name": "Sample Commerce",
+    "role_title": "Product Analyst",
+    "job_type": "FULL_TIME",
+    "location": "Bengaluru, India",
+    "description": "Define product metrics, run A/B tests and answer product questions with SQL and Python.",
+    "requirements": {},
+    "min_cgpa": null,
+    "min_cgpa_scale": null,
+    "allowed_fields": [],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": null,
+    "min_grad_year": null,
+    "max_grad_year": null,
+    "required_skills": [
+      "SQL",
+      "Python",
+      "A/B Testing"
+    ],
+    "apply_link": "https://careers.example.com/roles/product-analyst",
+    "deadline": null,
+    "source_job_id": "EX-FT-026"
+  },
+  {
+    "company_name": "Example Silicon",
+    "role_title": "Hardware Verification Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Hyderabad, India",
+    "description": "Write SystemVerilog testbenches for Verilog designs and automate regressions in Python.",
+    "requirements": {},
+    "min_cgpa": 7.5,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Electronics",
+      "Electrical Engineering"
+    ],
+    "min_degree_level": null,
+    "max_backlogs": 0,
+    "min_grad_year": 2026,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "Verilog",
+      "SystemVerilog",
+      "Python"
+    ],
+    "apply_link": "https://careers.example.com/roles/hardware-verification-intern",
+    "deadline": "2027-01-31",
+    "source_job_id": "EX-INT-027"
+  },
+  {
+    "company_name": "Sample Quant Fund",
+    "role_title": "Quantitative Analyst",
+    "job_type": "FULL_TIME",
+    "location": "Mumbai, India",
+    "description": "Research trading signals with Python and statistics, and maintain SQL research datasets.",
+    "requirements": {
+      "notes": "Postgraduate degree required."
+    },
+    "min_cgpa": 8.5,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Mathematics",
+      "Statistics",
+      "Finance"
+    ],
+    "min_degree_level": "MASTERS",
+    "max_backlogs": 0,
+    "min_grad_year": 2025,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "Python",
+      "Statistics",
+      "SQL"
+    ],
+    "apply_link": "https://careers.example.com/roles/quantitative-analyst",
+    "deadline": "2027-02-28",
+    "source_job_id": "EX-FT-028"
+  },
+  {
+    "company_name": "Example Vision",
+    "role_title": "Machine Learning Engineering Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Pune, India",
+    "description": "Train and deploy computer-vision models with TensorFlow, package them with Docker and log results to SQL.",
+    "requirements": {},
+    "min_cgpa": 8.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology",
+      "Data Science"
+    ],
+    "min_degree_level": null,
+    "max_backlogs": 0,
+    "min_grad_year": 2027,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "Python",
+      "TensorFlow",
+      "Docker",
+      "SQL"
+    ],
+    "apply_link": "https://careers.example.com/roles/ml-engineering-intern",
+    "deadline": "2027-01-31",
+    "source_job_id": "EX-INT-029"
+  },
+  {
+    "company_name": "Sample Auto Components",
+    "role_title": "Automotive Design Engineer",
+    "job_type": "FULL_TIME",
+    "location": "Chennai, India",
+    "description": "Model body components in CATIA and SolidWorks and apply GD&T to production drawings.",
+    "requirements": {},
+    "min_cgpa": 2.8,
+    "min_cgpa_scale": "SCALE_4",
+    "allowed_fields": [
+      "Mechanical Engineering",
+      "Automobile Engineering"
+    ],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": 1,
+    "min_grad_year": 2025,
+    "max_grad_year": 2026,
+    "required_skills": [
+      "CATIA",
+      "SolidWorks",
+      "GD&T"
+    ],
+    "apply_link": "https://careers.example.com/roles/automotive-design-engineer",
+    "deadline": "2027-03-15",
+    "source_job_id": "EX-FT-030"
+  },
+  {
+    "company_name": "Example Industrial",
+    "role_title": "Manufacturing Engineering Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Coimbatore, India",
+    "description": "Improve shop-floor processes with lean manufacturing methods, AutoCAD layouts and Excel analysis.",
+    "requirements": {},
+    "min_cgpa": null,
+    "min_cgpa_scale": null,
+    "allowed_fields": [],
+    "min_degree_level": null,
+    "max_backlogs": 2,
+    "min_grad_year": 2025,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "AutoCAD",
+      "Lean Manufacturing",
+      "Excel"
+    ],
+    "apply_link": "https://careers.example.com/roles/manufacturing-intern",
+    "deadline": null,
+    "source_job_id": "EX-INT-031"
+  },
+  {
+    "company_name": "Sample Energy",
+    "role_title": "Power Systems Engineer",
+    "job_type": "FULL_TIME",
+    "location": "Vadodara, India",
+    "description": "Run power-flow studies in ETAP and MATLAB and prepare AutoCAD drawings for grid projects.",
+    "requirements": {},
+    "min_cgpa": 70.0,
+    "min_cgpa_scale": "PERCENTAGE",
+    "allowed_fields": [
+      "Electrical Engineering"
+    ],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": 0,
+    "min_grad_year": 2025,
+    "max_grad_year": 2026,
+    "required_skills": [
+      "MATLAB",
+      "ETAP",
+      "AutoCAD"
+    ],
+    "apply_link": "https://careers.example.com/roles/power-systems-engineer",
+    "deadline": "2027-01-31",
+    "source_job_id": "EX-FT-032"
+  },
+  {
+    "company_name": "Example Cyber Labs",
+    "role_title": "Security Research Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Remote",
+    "description": "Analyse network captures in Wireshark and write Python tooling for Linux-based lab experiments.",
+    "requirements": {},
+    "min_cgpa": 7.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology"
+    ],
+    "min_degree_level": null,
+    "max_backlogs": 0,
+    "min_grad_year": 2027,
+    "max_grad_year": 2029,
+    "required_skills": [
+      "Python",
+      "Linux",
+      "Wireshark"
+    ],
+    "apply_link": "https://careers.example.com/roles/security-research-intern",
+    "deadline": "2027-02-15",
+    "source_job_id": "EX-INT-033"
+  },
+  {
+    "company_name": "Sample Logistics",
+    "role_title": "Graduate Software Engineer",
+    "job_type": "FULL_TIME",
+    "location": "Bengaluru, India",
+    "description": "Join a rotation programme building Java and Python services with SQL data stores and Git-based delivery.",
+    "requirements": {},
+    "min_cgpa": 6.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology",
+      "Electronics",
+      "Electrical Engineering"
+    ],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": 2,
+    "min_grad_year": 2027,
+    "max_grad_year": 2028,
+    "required_skills": [
+      "Java",
+      "Python",
+      "SQL",
+      "Git"
+    ],
+    "apply_link": "https://careers.example.com/roles/graduate-software-engineer",
+    "deadline": "2027-03-31",
+    "source_job_id": "EX-FT-034"
+  },
+  {
+    "company_name": "Example Health Analytics",
+    "role_title": "Data Science Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Remote",
+    "description": "Explore clinical-operations data with Python, R and SQL and present statistical findings.",
+    "requirements": {},
+    "min_cgpa": 7.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Data Science",
+      "Statistics"
+    ],
+    "min_degree_level": null,
+    "max_backlogs": 0,
+    "min_grad_year": 2027,
+    "max_grad_year": 2028,
+    "required_skills": [
+      "Python",
+      "R",
+      "SQL"
+    ],
+    "apply_link": "https://careers.example.com/roles/data-science-intern",
+    "deadline": "2027-01-31",
+    "source_job_id": "EX-INT-035"
+  },
+  {
+    "company_name": "Sample Streaming",
+    "role_title": "Node.js Developer",
+    "job_type": "FULL_TIME",
+    "location": "Remote",
+    "description": "Build streaming APIs in Node.js and JavaScript on MongoDB.",
+    "requirements": {},
+    "min_cgpa": 6.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": null,
+    "min_grad_year": null,
+    "max_grad_year": 2029,
+    "required_skills": [
+      "Node.js",
+      "JavaScript",
+      "MongoDB"
+    ],
+    "apply_link": "https://careers.example.com/roles/nodejs-developer",
+    "deadline": null,
+    "source_job_id": "EX-FT-036"
+  },
+  {
+    "company_name": "Example Robotics",
+    "role_title": "Robotics Intern",
+    "job_type": "INTERNSHIP",
+    "location": "Bengaluru, India",
+    "description": "Program robot arms with ROS, C++ and Python and validate motion plans in simulation.",
+    "requirements": {},
+    "min_cgpa": 3.0,
+    "min_cgpa_scale": "SCALE_4",
+    "allowed_fields": [
+      "Mechanical Engineering",
+      "Electronics",
+      "Mechatronics"
+    ],
+    "min_degree_level": null,
+    "max_backlogs": 0,
+    "min_grad_year": 2026,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "ROS",
+      "C++",
+      "Python"
+    ],
+    "apply_link": "https://careers.example.com/roles/robotics-intern",
+    "deadline": "2027-02-28",
+    "source_job_id": "EX-INT-037"
+  },
+  {
+    "company_name": "Sample Audit Partners",
+    "role_title": "Accounting Associate",
+    "job_type": "FULL_TIME",
+    "location": "Kolkata, India",
+    "description": "Prepare statutory accounts in Tally, reconcile ledgers in Excel and file GST returns.",
+    "requirements": {},
+    "min_cgpa": 55.0,
+    "min_cgpa_scale": "PERCENTAGE",
+    "allowed_fields": [
+      "Commerce",
+      "Accounting",
+      "Finance"
+    ],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": null,
+    "min_grad_year": 2025,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "Excel",
+      "Tally",
+      "GST"
+    ],
+    "apply_link": "https://careers.example.com/roles/accounting-associate",
+    "deadline": null,
+    "source_job_id": "EX-FT-038"
+  },
+  {
+    "company_name": "Example Ventures",
+    "role_title": "Other",
+    "job_type": "INTERNSHIP",
+    "location": null,
+    "description": "",
+    "requirements": {
+      "notes": "General application; the role is assigned after interview."
+    },
+    "min_cgpa": null,
+    "min_cgpa_scale": null,
+    "allowed_fields": [],
+    "min_degree_level": null,
+    "max_backlogs": null,
+    "min_grad_year": null,
+    "max_grad_year": null,
+    "required_skills": [],
+    "apply_link": "https://careers.example.com/roles/general-application",
+    "deadline": null,
+    "source_job_id": "EX-INT-039"
+  },
+  {
+    "company_name": "Sample Infra Co.",
+    "role_title": "Platform Engineer",
+    "job_type": "FULL_TIME",
+    "location": "Hyderabad, India",
+    "description": "Build internal developer platforms in Go on Docker and Kubernetes with Git-based delivery.",
+    "requirements": {},
+    "min_cgpa": 7.0,
+    "min_cgpa_scale": "SCALE_10",
+    "allowed_fields": [
+      "Computer Science",
+      "Information Technology"
+    ],
+    "min_degree_level": "BACHELORS",
+    "max_backlogs": 0,
+    "min_grad_year": 2026,
+    "max_grad_year": 2027,
+    "required_skills": [
+      "Go",
+      "Docker",
+      "Kubernetes",
+      "Git"
+    ],
+    "apply_link": "https://careers.example.com/roles/platform-engineer",
+    "deadline": "2027-03-31",
+    "source_job_id": "EX-FT-040"
   }
 ]
