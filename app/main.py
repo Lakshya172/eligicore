@@ -32,7 +32,7 @@ from app.config import get_settings
 # Registers operational models on Base.metadata. Import for the side effect: without
 # it, Alembic and the privacy guards see an empty schema.
 import app.models  # noqa: F401
-from app.routers import candidates, eligibility, jobs, matching, resumes
+from app.routers import applications, candidates, eligibility, jobs, matching, resumes
 
 settings = get_settings()
 
@@ -145,6 +145,13 @@ app = FastAPI(
             "description": (
                 "Stateless recommendations: eligibility verdicts and relevance scores side "
                 "by side, grouped and explained. Nothing is stored."
+            ),
+        },
+        {
+            "name": "applications",
+            "description": (
+                "Stateless tracker export: application-tracking rows supplied by the client, "
+                "returned as an Excel workbook. Nothing is stored."
             ),
         },
         {"name": "system", "description": "Operational endpoints."},
@@ -304,3 +311,4 @@ app.include_router(resumes.router, prefix=settings.api_v1_prefix)
 app.include_router(jobs.router, prefix=settings.api_v1_prefix)
 app.include_router(eligibility.router, prefix=settings.api_v1_prefix)
 app.include_router(matching.router, prefix=settings.api_v1_prefix)
+app.include_router(applications.router, prefix=settings.api_v1_prefix)
