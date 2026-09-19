@@ -32,7 +32,7 @@ from app.config import get_settings
 # Registers operational models on Base.metadata. Import for the side effect: without
 # it, Alembic and the privacy guards see an empty schema.
 import app.models  # noqa: F401
-from app.routers import candidates, eligibility, jobs, resumes
+from app.routers import candidates, eligibility, jobs, matching, resumes
 
 settings = get_settings()
 
@@ -104,12 +104,15 @@ app = FastAPI(
         "table. `candidate_id` is a client-generated correlation identifier, not a "
         "server-side key.\n\n"
         "### Current status\n"
-        "Week 4 of a 10-week build is complete. Candidate profile, resume parsing, job "
-        "catalogue and eligibility endpoints exist. Eligibility requirements are checked "
-        "deterministically; a field of study that is not an exact match for a permitted "
-        "field may be assessed by an AI second stage, which cannot override a deterministic "
-        "failure. No candidate data or evaluation result is stored. Matching, "
-        "recommendations, application preparation and export are not yet implemented."
+        "Week 5 of a 10-week build is in progress. Candidate profile, resume parsing, job "
+        "catalogue, eligibility and recommendation endpoints exist. Eligibility requirements "
+        "are checked deterministically; a field of study that is not an exact match for a "
+        "permitted field may be assessed by an AI second stage, which cannot override a "
+        "deterministic failure. Recommendations group jobs by that eligibility verdict and "
+        "order them within a group by a deterministic TF-IDF relevance score; the two are "
+        "never combined. No candidate data, evaluation or recommendation is stored. "
+        "Single-pair match scoring, application preparation and export are not yet "
+        "implemented."
     ),
     openapi_tags=[
         {
@@ -135,6 +138,13 @@ app = FastAPI(
             "description": (
                 "Stateless eligibility evaluation against the job catalogue. The profile "
                 "is evaluated and returned with explained verdicts; nothing is stored."
+            ),
+        },
+        {
+            "name": "recommendations",
+            "description": (
+                "Stateless recommendations: eligibility verdicts and relevance scores side "
+                "by side, grouped and explained. Nothing is stored."
             ),
         },
         {"name": "system", "description": "Operational endpoints."},
@@ -293,3 +303,4 @@ app.include_router(candidates.router, prefix=settings.api_v1_prefix)
 app.include_router(resumes.router, prefix=settings.api_v1_prefix)
 app.include_router(jobs.router, prefix=settings.api_v1_prefix)
 app.include_router(eligibility.router, prefix=settings.api_v1_prefix)
+app.include_router(matching.router, prefix=settings.api_v1_prefix)
