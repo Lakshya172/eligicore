@@ -367,6 +367,15 @@ every fixture id was one character, which the tokenizer drops.
 length ≥ 2), give at least one test an input above it. Compute expected TF-IDF values from the
 formula in the test, never by hand in a literal.
 
+### D-30 · A corpus identity must not depend on mutable metadata
+The corpus fingerprint hashes the catalogue *in the order given*. Loading the catalogue by
+`last_verified_at` would have changed the fingerprint on every ingestion run while no score
+changed; only a mutation (the router ordering by verification time) exposed that nothing
+tested it.
+**What to do:** the recommendations router loads the catalogue ordered by `id`; a test
+re-verifies every job and asserts the fingerprint is unchanged, then edits one job and asserts
+it changes. Apply the same rule to any future hash or cache key over catalogue data.
+
 ---
 
 ## Lessons

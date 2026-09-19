@@ -39,6 +39,7 @@ from app.services.matching_engine import (
     build_vectorizer,
     candidate_match_input,
     candidate_terms,
+    corpus_fingerprint,
     cosine_similarity,
     job_match_input,
     job_terms,
@@ -786,6 +787,85 @@ def test_order_key_uses_only_score_and_job_id() -> None:
 
 def test_zero_ranks_above_null() -> None:
     assert [m.job_id for m in order_matches([made("a", None), made("b", 0.0)])] == ["b", "a"]
+
+
+# ---------------------------------------------------------------------------------------
+# Corpus fingerprint (ADR-020 §5, Week 5B ruling C-19)
+# ---------------------------------------------------------------------------------------
+
+
+def test_fingerprint_is_the_sha256_of_canonical_job_ids_and_terms() -> None:
+    import hashlib
+    import json
+
+    canonical = json.dumps(
+        [[j.job_id, job_terms(j)] for j in THREE_JOBS], ensure_ascii=False, separators=(",", ":")
+    )
+    expected = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    assert corpus_fingerprint(THREE_JOBS) == expected
+    assert score_jobs(candidate(("Python",)), THREE_JOBS).corpus_fingerprint == expected
+    assert re.fullmatch(r"[0-9a-f]{64}", expected)
+
+
+def test_fingerprint_is_stable_for_an_identical_catalogue() -> None:
+    copy = [JobMatchInput(j.job_id, j.role_title, j.description, j.required_skills) for j in THREE_JOBS]
+    assert corpus_fingerprint(THREE_JOBS) == corpus_fingerprint(copy)
+    assert corpus_fingerprint(THREE_JOBS) == corpus_fingerprint(THREE_JOBS)
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        job("b", ("Python", "SQL", "Git"), "data"),  # required skills
+        job("b", ("Python", "SQL"), "data engineer"),  # title
+        job("b", ("Python", "SQL"), "data", "pipelines"),  # description
+        job("b2", ("Python", "SQL"), "data"),  # id
+    ],
+)
+def test_fingerprint_changes_with_job_matching_content(changed: JobMatchInput) -> None:
+    edited = [THREE_JOBS[0], changed, THREE_JOBS[2]]
+    assert corpus_fingerprint(edited) != corpus_fingerprint(THREE_JOBS)
+
+
+def test_fingerprint_changes_with_catalogue_order_and_membership() -> None:
+    assert corpus_fingerprint(list(reversed(THREE_JOBS))) != corpus_fingerprint(THREE_JOBS)
+    assert corpus_fingerprint(THREE_JOBS[:2]) != corpus_fingerprint(THREE_JOBS)
+
+
+def test_fingerprint_ignores_formatting_that_does_not_change_terms() -> None:
+    """Only matching terms count: casing, stop words and duplicate skills do not."""
+    plain = [job("a", ("Python",), "backend")]
+    noisy = [job("a", ("python", "PYTHON"), "The BACKEND")]
+    assert corpus_fingerprint(plain) == corpus_fingerprint(noisy)
+
+
+def test_fingerprint_is_independent_of_the_candidate() -> None:
+    prints = {
+        score_jobs(who, THREE_JOBS).corpus_fingerprint
+        for who in (
+            candidate(),
+            candidate(("Python",), ("data",)),
+            candidate_match_input(marker_profile()),
+            candidate(("Haskell", "SQL"), ("MARKER-ID-7731 Markerville",)),
+        )
+    }
+    assert len(prints) == 1
+
+
+def test_fingerprint_does_not_depend_on_the_selected_subset() -> None:
+    who = candidate(("Python",))
+    assert (
+        score_jobs(who, THREE_JOBS, job_ids=["b"]).corpus_fingerprint
+        == score_jobs(who, THREE_JOBS).corpus_fingerprint
+    )
+
+
+def test_empty_catalogue_has_a_fingerprint() -> None:
+    import hashlib
+
+    assert score_jobs(candidate(("Python",)), []).corpus_fingerprint == (
+        hashlib.sha256(b"[]").hexdigest()
+    )
 
 
 # ---------------------------------------------------------------------------------------

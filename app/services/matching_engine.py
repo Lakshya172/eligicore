@@ -28,6 +28,8 @@ The algorithm is fixed by ADR-020 (match scoring) and ADR-021 (skill comparison)
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -399,11 +401,31 @@ class JobMatch:
 
 @dataclass(frozen=True)
 class MatchingResult:
-    """Matches for the selected jobs, in selection order, and the size of their corpus."""
+    """Matches for the selected jobs, in selection order, and the corpus they were scored in."""
 
     matching_version: str
     corpus_size: int
+    #: SHA-256 of the corpus as matching saw it (:func:`corpus_fingerprint`). Candidate-free.
+    corpus_fingerprint: str
     matches: tuple[JobMatch, ...]
+
+
+def corpus_fingerprint(catalogue: Sequence[JobMatchInput]) -> str:
+    """Identify the TF-IDF corpus, so a client can tell when a stored score was computed
+    against a different catalogue (ADR-020 §5).
+
+    SHA-256 of a canonical JSON array holding, for each catalogue job **in the order given**,
+    its id and its matching terms (:func:`job_terms`). JSON quoting makes the encoding
+    unambiguous and independent of Python ``repr``; nothing about the candidate is read.
+    Same catalogue in the same order gives the same fingerprint; changed matching content,
+    membership or order gives a different one.
+    """
+    canonical = json.dumps(
+        [[job.job_id, job_terms(job)] for job in catalogue],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def score_jobs(
@@ -482,6 +504,7 @@ def score_jobs(
     return MatchingResult(
         matching_version=MATCHING_VERSION,
         corpus_size=len(catalogue),
+        corpus_fingerprint=corpus_fingerprint(catalogue),
         matches=tuple(matches),
     )
 

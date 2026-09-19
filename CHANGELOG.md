@@ -14,7 +14,34 @@ dossier considers the system complete and demoable. No release is claimed before
 
 ## [Unreleased]
 
-Nothing pending. **Week 5 PR 5B (recommendations) has not started.**
+### Week 5 — PR 5B: Recommendations endpoint *(in review, not merged)*
+
+#### Added
+
+- **`POST /api/v1/recommendations`** — eligibility verdicts and relevance scores side by side.
+  Groups: `ranked` (`ELIGIBLE`, `LIKELY_ELIGIBLE`), `needs_review` (`NEEDS_REVIEW`, `UNKNOWN`),
+  `not_eligible` (unranked, no score), `not_open` (requested `CLOSED`/`EXPIRED`, unranked, takes
+  precedence; keeps its match score). Ranked groups ordered by `match_score` descending, nulls
+  last, then id. Default
+  scope ACTIVE + UNKNOWN, at most 50 by `last_verified_at` then id, remainder disclosed in
+  `jobs_not_considered`; explicit `job_ids` (1–50) of any status; unknown ids in
+  `not_found_job_ids`.
+- `app/services/recommendations.py` — orchestrates one Week 4 eligibility pass and one Week 5A
+  matching pass over the whole catalogue; embeds each `JobEligibility` unchanged; composes
+  explanations from the eligibility summary and the matching explanation.
+- `app/schemas/matching.py` — request, response, item and match schemas;
+  `MAX_RECOMMENDATION_JOBS = 50`; `MatchScoreBasis.WITHHELD_NOT_ELIGIBLE`.
+- `MatchingResult.corpus_fingerprint` — SHA-256 of the catalogue's job ids and matching terms.
+- **114 new tests** (850 total) and a 40-mutation run, all caught.
+
+#### Decided
+
+- **ADR-022** recommendation orchestration (C-19..C-22); ADR-020 §5 amended for the fingerprint.
+
+#### Not in this change
+
+- No `/matching/score`, new AI, database change, persistence, frontend, auto-apply or browser
+  automation. Week 4 eligibility and the matching algorithm are unchanged.
 
 ---
 
