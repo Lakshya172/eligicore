@@ -187,6 +187,14 @@ tokens, TF-IDF fitted on the whole catalogue and never on the candidate, a 0–1
 combined with it. The engine imports no eligibility, AI, framework or database code; eligibility
 never imports matching.
 
+Recommendations are ruled in **ADR-022** (`app/services/recommendations.py`,
+`POST /api/v1/recommendations`): an orchestrator that calls Week 4 eligibility and Week 5A
+matching once each and changes neither. The whole catalogue is the TF-IDF corpus; the returned
+scope is ACTIVE + UNKNOWN (at most 50, remainder disclosed) or explicit ids of any status. Jobs
+are grouped `not_open` → `ranked` → `needs_review` → `not_eligible`; similarity orders jobs only
+within `ranked` and `needs_review`, and a `NOT_ELIGIBLE` job carries no score. Dependency
+direction: router → recommendations → eligibility + matching.
+
 TF-IDF rather than embeddings because it needs no training data, costs nothing, runs locally,
 and — decisively — is explainable. The system can state which terms drove a score. For a tool
 whose value proposition is transparency, an unexplainable score is self-defeating. Embeddings

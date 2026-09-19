@@ -79,6 +79,12 @@ equals the pin.
 Consequence: a score can change when the catalogue changes (ingestion adds, edits or removes a
 job). A catalogue fingerprint for clients to detect that belongs to the response contract, PR 5B.
 
+**Amended 2026-09-19 (ADR-022, ruling C-19):** `MatchingResult.corpus_fingerprint` is that
+fingerprint, computed inside `score_jobs`: SHA-256 of a canonical JSON array of `[job_id,
+job_terms(job)]` for each catalogue job in the order given. Job-side matching data only — no
+candidate field — deterministic, and never persisted. Changed matching content, membership or
+order changes it; formatting that leaves the terms unchanged does not. No score changes.
+
 ### 6. Cosine and the score
 
 Both vectors are unit length, so `cosine = candidate_vector · job_vector`, in [0, 1] because TF-IDF

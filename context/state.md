@@ -12,14 +12,14 @@
 | Field | Value |
 |---|---|
 | **Date** | 2026-09-17 |
-| **Phase** | **Week 5 — Matching Engine · IN PROGRESS** — PR 5A (deterministic matching engine) merged and verified; PR 5B not started |
-| **Roadmap position** | Weeks 1–4 complete and merged. Week 5 PR 5A **merged and verified** (Checkpoint 5A). PR 5B (recommendations) **not started, not authorized**. |
-| **Health** | 🟢 GREEN — 736 tests passing on `main`, 36/36 matching mutations caught, CI green, no open blockers |
+| **Phase** | **Week 5 — Matching Engine · IN PROGRESS** — PR 5A merged and verified (Checkpoint 5A); PR 5B (recommendations) implemented, **in review, not merged** |
+| **Roadmap position** | Weeks 1–4 complete and merged. Week 5 PR 5A **merged and verified** (Checkpoint 5A). PR 5B open on `feature/week-5-recommendations`, **not merged**. |
+| **Health** | 🟢 GREEN — 736 tests on `main`; 833 on the PR 5B branch; no open blockers |
 | **Stable branch** | `main` |
 | **Current checkpoint** | **Checkpoint 5A** (intermediate, matching engine) — `05534affced482f6bc5e188ac465144dd425f9a7` |
 | **Produced by** | PR #13 (`feature/week-5-matching-engine`), **MERGED** 2026-09-17 |
 | **Rollback target** | Checkpoint 5A first; Checkpoint 4 by reverting PR #13 (no database step); Checkpoint 4A by also reverting PR #11; Checkpoint 3 also needs `alembic downgrade 7c2f1a9b4d30`; below Checkpoint 3 also needs `alembic downgrade base`. |
-| **Next milestone** | PR 5B — recommendations — **not started, not authorized**. **Checkpoint 5 not established.** |
+| **Next milestone** | PR 5B external review and merge decision. **Checkpoint 5 not established.** |
 | **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
@@ -91,7 +91,7 @@
 | Eligibility engine (deterministic stage) | 4 | **COMPLETE** — PR #9, Checkpoint 4A |
 | Eligibility engine (AI ambiguity stage) | 4 | **COMPLETE** — PR #11, Checkpoint 4; field-of-study relatedness only (ADR-019) |
 | Matching engine (skill normalization, TF-IDF, cosine) | 5 | **COMPLETE** — PR #13, Checkpoint 5A; service only (ADR-020, ADR-021) |
-| Recommendations (eligibility + matching, `POST /api/v1/recommendations`) | 5 | NOT STARTED — PR 5B, not authorized |
+| Recommendations (eligibility + matching, `POST /api/v1/recommendations`) | 5 | **IN REVIEW** — PR 5B, not merged (ADR-022) |
 | Excel export (openpyxl) | 6 | NOT STARTED |
 | Deterministic **eligibility** test suite (boundary/missing/invalid per constraint) | 4 | **COMPLETE** — PR #9 |
 | Application preparation + truthfulness validator | 7 | NOT STARTED |
@@ -113,9 +113,13 @@ demoable. Weeks 7–10 are enhancement.
   cosine 0–100 or null, skill coverage, top terms, template explanations, ordering key),
   `scikit-learn==1.7.2`, the `.NET` normalizer correction, ADR-020 and ADR-021. No router, no
   endpoint, no eligibility, AI or database change.
-- **PR 5B — recommendations.** **Not started, not authorized.** Owns eligibility integration,
-  grouping, job-status scope, the batch cap, `POST /api/v1/recommendations` and ADR-022.
-  `/matching/score` is deferred.
+- **PR 5B — recommendations.** Implemented on `feature/week-5-recommendations`, open for
+  external review, **not merged**. `POST /api/v1/recommendations`: one catalogue query, one
+  Week 4 eligibility pass, one Week 5A matching pass over the whole catalogue; default scope
+  ACTIVE + UNKNOWN capped at 50 with disclosure; explicit ids of any status; groups `ranked`,
+  `needs_review`, `not_eligible`, `not_open` (precedence); no score for `NOT_ELIGIBLE`;
+  composed explanations; `corpus_fingerprint` added to the matching engine. ADR-022. No
+  database, AI or eligibility change. `/matching/score` is not implemented.
 
 Dossier §12.2 and §15: skill normalization, TF-IDF vectorization, cosine similarity, and ranked,
 explained recommendations. Eligibility and matching stay separate: matching must consume Week 4
@@ -180,6 +184,10 @@ never silently fixed. These are internal to the dossier.
 | **C-14** | The PR 4B brief said empty `allowed_fields` → `UNKNOWN`; merged ruling A-2 omits the requirement, and R-4 depends on it. | PR 4B brief vs ADR-018 | **RULED 2026-09-17.** A-2 stands: empty means no field restriction — omitted, never `UNKNOWN`, never sent to AI. |
 | **C-17** | `normalize_skill(".NET")` returned `"NET"`: a leading dot was trimmed as punctuation. | Week 1 code vs dossier §12.2 | **RULED 2026-09-17 — ADR-021.** Dot trimmed from the end only; `net`/`dotnet` alias to `.NET`. Fixed in PR 5A. |
 | **C-18** | scikit-learn's default token pattern deletes C, R, C++ and C#, contradicting memory D-3/D-12. | library default vs repo rule | **RULED 2026-09-17 — ADR-020.** Custom tokenizer plus a separate skill namespace. Implemented in PR 5A. |
+| **C-19** | The recommendation contract needs `corpus_fingerprint`; `MatchingResult` had none. | Week 5B contract vs Week 5A engine | **RULED 2026-09-19 — ADR-022, amends ADR-020 §5.** Added to `MatchingResult`, computed in `score_jobs` from job ids and terms only. |
+| **C-20** | `score_jobs` raises for an id absent from the catalogue; eligibility reports unknown ids. | matching vs eligibility error models | **RULED 2026-09-19 — ADR-022.** The service splits out `not_found_job_ids` first; `score_jobs` unchanged. |
+| **C-21** | `check_eligibility_with_ai` does not de-duplicate ids; only its request schema does. | eligibility service vs schema | **RULED 2026-09-19 — ADR-022.** De-duplicated by the recommendation schema and again by the service. |
+| **C-22** | Explicit CLOSED/EXPIRED jobs would still go through Week 4 eligibility (and possibly AI). | Week 4 path vs `not_open` | **RULED 2026-09-19 — ADR-022, option (a).** Evaluated unchanged, then grouped `not_open` with precedence. |
 
 ### Still open — not to be resolved without instruction
 
@@ -196,6 +204,7 @@ Full index in `context/decisions.md`.
 
 | ADR | Title | Date |
 |---|---|---|
+| ADR-022 | Recommendation orchestration (C-19..C-22) | 2026-09-19 |
 | ADR-021 | Skill comparison for matching (C-17) | 2026-09-17 |
 | ADR-020 | Match scoring (C-18) | 2026-09-17 |
 | ADR-019 | AI-assisted field-of-study relatedness (A-3, R-2, C-14) | 2026-09-17 |
@@ -271,7 +280,8 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Await explicit instruction before starting PR 5B.** No step rolls into the next automatically.
+1. **PR 5B awaits external review.** Do not merge it, and do not create Checkpoint 5 or start
+   any further work, without explicit instruction.
 2. Before relying on live AI: exercise Gemini's `assess_field_relatedness` (and
    `extract_resume`) against the real service once, and confirm the model identifier.
 3. Before deployment (Week 9 / QG-007): verify the migration chain against PostgreSQL.
@@ -282,7 +292,8 @@ has never run against the live service. Confirm the model identifier and exercis
 relying on live extraction.
 
 **Week 5 is in progress; Weeks 6–10 have not started.** PR 5A (matching engine, service only) is
-merged as Checkpoint 5A. **PR 5B has not started.** No recommendations, `/matching/score` or
+merged as Checkpoint 5A. PR 5B (recommendations endpoint) is in review on
+`feature/week-5-recommendations`. No `/matching/score` or
 application preparation code exists anywhere in the repository.
 
 **Doc drift corrected:** the OpenAPI "Current status" string in `app/main.py` said the AI
