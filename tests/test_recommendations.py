@@ -474,6 +474,73 @@ async def test_withholding_is_limited_to_the_not_eligible_group() -> None:
 
 
 # ---------------------------------------------------------------------------------------
+# Corpus fingerprint through the service (ADR-020 §5, C-19)
+# ---------------------------------------------------------------------------------------
+
+FINGERPRINT_CATALOGUE = [
+    make_job("fp-a", required_skills=["Python"], description="Backend services."),
+    make_job("fp-b", required_skills=["SQL"], description="Data pipelines.", status="CLOSED"),
+    make_job("fp-c", required_skills=["Java"], description="Frontend styling."),
+]
+
+
+async def fingerprint(catalogue, who=None) -> str:
+    return (await recommend(who or profile(), None, catalogue, ai())).corpus_fingerprint
+
+
+async def test_fingerprint_a_same_jobs_same_order_is_identical() -> None:
+    copy = [job.model_copy() for job in FINGERPRINT_CATALOGUE]
+    assert await fingerprint(FINGERPRINT_CATALOGUE) == await fingerprint(copy)
+
+
+async def test_fingerprint_b_same_jobs_different_order_differs() -> None:
+    reordered = [FINGERPRINT_CATALOGUE[2], FINGERPRINT_CATALOGUE[0], FINGERPRINT_CATALOGUE[1]]
+    first = await recommend(profile(), None, FINGERPRINT_CATALOGUE, ai())
+    second = await recommend(profile(), None, reordered, ai())
+    assert first.corpus_fingerprint != second.corpus_fingerprint
+    # Only the fingerprint moves: scores do not depend on catalogue order.
+    assert {i.eligibility.job_id: i.match for i in all_items(first)} == {
+        i.eligibility.job_id: i.match for i in all_items(second)
+    }
+
+
+async def test_fingerprint_c_only_last_verified_at_changed_is_identical() -> None:
+    reverified = [
+        job.model_copy(update={"last_verified_at": BASE_TIME + timedelta(days=90 - n)})
+        for n, job in enumerate(FINGERPRINT_CATALOGUE)
+    ]
+    assert await fingerprint(FINGERPRINT_CATALOGUE) == await fingerprint(reverified)
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        {"description": "Rewritten posting."},
+        {"role_title": "Platform Engineer"},
+        {"required_skills": ["SQL", "Git"]},
+    ],
+)
+async def test_fingerprint_d_changed_matching_content_differs(update: dict[str, Any]) -> None:
+    edited = [
+        FINGERPRINT_CATALOGUE[0],
+        FINGERPRINT_CATALOGUE[1].model_copy(update=update),
+        FINGERPRINT_CATALOGUE[2],
+    ]
+    assert await fingerprint(FINGERPRINT_CATALOGUE) != await fingerprint(edited)
+
+
+async def test_fingerprint_e_changed_candidate_is_identical() -> None:
+    others = [
+        profile(candidate_id="someone-else", skills=["Haskell"], experience=[]),
+        profile(skills=[], experience=[{"title": "Quokka wrangler"}]),
+        marker_profile(),
+    ]
+    baseline = await fingerprint(FINGERPRINT_CATALOGUE)
+    for other in others:
+        assert await fingerprint(FINGERPRINT_CATALOGUE, other) == baseline
+
+
+# ---------------------------------------------------------------------------------------
 # Integration — one eligibility pass, one matching pass, the whole catalogue as corpus
 # ---------------------------------------------------------------------------------------
 

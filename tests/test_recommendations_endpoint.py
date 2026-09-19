@@ -465,3 +465,20 @@ def test_not_open_items_are_unranked_but_scored(
         for i in body[group]
     ]
     assert sorted(seen) == sorted([job_id, "eligible"])
+
+
+def test_fingerprint_follows_catalogue_contents_not_verification_or_candidate(
+    catalogue: Catalogue,
+) -> None:
+    baseline = catalogue.client.post(URL, json={"profile": profile()}).json()["corpus_fingerprint"]
+
+    other = catalogue.client.post(
+        URL, json={"profile": profile(candidate_id="other", skills=["Haskell"], experience=[])}
+    ).json()
+    assert other["corpus_fingerprint"] == baseline
+
+    with catalogue.factory() as session:
+        add_job(session, "aaa-first-by-id", required_skills=["Rust"])
+        session.commit()
+    grown = catalogue.client.post(URL, json={"profile": profile()}).json()["corpus_fingerprint"]
+    assert grown != baseline
