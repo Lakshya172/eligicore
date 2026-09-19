@@ -1,7 +1,7 @@
 # EligiCore — dependencies
 #
 # Only what the implemented phases actually need. The remainder of the dossier's stack
-# (spaCy, openpyxl) arrives with the phases that use it.
+# (spaCy) arrives with the phase that uses it.
 #
 # No AI vendor SDK is listed: the Gemini provider calls the official REST API through
 # httpx, which the dossier §9 already names for exactly this purpose (ADR-013).
@@ -34,6 +34,12 @@ python-docx==1.1.2
 # its ENGLISH_STOP_WORDS list is part of the scoring definition (ADR-020), so a different
 # version could change scores. Brings numpy, scipy, joblib and threadpoolctl with it.
 scikit-learn==1.7.2
+
+# --- Tracker export (Week 6) ---
+# Named in the dossier's approved stack (§9) for Excel generation. Pure Python, MIT. Its one
+# dependency, et-xmlfile, is pinned too so the workbook writer cannot change underneath us.
+openpyxl==3.1.5
+et-xmlfile==2.0.0
 
 # --- Testing ---
 pytest==8.3.4
