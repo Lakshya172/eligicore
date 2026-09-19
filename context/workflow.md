@@ -160,7 +160,8 @@ the single commit on `main` where that phase's merge landed.
 | **4A** | Week 4 — Deterministic Eligibility Engine (PR 4A) · **intermediate** | `4a5cb84` | PR #9 (`feature/week-4-eligibility-engine`), merged 2026-09-17 | ✅ `test` success on `4a5cb84` | 524 passed | **Stable** |
 | **4** | Week 4 — Eligibility Intelligence (final: PR 4A + PR 4B) | `f56d7df` | PR #9 (`4a5cb84`) + PR #11 (`feature/week-4-eligibility-ai`), merged 2026-09-17 | ✅ `test` success on `f56d7df` | 615 passed | **Stable** |
 | **5A** | Week 5 — Deterministic Matching Engine (PR 5A) · **intermediate** | `05534af` | PR #13 (`feature/week-5-matching-engine`), merged 2026-09-17 | ✅ `test` success on `05534af` | 736 passed | **Stable** |
-| **5** | Week 5 — Matching Engine (final: PR 5A + PR 5B) | `0aaaa1d` | PR #13 (`05534af`) + PR #15 (`feature/week-5-recommendations`), merged 2026-09-19 | ✅ `test` success on `0aaaa1d` | 850 passed | **Stable — current** |
+| **5** | Week 5 — Matching Engine (final: PR 5A + PR 5B) | `0aaaa1d` | PR #13 (`05534af`) + PR #15 (`feature/week-5-recommendations`), merged 2026-09-19 | ✅ `test` success on `0aaaa1d` | 850 passed | **Stable** |
+| **6A** | Week 6 — Excel Export (PR 6A) · **intermediate** | `0125703` | PR #17 (`feature/week-6-excel-export`), merged 2026-09-19 | ✅ `test` success on `0125703` | 1075 passed | **Stable — current** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
 **Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
@@ -169,6 +170,7 @@ the single commit on `main` where that phase's merge landed.
 **Checkpoint 4 full SHA:** `f56d7dfabeeb8a7addac693d2c7552b0c1fc4e76`
 **Checkpoint 5A full SHA:** `05534affced482f6bc5e188ac465144dd425f9a7`
 **Checkpoint 5 full SHA:** `0aaaa1da6fe643b8164df645113322adc889075d`
+**Checkpoint 6A full SHA:** `0125703ad9464216b1622c14941664ec32ac9bac`
 
 **Checkpoint 4A is intermediate, not Checkpoint 4.** Week 4 is delivered in two PRs. 4A marks the
 verified deterministic engine; **Checkpoint 4 is reserved for Week 4 as a whole** and is
@@ -184,6 +186,105 @@ whole** and is established only after PR 5B (recommendations) is merged and veri
 
 **Checkpoint 5 established 2026-09-19** at `0aaaa1d`, after PR 5B was merged and verified. 5A
 remains recorded as the intermediate matching-engine checkpoint.
+
+**Checkpoint 6A is intermediate, not Checkpoint 6.** Week 6 is delivered in two PRs. 6A marks the
+verified Excel tracker export; **Checkpoint 6 is reserved for the final Week 6 MVP** and is
+established only after PR 6B (polish, catalogue, demo command, full-flow test) is merged and
+verified. A checkpoint is not a release, version or tag (C-28). Checkpoint 5 remains the final
+Week 5 checkpoint.
+
+### Checkpoint 6A — verification record (intermediate)
+
+**Checkpoint:** Checkpoint 6A — Week 6 Excel Export (intermediate)
+**Phase:** Week 6, PR 6A — Excel tracker export
+**Commit on `main`:** `0125703` — the PR #17 merge commit, parents `b39937a` (previous `main`, the
+Checkpoint 5 record) and `c56d1d8` (PR 6A branch head). Real merge; the ten PR 6A commits are
+preserved.
+**Merged by:** `Lakshya172` on GitHub at 2026-09-19T18:47:26Z, after review and a real Microsoft
+Excel compatibility check of the PR head. The post-merge gate confirmed the merged tree
+(`d50f570`) is identical to the reviewed head `c56d1d8` and verified that state.
+
+**Git history of Week 6 so far:**
+
+| Step | Merge on `main` |
+|---|---|
+| Week 6A implementation (PR #17) — **Checkpoint 6A** | `0125703ad9464216b1622c14941664ec32ac9bac` |
+
+**Week 6 capability at this checkpoint — Excel tracker export** (`POST /api/v1/applications/export`,
+ADR-023):
+
+- **Stateless renderer.** The client supplies complete tracker records; the server renders them to
+  `.xlsx` in memory and returns the file. No database lookup, no persistence, no server-side
+  tracker storage, no cache, no AI, no recalculation of eligibility or matching, no enrichment.
+- **Contract.** 1–500 records; duplicate `job_id` rejected; unknown fields rejected at every
+  level; `ApplicationStatus` = `NOT_APPLIED` · `APPLIED` · `INTERVIEW` · `REJECTED` · `OFFER`;
+  nullable `match_score`; optional `requirement_breakdown`; rows written in request order.
+- **Workbook.** Sheet `Tracker` (13 fixed columns) and, only when breakdown data exists, sheet
+  `Requirements` (10 fixed columns, each row tied to its parent by `Tracker Row` and `Job ID`).
+  A null score is an empty cell, never 0; `deadline` is a real Excel date; `evaluated_at` a real
+  Excel datetime in UTC; Unicode preserved; apply links are plain text, never hyperlinks.
+- **Formula-injection defence.** Text starting with `=`, `+`, `-`, `@`, tab or carriage return is
+  prefixed with an apostrophe, and every text cell is pinned to the string type — which also keeps
+  `#N/A`, `#REF!` and the other error codes as literal text.
+- **Identity and metadata.** No candidate field in the request; fixed metadata (creator and
+  last-modified-by `EligiCore`, title `EligiCore application tracker`); fixed filename
+  `eligicore-tracker.xlsx` with no candidate data or timestamp; `Cache-Control: no-store`.
+- **No temporary file.** openpyxl's own save spools worksheets through temporary files; the
+  service serialises them in memory instead (ADR-023 §9, memory D-31).
+- **API contract exception (C-23).** The successful 200 is a deliberate binary response — the one
+  documented exception to the JSON/Pydantic `response_model` convention. The request is still a
+  Pydantic model, and 405/422/500 still use the standard error envelope without echoing input.
+- **Also in PR 6A:** the stale OpenAPI status text is corrected — Weeks 1–5 complete, Week 6
+  underway (C-29).
+
+**Architecture at this checkpoint:** `router → tracker_export service`. The export service imports
+only the standard library, openpyxl and schema types — no FastAPI, Starlette, SQLAlchemy, database,
+models, AI, eligibility, matching, recommendations or filesystem module (AST and fresh-interpreter
+tests). Nothing but `app/main.py` and its router imports it. The Week 1–5 architecture is unchanged:
+no Week 1–5 service, schema, router, model, migration, adapter, AI module or CI file was modified.
+
+| Check | Result |
+|---|---|
+| PR #17 merged on GitHub | `merged: true`, `merge_commit_sha` = `0125703ad9464216b1622c14941664ec32ac9bac` |
+| Tree on `main` vs reviewed PR head `c56d1d8` | **Identical** |
+| Scope | 16 files: tracker schema, export service, applications router, `app/main.py` (registration + C-29 text), `requirements.txt`, ADR-023, `standards/api_design.md` pointer, context, CHANGELOG, README, config, two test files |
+| Working tree / `origin/main` | Clean; local `main` = `origin/main` = `0125703` |
+| Full suite from `main` | **1075 total — 1075 passed, 0 failed, 0 skipped**, offline (no `ELIGICORE_*`, proxies to a dead port) |
+| Regression | The 850 tests of Checkpoint 5 unchanged and passing; 225 new |
+| CI on `0125703` | `test` completed, conclusion `success` (run `35462320893`) |
+| Mutation testing from `main` | Week 6A **30/30** · Week 5B **40/40** · Week 5A **36/36** · Week 4 **27/27**; sources identical to `HEAD` afterwards |
+| Live API (uvicorn, migrated file database) | **46/46** checks: 200 with the XLSX type, fixed filename, `no-store` and `X-Request-ID`; `GET` → 405; malformed, wrong-type, empty, duplicate-id, 501-row, bad-status, bad-score, oversized and unknown-field bodies → 422 in the standard envelope without echo; `/api/v1/matching/score` → 404; `/api/v1/jobs/ingest` absent; exactly nine routes; workbook structure, values, types and XML |
+| Microsoft Excel 16.0 | Opened without repair (a deliberately corrupted control copy was refused under the same settings); **23/23** checks: sheets and headers, row order, text/number/date/empty types and display, UTC datetimes, Unicode, dangerous strings and error codes as literal text, no formula or error cells, no hyperlinks, comments, hidden rows/columns, external links, defined names or VBA project, metadata `EligiCore` only |
+| Workbook XML | No `<f>` element or `calcChain`; no hyperlink element or relationship; no external targets or links; no macros, custom XML, comments, drawings, connections or hidden state |
+| Privacy | No database write — database file byte-identical; no candidate data in DEBUG logs or errors; one counts-only `tracker_export` log line; no project files, no openpyxl or temporary workbook files |
+| Dependencies | `openpyxl==3.1.5`, `et-xmlfile==2.0.0` pinned and installed; `pip check` clean; no other pin changed |
+| Migration chain | Unchanged — three migrations, head `b3e8d2c61a47`; no Week 6 migration; models unchanged; fresh `upgrade head` + `alembic check` clean |
+| Tables | Exactly `jobs`, `ingestion_state` (+ `alembic_version`); no tracker, application, evaluation or candidate table |
+| Performance (local, synthetic) | 500 rows ≈ 39 ms; 500 rows + 2,500 requirement rows ≈ 244 ms; schema maximum ≈ 0.7 s, 37 MiB peak — not a production capacity claim |
+
+**Gates:** QG-001 PASS · QG-004 PASS (binary 200 recorded as the item-3 exception, ADR-023 §8) ·
+QG-005 PASS · QG-002 N/A (no eligibility change) · QG-003 N/A (no AI change) · QG-006 N/A (no model
+or migration) · QG-007 N/A (no deployment) · QG-008 N/A (no resume change).
+
+**Reviewers:** api, qa, architect, security, documentation PASS (architect note: the in-memory
+writer relies on openpyxl internals — pinned exactly and guarded by the no-file and equivalence
+tests). performance not triggered by the map (benchmark recorded above); ai and release not
+triggered.
+
+**Known limitations:**
+- The server cannot vouch for a row: a client can export stale or edited verdicts (accepted, A-27).
+- A neutralised value visibly keeps its leading apostrophe (`'=1+1`) — by design.
+- The in-memory writer overrides openpyxl internals; re-run the no-file tests on any upgrade.
+- Carried from Checkpoint 5: 5-job curated catalogue (expansion is PR 6B), Gemini's live calls and
+  model identifier unverified, PostgreSQL unverified.
+
+**Deferred, explicitly:** `/api/v1/matching/score` · `/api/v1/jobs/ingest` ·
+`/api/v1/applications/prepare` · catalogue expansion · local setup/demo command · full-flow Week 6B
+test · application preparation · truthfulness validator · caching · cost logging · deployment ·
+frontend · authentication · new AI. No stub routes exist.
+
+**PR 6B has not started. Checkpoint 6 is not established.** No 6B branch or PR, no catalogue
+expansion, no demo command, no full-flow test, no further Week 6 feature work.
 
 ### Checkpoint 5 — verification record (final Week 5)
 
@@ -545,14 +646,15 @@ Notes that remove the ambiguities this registry exists to close:
 
 | Priority | Checkpoint | Commit | Role |
 |---|---|---|---|
-| **1st** | Checkpoint 5 — Week 5 Matching Engine (final) | `0aaaa1d` | **Current stable point.** If Week 6 introduces a regression, this is the immediate rollback reference. |
-| **2nd** | Checkpoint 5A — Week 5 deterministic matching engine | `05534af` | Matching engine without the recommendations endpoint. Reached by reverting the PR #15 merge; no database step. |
-| **3rd** | Checkpoint 4 — Week 4 Eligibility Intelligence | `f56d7df` | Last state before any matching code. Reached by also reverting the PR #13 merge; no database step (scikit-learn leaves `requirements.txt` with it). |
-| **4th** | Checkpoint 4A — Week 4 deterministic engine | `4a5cb84` | Deterministic eligibility without the AI stage. Reached by also reverting the PR #11 merge; no database step. |
-| **5th** | Checkpoint 3 — Week 3 | `2cfd4f0` | Last state before any eligibility code. |
-| **6th** | Checkpoint 2 — Week 2 | `91dd31d` | Known-good state before the job catalogue. |
-| **7th** | Checkpoint 1 — Week 1 | `2e79454` | Remains available indefinitely as a historical recovery point. |
-| **8th** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
+| **1st** | Checkpoint 6A — Week 6 Excel Export (intermediate) | `0125703` | **Current stable point.** If PR 6B introduces a regression, this is the immediate rollback reference. |
+| **2nd** | Checkpoint 5 — Week 5 Matching Engine (final) | `0aaaa1d` | Last state before any Week 6 code. Reached by reverting the PR #17 merge; no database step (`openpyxl` and `et-xmlfile` leave `requirements.txt` with it). |
+| **3rd** | Checkpoint 5A — Week 5 deterministic matching engine | `05534af` | Matching engine without the recommendations endpoint. Reached by also reverting the PR #15 merge; no database step. |
+| **4th** | Checkpoint 4 — Week 4 Eligibility Intelligence | `f56d7df` | Last state before any matching code. Reached by also reverting the PR #13 merge; no database step (scikit-learn leaves `requirements.txt` with it). |
+| **5th** | Checkpoint 4A — Week 4 deterministic engine | `4a5cb84` | Deterministic eligibility without the AI stage. Reached by also reverting the PR #11 merge; no database step. |
+| **6th** | Checkpoint 3 — Week 3 | `2cfd4f0` | Last state before any eligibility code. |
+| **7th** | Checkpoint 2 — Week 2 | `91dd31d` | Known-good state before the job catalogue. |
+| **8th** | Checkpoint 1 — Week 1 | `2e79454` | Remains available indefinitely as a historical recovery point. |
+| **9th** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
 
 **Recovering from Checkpoint 4A to Checkpoint 3 requires `alembic downgrade 7c2f1a9b4d30`**,
 which drops only `jobs.min_degree_level` (verified with existing rows preserved and the existing

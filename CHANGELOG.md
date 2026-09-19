@@ -7,14 +7,31 @@ active pre-release development and does **not** yet follow semantic versioning �
 released version. Development progresses through **checkpoints**, one per completed and merged
 phase.
 
-The first meaningful release milestone will be the **Week 6 MVP checkpoint**, at which point the
-dossier considers the system complete and demoable. No release is claimed before then.
+The **Week 6 MVP checkpoint** (Checkpoint 6) is the point at which the dossier considers the
+system complete and demoable. Per ruling C-28 it is a checkpoint, not a release: no version or
+tag is created for it.
 
 ---
 
 ## [Unreleased]
 
-### Week 6 — PR 6A: Excel tracker export (in review, not merged)
+Nothing pending. **PR 6B (Week 6 polish) has not started.**
+
+---
+
+## Checkpoint 6A — Week 6 Excel Export (intermediate)
+
+**Date:** 2026-09-19 · **Commit on `main`:** `0125703` · **Status:** Stable — current
+**Produced by:** PR #17 (`feature/week-6-excel-export`)
+**Full SHA:** `0125703ad9464216b1622c14941664ec32ac9bac` · **CI:** `test` success ·
+**Tests:** 1075 passing from `main` (0 failed, 0 skipped) · **Mutations:** 6A 30/30 · 5B 40/40 ·
+5A 36/36 · Week 4 27/27 · **Live API:** 46/46 · **Microsoft Excel:** opened without repair, 23/23
+
+An intermediate checkpoint — **not a release, version or tag**, and not the final Week 6 MVP.
+Checkpoint 6 is reserved for Week 6 as a whole, after PR 6B. Checkpoint 5 remains the final
+Week 5 checkpoint.
+
+### PR 6A — Excel tracker export
 
 #### Added
 
@@ -34,8 +51,19 @@ dossier considers the system complete and demoable. No release is claimed before
 
 #### Not included
 
-- No `/matching/score` or `/jobs/ingest` (deferred, C-25), no database change, no AI, no Week 6B
-  polish. **PR 6B has not started.**
+- No `/matching/score`, `/jobs/ingest` or `/applications/prepare` (deferred, C-25), no database
+  change or migration, no AI, no persistence or cache, no Week 6B polish. **PR 6B has not
+  started.**
+
+#### Verified at this checkpoint
+
+- Stateless and in memory: no database query or write (database byte-identical), no temporary
+  workbook file, no project file, no candidate data in logs or errors, counts-only log line.
+- The successful 200 is a deliberate binary response (ADR-023 §8); errors keep the standard
+  envelope.
+- Microsoft Excel opened the workbook without repair: correct sheets, values and types; no
+  formulas, hyperlinks, external links or hidden content; metadata `EligiCore` only.
+- Migration chain unchanged (three migrations); `alembic check` clean.
 
 ---
 

@@ -21,14 +21,14 @@ project:
   api_namespace: /api/v1
   env_prefix: ELIGICORE_
   database_name: eligicore
-  phase: "Week 6 — Polish, Excel export, testing (IN PROGRESS — PR 6A open, not merged)"
-  next_approved_phase: "PR 6B — Week 6 polish (not started; only after Checkpoint 6A). /matching/score and /jobs/ingest deferred (ADR-023)"
+  phase: "Week 6 — Polish, Excel export, testing (IN PROGRESS — Checkpoint 6A recorded; PR 6B not started)"
+  next_approved_phase: "PR 6B — Week 6 polish (not started, not authorized). /matching/score and /jobs/ingest deferred (ADR-023)"
   source_of_truth: EligiCore_Dossier_update.md
   ai_provider_phase_1: gemini-flash   # ADR-013. Concrete implementation, not a dependency.
   vcs:
     remote: https://github.com/Lakshya172/eligicore
     default_branch: main
-    last_stable_checkpoint: "Checkpoint 5 — 0aaaa1da6fe643b8164df645113322adc889075d"
+    last_stable_checkpoint: "Checkpoint 6A — 0125703ad9464216b1622c14941664ec32ac9bac"
 
 # Read at the start of every session, without exception.
 context:
