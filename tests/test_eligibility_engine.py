@@ -858,7 +858,10 @@ def test_curated_dataset_golden_verdicts() -> None:
         [edu(level="BACHELORS", field_of_study="Information Technology", grad_year=2026, cgpa=7.2)],
         backlogs=1,
     )
-    states = {sid: evaluate_job(profile, job).eligibility_state for sid, job in jobs.items()}
+    # The original five curated jobs. Week 6B appended 35 more (ADR-024 §2); this golden map
+    # is about these five verdicts, which are unchanged.
+    original = ["EX-INT-001", "EX-FT-002", "EX-INT-003", "EX-FT-004", "EX-INT-005"]
+    states = {sid: evaluate_job(profile, jobs[sid]).eligibility_state for sid in original}
     assert states == {
         "EX-INT-001": E.NOT_ELIGIBLE,  # backlogs 1 > 0
         "EX-FT-002": E.ELIGIBLE,  # every requirement, including BACHELORS, met
