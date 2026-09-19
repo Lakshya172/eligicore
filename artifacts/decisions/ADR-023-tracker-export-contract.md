@@ -109,7 +109,9 @@ through one writer:
    apostrophe** (`=1+1` → `'=1+1`). The value stays readable, and the leading apostrophe is the
    convention spreadsheet users recognise for "this is text".
 2. The cell's type is set **explicitly to string**. openpyxl otherwise treats a string starting
-   with `=` as a formula; the explicit type is the second, independent guard.
+   with `=` as a formula, and stores a string equal to an Excel error code (`#N/A`, `#REF!`,
+   `#DIV/0!`, …) as an error cell; the explicit type is the second, independent guard and keeps
+   both as the text the client sent.
 
 Tests reopen the file, check every cell's type and value, and scan the sheet XML for `<f>`
 elements. `apply_link` is plain text: no hyperlink object and no hyperlink relationship is

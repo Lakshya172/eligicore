@@ -484,6 +484,14 @@ def test_no_formula_element_in_any_sheet_xml() -> None:
     assert "xl/calcChain.xml" not in entries
 
 
+@pytest.mark.parametrize("code", ["#N/A", "#REF!", "#DIV/0!", "#NULL!", "#VALUE!", "#NAME?", "#NUM!"])
+def test_error_code_text_stays_text(code: str) -> None:
+    """openpyxl would store these strings as Excel error cells; the pinned type keeps them text."""
+    sheet = workbook(export([record(notes=code, reason=code)]))[TRACKER_SHEET]
+    for cell in (sheet["K2"], sheet["M2"]):
+        assert cell.data_type == "s" and cell.value == code
+
+
 def test_formula_prefix_alone_would_have_become_a_formula() -> None:
     """Guard the guard: without neutralisation openpyxl really does store a formula."""
     book = openpyxl.Workbook()
