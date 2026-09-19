@@ -29,6 +29,9 @@ The test: could this service be called from a CLI script with no server running?
 - Request and response models are distinct types, even when they look identical today.
 - Use `response_model=` on every route so the contract is enforced and the OpenAPI doc is
   accurate.
+- **One recorded exception:** `POST /api/v1/applications/export` returns the `.xlsx` file itself
+  (ADR-023 §8, ruling C-23). Its request is still a Pydantic model and its errors still use the
+  standard envelope. No other route may cite it; another binary response needs its own ruling.
 - Field names are `snake_case` and stable — a rename is a breaking change (ADR-010).
 - Enums are declared as Python enums, never bare strings.
 

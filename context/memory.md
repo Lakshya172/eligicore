@@ -376,6 +376,21 @@ tested it.
 re-verifies every job and asserts the fingerprint is unchanged, then edits one job and asserts
 it changes. Apply the same rule to any future hash or cache key over catalogue data.
 
+### D-31 · openpyxl writes a temporary file even when you save to a buffer
+`Workbook.save(BytesIO())` still spools every worksheet through
+`NamedTemporaryFile(delete=False)` in the system temp directory, then copies it into the zip
+and deletes it. A "directory is empty afterwards" test cannot see it; only refusing `open` and
+`tempfile` during the export exposed it.
+**What to do:** the tracker export saves through `_InMemoryExcelWriter`, which hands
+openpyxl's `WorksheetWriter` a `BytesIO`. It touches a private openpyxl module, so openpyxl is
+pinned exactly; re-run the no-file tests on any upgrade.
+
+### D-32 · openpyxl turns some plain strings into formulas or error cells
+A string starting with `=` is stored as a formula, and a string equal to an Excel error code
+(`#N/A`, `#REF!`, …) as an error cell. Neutralising the prefix covers the first only.
+**What to do:** write client text through one function that both neutralises the prefix and
+sets `cell.data_type = "s"`.
+
 ---
 
 ## Lessons

@@ -79,7 +79,8 @@ runs, and is tested. The authoritative, always-current state lives in
 - **`GET /api/v1/health`** — liveness
 - **Matching engine** — deterministic TF-IDF cosine similarity between a candidate's skills and experience and the job catalogue, with skill coverage, the shared terms behind each score and a template explanation. It reads no eligibility data and stores nothing.
 - **`POST /api/v1/recommendations`** — eligibility verdicts and relevance scores side by side: eligible jobs ranked by match score, borderline jobs flagged separately, ineligible and closed jobs listed with their reasons but never ranked. The two are never combined into one number. Nothing is stored.
-- **850 tests**, running offline with no credentials and no network
+- **`POST /api/v1/applications/export`** *(PR 6A — in review)* — turns the tracking rows a client sends into an Excel tracker, built entirely in memory. Nothing that could run as a formula survives, and nothing is stored.
+- **850 tests** on `main` (1075 with PR 6A), running offline with no credentials and no network
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
 - Repository workflow: branching, conventional commits, PR standard, CI, checkpoint discipline
 
@@ -97,7 +98,7 @@ asserts none exists. Uploaded resumes exist only for the duration of processing.
 | 3 | Job schema, source adapters, ingestion, deduplication | **Complete** |
 | 4 | Eligibility engine — deterministic rules plus AI for ambiguity | **Complete** — deterministic engine (PR #9) + AI field relatedness (PR #11), Checkpoint 4 |
 | 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | **Complete** — matching engine (PR #13) + recommendations endpoint (PR #15), Checkpoint 5 |
-| 6 | **Polish, Excel export, testing — complete demoable MVP** | Not started |
+| 6 | **Polish, Excel export, testing — complete demoable MVP** | **In progress** — Excel export (PR 6A) in review; polish (PR 6B) not started |
 | 7 | Application preparation with truthfulness validation | Not started |
 | 8 | Caching and AI cost logging | Not started |
 | 9 | Documentation and deployment | Not started |
