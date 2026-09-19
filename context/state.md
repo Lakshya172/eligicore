@@ -14,7 +14,7 @@
 | **Date** | 2026-09-17 |
 | **Phase** | **Week 5 — Matching Engine · IN PROGRESS** — PR 5A merged and verified (Checkpoint 5A); PR 5B (recommendations) implemented, **in review, not merged** |
 | **Roadmap position** | Weeks 1–4 complete and merged. Week 5 PR 5A **merged and verified** (Checkpoint 5A). PR 5B open on `feature/week-5-recommendations`, **not merged**. |
-| **Health** | 🟢 GREEN — 736 tests on `main`; 833 on the PR 5B branch; no open blockers |
+| **Health** | 🟢 GREEN — 736 tests on `main`; 850 on the PR 5B branch; no open blockers |
 | **Stable branch** | `main` |
 | **Current checkpoint** | **Checkpoint 5A** (intermediate, matching engine) — `05534affced482f6bc5e188ac465144dd425f9a7` |
 | **Produced by** | PR #13 (`feature/week-5-matching-engine`), **MERGED** 2026-09-17 |
@@ -117,7 +117,8 @@ demoable. Weeks 7–10 are enhancement.
   external review, **not merged**. `POST /api/v1/recommendations`: one catalogue query, one
   Week 4 eligibility pass, one Week 5A matching pass over the whole catalogue; default scope
   ACTIVE + UNKNOWN capped at 50 with disclosure; explicit ids of any status; groups `ranked`,
-  `needs_review`, `not_eligible`, `not_open` (precedence); no score for `NOT_ELIGIBLE`;
+  `needs_review`, `not_eligible`, `not_open` (precedence); no score in `not_eligible`, full
+  match result but no rank in `not_open`;
   composed explanations; `corpus_fingerprint` added to the matching engine. ADR-022. No
   database, AI or eligibility change. `/matching/score` is not implemented.
 

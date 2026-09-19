@@ -413,3 +413,55 @@ def test_fingerprint_ignores_verification_time_but_tracks_content(catalogue: Cat
         session.commit()
     edited = catalogue.client.post(URL, json={"profile": profile()}).json()
     assert edited["corpus_fingerprint"] != first
+
+
+# ---------------------------------------------------------------------------------------
+# not_open keeps its match result (ADR-022 §7)
+# ---------------------------------------------------------------------------------------
+
+PERFECT_JOB = {
+    "required_skills": ["Python", "SQL"],
+    "role_title": "Data Intern",
+    "description": f"{EXPERIENCE} in Python.",
+}
+INELIGIBLE = {"min_cgpa": 9.0, "min_cgpa_scale": "SCALE_10"}
+ELIGIBLE = {"min_cgpa": 7.0, "min_cgpa_scale": "SCALE_10"}
+# CGPA passes; the non-exact field goes to the default (uncertain) AI stage.
+REVIEW = {"min_cgpa": 7.0, "min_cgpa_scale": "SCALE_10", "allowed_fields": ["Mathematics"]}
+
+
+@pytest.mark.parametrize(
+    ("job_id", "status", "requirements", "state"),
+    [
+        ("closed-ineligible", JobStatus.CLOSED, INELIGIBLE, "NOT_ELIGIBLE"),
+        ("expired-ineligible", JobStatus.EXPIRED, INELIGIBLE, "NOT_ELIGIBLE"),
+        ("closed-eligible", JobStatus.CLOSED, ELIGIBLE, "ELIGIBLE"),
+        ("expired-review", JobStatus.EXPIRED, REVIEW, "NEEDS_REVIEW"),
+    ],
+)
+def test_not_open_items_are_unranked_but_scored(
+    catalogue: Catalogue, job_id: str, status: JobStatus, requirements: dict[str, Any], state: str
+) -> None:
+    with catalogue.factory() as session:
+        add_job(session, job_id, status=status, **PERFECT_JOB, **requirements)
+        session.commit()
+    body = catalogue.client.post(
+        URL, json={"profile": profile(), "job_ids": [job_id, "eligible"]}
+    ).json()
+
+    assert item_ids(body, "not_open") == [job_id]
+    assert item_ids(body, "ranked") == ["eligible"]  # the higher score does not move it
+    item = body["not_open"][0]
+    assert item["rank"] is None
+    assert item["eligibility"]["eligibility_state"] == state
+    assert item["eligibility"]["job_status"] == status.value
+    assert item["match"]["match_score"] is not None
+    assert item["match"]["match_score"] > body["ranked"][0]["match"]["match_score"]
+    assert item["match"]["score_basis"] == "SCORED"
+    assert item["match"]["top_terms"]
+    seen = [
+        i["eligibility"]["job_id"]
+        for group in ("ranked", "needs_review", "not_eligible", "not_open")
+        for i in body[group]
+    ]
+    assert sorted(seen) == sorted([job_id, "eligible"])

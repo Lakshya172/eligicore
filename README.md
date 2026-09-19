@@ -80,7 +80,7 @@ runs, and is tested. The authoritative, always-current state lives in
 - **`GET /api/v1/health`** — liveness
 - **Matching engine** — deterministic TF-IDF cosine similarity between a candidate's skills and experience and the job catalogue, with skill coverage, the shared terms behind each score and a template explanation. It reads no eligibility data and stores nothing.
 - **`POST /api/v1/recommendations`** *(PR 5B, in review)* — eligibility verdicts and relevance scores side by side: eligible jobs ranked by match score, borderline jobs flagged separately, ineligible and closed jobs listed with their reasons but never ranked. The two are never combined into one number. Nothing is stored.
-- **833 tests** on the PR 5B branch (736 on `main`), running offline with no credentials and no network
+- **850 tests** on the PR 5B branch (736 on `main`), running offline with no credentials and no network
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
 - Repository workflow: branching, conventional commits, PR standard, CI, checkpoint discipline
 

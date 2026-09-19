@@ -409,11 +409,68 @@ async def test_not_open_is_ordered_by_id() -> None:
     assert ids(response.not_open) == ["a", "b", "c"]
 
 
-async def test_not_eligible_closed_job_has_no_score_either() -> None:
-    catalogue = [make_job("x", status="EXPIRED", **NOT_ELIGIBLE)]
-    item = (await recommend(profile(), ["x"], catalogue, ai())).not_open[0]
-    assert item.match.match_score is None
-    assert item.match.score_basis is MatchScoreBasis.WITHHELD_NOT_ELIGIBLE
+# not_open changes the group, not the matching result (ADR-022 §7).
+PERFECT = {
+    "required_skills": ["Python", "SQL"],
+    "role_title": "Data Intern",
+    "description": "Built data pipelines in Python.",
+}
+
+
+@pytest.mark.parametrize(
+    ("status", "requirements", "state"),
+    [
+        ("CLOSED", NOT_ELIGIBLE, EligibilityState.NOT_ELIGIBLE),
+        ("EXPIRED", NOT_ELIGIBLE, EligibilityState.NOT_ELIGIBLE),
+        ("CLOSED", ELIGIBLE, EligibilityState.ELIGIBLE),
+        ("EXPIRED", NEEDS_REVIEW, EligibilityState.NEEDS_REVIEW),
+    ],
+)
+async def test_not_open_keeps_the_full_match_result_whatever_the_verdict(
+    status: str, requirements: dict[str, Any], state: EligibilityState
+) -> None:
+    catalogue = [make_job("gone", status=status, **PERFECT, **requirements), make_job("other")]
+    response = await recommend(profile(), ["gone"], catalogue, ai())
+    item = response.not_open[0]
+    direct = score_jobs(
+        candidate_match_input(profile()), [job_match_input(j) for j in catalogue], ["gone"]
+    ).matches[0]
+
+    assert item.rank is None
+    assert item.eligibility.eligibility_state is state
+    assert item.match.match_score == direct.match_score == 100.0
+    assert item.match.score_basis is MatchScoreBasis.SCORED
+    assert [t.term for t in item.match.top_terms] == [t.term for t in direct.top_terms]
+    assert item.match.matched_required_skills == ["Python", "SQL"]
+    assert item.explanation.endswith(direct.explanation)
+    assert all_items(response) == [item]
+
+
+async def test_not_open_order_ignores_scores() -> None:
+    catalogue = [
+        make_job("a-low", status="CLOSED", required_skills=["Java"], description="Frontend work.",
+                 **NOT_ELIGIBLE),
+        make_job("b-high", status="EXPIRED", **PERFECT, **NOT_ELIGIBLE),
+        make_job("c-mid", status="CLOSED", **ELIGIBLE),
+    ]
+    response = await recommend(profile(), ["c-mid", "b-high", "a-low"], catalogue, ai())
+    assert ids(response.not_open) == ["a-low", "b-high", "c-mid"]
+    assert [i.rank for i in response.not_open] == [None, None, None]
+    scores = [i.match.match_score for i in response.not_open]
+    assert scores[1] > scores[2] > scores[0]  # the highest score is not first: order is by id
+
+
+async def test_withholding_is_limited_to_the_not_eligible_group() -> None:
+    catalogue = [
+        make_job("open-ineligible", **PERFECT, **NOT_ELIGIBLE),
+        make_job("closed-ineligible", status="CLOSED", **PERFECT, **NOT_ELIGIBLE),
+    ]
+    response = await recommend(profile(), [j.id for j in catalogue], catalogue, ai())
+    assert response.not_eligible[0].match.match_score is None
+    assert response.not_eligible[0].match.score_basis is MatchScoreBasis.WITHHELD_NOT_ELIGIBLE
+    assert response.not_open[0].match.match_score == 100.0
+    for item in all_items(response):
+        assert item.eligibility.eligibility_state is EligibilityState.NOT_ELIGIBLE
 
 
 # ---------------------------------------------------------------------------------------

@@ -33,8 +33,9 @@ class MatchScoreBasis(str, Enum):
     """Why ``match_score`` has a value, or why it is null.
 
     The first three mirror the matching engine's ``ScoreBasis``. ``WITHHELD_NOT_ELIGIBLE`` is
-    the recommendation layer's: a job the candidate is not eligible for is not scored for
-    recommendation purposes, so no similarity number competes with the eligibility verdict.
+    the recommendation layer's: a job in ``not_eligible`` is not scored for recommendation
+    purposes, so no similarity number competes with the eligibility verdict. Jobs in
+    ``not_open`` keep their score whatever their verdict; they are never ranked.
     """
 
     SCORED = "SCORED"
@@ -74,8 +75,8 @@ class RecommendationMatch(BaseModel):
         le=100,
         description=(
             "TF-IDF cosine similarity between the profile's skills and experience and the job, "
-            "× 100, one decimal. Null when there was nothing to compare or the job is not "
-            "eligible — see `score_basis`. Null is not zero. Not an eligibility score."
+            "× 100, one decimal. Null when there was nothing to compare, or for a job in "
+            "`not_eligible` — see `score_basis`. Null is not zero. Not an eligibility score."
         ),
     )
     score_basis: MatchScoreBasis

@@ -192,7 +192,8 @@ Recommendations are ruled in **ADR-022** (`app/services/recommendations.py`,
 matching once each and changes neither. The whole catalogue is the TF-IDF corpus; the returned
 scope is ACTIVE + UNKNOWN (at most 50, remainder disclosed) or explicit ids of any status. Jobs
 are grouped `not_open` → `ranked` → `needs_review` → `not_eligible`; similarity orders jobs only
-within `ranked` and `needs_review`, and a `NOT_ELIGIBLE` job carries no score. Dependency
+within `ranked` and `needs_review`. Jobs in `not_eligible` carry no score; a `not_open` job keeps
+its full match result but is never ranked. Dependency
 direction: router → recommendations → eligibility + matching.
 
 TF-IDF rather than embeddings because it needs no training data, costs nothing, runs locally,

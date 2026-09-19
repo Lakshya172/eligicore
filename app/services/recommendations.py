@@ -18,8 +18,9 @@ What it adds is ADR-022: scope, grouping, ranking and explanation composition.
 * **Grouping never rewrites a verdict.** ``not_open`` (a requested CLOSED or EXPIRED job) takes
   precedence; otherwise the Week 4 state decides. The embedded ``JobEligibility`` is the object
   Week 4 returned.
-* **Similarity only orders within a group.** A high score cannot move a job between groups, and
-  no ``NOT_ELIGIBLE`` job receives a score, whichever group it is in.
+* **Similarity only orders within a group.** A high score cannot move a job between groups. Jobs
+  in ``not_eligible`` carry no score; a ``not_open`` job keeps its full match result, whatever its
+  verdict — ``not_open`` changes the group, not the matching result.
 
 Stateless: nothing is stored, cached or written. One counts-only log line; never the profile,
 ``candidate_id``, skills, experience, terms or per-job scores (INV-4).
@@ -122,24 +123,23 @@ def group_for(eligibility: JobEligibility) -> str:
 # ---------------------------------------------------------------------------------------
 
 
-def score_withheld(eligibility: JobEligibility) -> bool:
-    """True for a ``NOT_ELIGIBLE`` verdict, in whichever group the job lands.
+def score_withheld(group: str) -> bool:
+    """True only for the ``not_eligible`` group, whose jobs are not scored for recommendation.
 
-    An ineligible job is not scored for recommendation purposes, so no similarity number sits
-    beside a verdict saying the candidate may not apply — including a closed job in
-    ``not_open`` (ADR-022).
+    A ``not_open`` job keeps its score whatever its verdict: ``not_open`` changes the group,
+    not the matching result, and it is never ranked (ADR-022 §7).
     """
-    return eligibility.eligibility_state is EligibilityState.NOT_ELIGIBLE
+    return group == NOT_ELIGIBLE
 
 
-def match_view(match: JobMatch, eligibility: JobEligibility) -> RecommendationMatch:
+def match_view(match: JobMatch, group: str) -> RecommendationMatch:
     """The matching engine's evidence, as the API shows it.
 
-    For a ``NOT_ELIGIBLE`` job the score and its shared terms are withheld; skill coverage is
-    still shown.
+    In ``not_eligible`` the score and its shared terms are withheld; skill coverage is still
+    shown. Every other group shows the matching result unchanged.
     """
     coverage = match.skill_coverage
-    withheld = score_withheld(eligibility)
+    withheld = score_withheld(group)
     return RecommendationMatch(
         match_score=None if withheld else match.match_score,
         score_basis=(
@@ -166,7 +166,7 @@ def match_view(match: JobMatch, eligibility: JobEligibility) -> RecommendationMa
 def compose_explanation(eligibility: JobEligibility, match: JobMatch, group: str) -> str:
     """Join the Week 4 summary and the Week 5A match explanation. No text is generated here
     beyond fixed connecting sentences."""
-    if score_withheld(eligibility):
+    if score_withheld(group):
         body = (
             f"{eligibility.summary} Similarity is not reported for a job the profile is not "
             "eligible for."
@@ -236,7 +236,7 @@ async def recommend(
             RecommendationItem(
                 rank=rank,
                 eligibility=result,
-                match=match_view(match, result),
+                match=match_view(match, name),
                 explanation=compose_explanation(result, match, name),
             )
             for rank, (result, match) in zip(ranks, pairs)

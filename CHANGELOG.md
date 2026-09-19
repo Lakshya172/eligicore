@@ -21,7 +21,8 @@ dossier considers the system complete and demoable. No release is claimed before
 - **`POST /api/v1/recommendations`** — eligibility verdicts and relevance scores side by side.
   Groups: `ranked` (`ELIGIBLE`, `LIKELY_ELIGIBLE`), `needs_review` (`NEEDS_REVIEW`, `UNKNOWN`),
   `not_eligible` (unranked, no score), `not_open` (requested `CLOSED`/`EXPIRED`, unranked, takes
-  precedence). Ranked groups ordered by `match_score` descending, nulls last, then id. Default
+  precedence; keeps its match score). Ranked groups ordered by `match_score` descending, nulls
+  last, then id. Default
   scope ACTIVE + UNKNOWN, at most 50 by `last_verified_at` then id, remainder disclosed in
   `jobs_not_considered`; explicit `job_ids` (1–50) of any status; unknown ids in
   `not_found_job_ids`.
@@ -31,7 +32,7 @@ dossier considers the system complete and demoable. No release is claimed before
 - `app/schemas/matching.py` — request, response, item and match schemas;
   `MAX_RECOMMENDATION_JOBS = 50`; `MatchScoreBasis.WITHHELD_NOT_ELIGIBLE`.
 - `MatchingResult.corpus_fingerprint` — SHA-256 of the catalogue's job ids and matching terms.
-- **97 new tests** (833 total) and a 38-mutation run, all caught.
+- **114 new tests** (850 total) and a 40-mutation run, all caught.
 
 #### Decided
 

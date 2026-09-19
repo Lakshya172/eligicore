@@ -90,11 +90,17 @@ object Week 4 returned; tests compare it field for field with `/eligibility/chec
 
 - `match_score` is exactly the Week 5A value (ADR-020): cosine × 100, one decimal, or null with
   its `score_basis`. Null is not zero, and it is not an eligibility score.
-- **A `NOT_ELIGIBLE` verdict never carries a score**, in whichever group the job lands (so also a
-  closed, ineligible job in `not_open`): `match_score = null`,
-  `score_basis = WITHHELD_NOT_ELIGIBLE`, no top terms. Skill coverage is still shown. No
-  similarity number sits beside a verdict saying the candidate may not apply.
+- **Jobs in `not_eligible` are not scored for recommendation purposes:** `match_score = null`,
+  `score_basis = WITHHELD_NOT_ELIGIBLE`, no top terms. Skill coverage is still shown.
+- **`not_open` changes the group, not the matching result.** A `not_open` job carries its full
+  match result — `match_score`, its `score_basis`, skill coverage and top terms — whatever its
+  eligibility verdict, including `NOT_ELIGIBLE`. It is never ranked (`rank = null`), it is
+  ordered by `job_id` only, and its score never affects its group or its position.
 - There is no combined, overall or eligibility-weighted score, and no second recommendation score.
+
+*Review correction (PR #15):* an earlier draft withheld the score for every `NOT_ELIGIBLE`
+verdict, including inside `not_open`. That contradicted the approved `not_open` contract and was
+reverted before merge; withholding applies to the `not_eligible` group only.
 
 ### 8. Corpus fingerprint (C-19) — amends ADR-020 §5
 
@@ -107,7 +113,7 @@ order → same value; changed matching content, membership or order → differen
 ### 9. Explanations
 
 Composed, not generated: the Week 4 `summary` followed by the Week 5A `JobMatch.explanation`. Fixed
-connecting sentences only — for a withheld score, *"Similarity is not reported for a job the
+connecting sentences only — for a job in `not_eligible`, *"Similarity is not reported for a job the
 profile is not eligible for."*; for `not_open`, a leading *"This posting is CLOSED and is listed
 for reference, not ranked."* No LLM, and no judgement ("perfect fit", "you should apply" …) —
 enforced by a denylist test.
@@ -152,4 +158,4 @@ runs it.
 
 `app/services/recommendations.py` · `app/schemas/matching.py` · `app/routers/matching.py` ·
 `app/services/matching_engine.py` (`corpus_fingerprint`) · `tests/test_recommendations.py` ·
-`tests/test_recommendations_endpoint.py` · 38-mutation run · QG-001, QG-004, QG-005
+`tests/test_recommendations_endpoint.py` · 40-mutation run · QG-001, QG-004, QG-005
