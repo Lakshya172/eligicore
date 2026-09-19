@@ -48,11 +48,11 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 
 ## Project status
 
-**Pre-release development. Weeks 1–5 of a 10-week solo build complete.**
+**Pre-release development. Weeks 1–5 of a 10-week solo build complete; Week 6 in progress.**
 
-Current stable checkpoint: **Checkpoint 5** (`0aaaa1d`) — Week 5 Matching Engine: a deterministic
-TF-IDF matching engine and a recommendations endpoint that groups jobs by eligibility and orders
-them by relevance, never combining the two.
+Current stable checkpoint: **Checkpoint 6A** (`0125703`) — Week 6 Excel Export (intermediate): a
+stateless Excel tracker export built entirely in memory, on top of Checkpoint 5's matching engine
+and recommendations. Week 6 polish (PR 6B) and the final Week 6 checkpoint are still pending.
 
 > **Not production-ready.** The Gemini Flash provider has not been exercised against the live
 > API — no key is configured and the test suite runs without one. The provider contract is
@@ -79,8 +79,8 @@ runs, and is tested. The authoritative, always-current state lives in
 - **`GET /api/v1/health`** — liveness
 - **Matching engine** — deterministic TF-IDF cosine similarity between a candidate's skills and experience and the job catalogue, with skill coverage, the shared terms behind each score and a template explanation. It reads no eligibility data and stores nothing.
 - **`POST /api/v1/recommendations`** — eligibility verdicts and relevance scores side by side: eligible jobs ranked by match score, borderline jobs flagged separately, ineligible and closed jobs listed with their reasons but never ranked. The two are never combined into one number. Nothing is stored.
-- **`POST /api/v1/applications/export`** *(PR 6A — in review)* — turns the tracking rows a client sends into an Excel tracker, built entirely in memory. Nothing that could run as a formula survives, and nothing is stored.
-- **850 tests** on `main` (1075 with PR 6A), running offline with no credentials and no network
+- **`POST /api/v1/applications/export`** — turns the tracking rows a client sends into an Excel tracker, built entirely in memory. Nothing that could run as a formula survives, and nothing is stored.
+- **1075 tests**, running offline with no credentials and no network
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
 - Repository workflow: branching, conventional commits, PR standard, CI, checkpoint discipline
 
@@ -98,7 +98,7 @@ asserts none exists. Uploaded resumes exist only for the duration of processing.
 | 3 | Job schema, source adapters, ingestion, deduplication | **Complete** |
 | 4 | Eligibility engine — deterministic rules plus AI for ambiguity | **Complete** — deterministic engine (PR #9) + AI field relatedness (PR #11), Checkpoint 4 |
 | 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | **Complete** — matching engine (PR #13) + recommendations endpoint (PR #15), Checkpoint 5 |
-| 6 | **Polish, Excel export, testing — complete demoable MVP** | **In progress** — Excel export (PR 6A) in review; polish (PR 6B) not started |
+| 6 | **Polish, Excel export, testing — complete demoable MVP** | **In progress** — Excel export complete (PR #17, Checkpoint 6A); polish (PR 6B) not started |
 | 7 | Application preparation with truthfulness validation | Not started |
 | 8 | Caching and AI cost logging | Not started |
 | 9 | Documentation and deployment | Not started |
