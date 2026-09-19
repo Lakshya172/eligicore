@@ -159,7 +159,8 @@ the single commit on `main` where that phase's merge landed.
 | **3** | Week 3 — Job Schema, Adapters and Ingestion | `2cfd4f0` | PR #6 (`f538015`) + PR #7 (`2cfd4f0`), merged 2026-09-10 | ✅ `test` success on `2cfd4f0` | 328 passed | **Stable** |
 | **4A** | Week 4 — Deterministic Eligibility Engine (PR 4A) · **intermediate** | `4a5cb84` | PR #9 (`feature/week-4-eligibility-engine`), merged 2026-09-17 | ✅ `test` success on `4a5cb84` | 524 passed | **Stable** |
 | **4** | Week 4 — Eligibility Intelligence (final: PR 4A + PR 4B) | `f56d7df` | PR #9 (`4a5cb84`) + PR #11 (`feature/week-4-eligibility-ai`), merged 2026-09-17 | ✅ `test` success on `f56d7df` | 615 passed | **Stable** |
-| **5A** | Week 5 — Deterministic Matching Engine (PR 5A) · **intermediate** | `05534af` | PR #13 (`feature/week-5-matching-engine`), merged 2026-09-17 | ✅ `test` success on `05534af` | 736 passed | **Stable — current** |
+| **5A** | Week 5 — Deterministic Matching Engine (PR 5A) · **intermediate** | `05534af` | PR #13 (`feature/week-5-matching-engine`), merged 2026-09-17 | ✅ `test` success on `05534af` | 736 passed | **Stable** |
+| **5** | Week 5 — Matching Engine (final: PR 5A + PR 5B) | `0aaaa1d` | PR #13 (`05534af`) + PR #15 (`feature/week-5-recommendations`), merged 2026-09-19 | ✅ `test` success on `0aaaa1d` | 850 passed | **Stable — current** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
 **Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
@@ -167,6 +168,7 @@ the single commit on `main` where that phase's merge landed.
 **Checkpoint 4A full SHA:** `4a5cb844d1aa4ca4aa3e0906481d0d91c8fc67d4`
 **Checkpoint 4 full SHA:** `f56d7dfabeeb8a7addac693d2c7552b0c1fc4e76`
 **Checkpoint 5A full SHA:** `05534affced482f6bc5e188ac465144dd425f9a7`
+**Checkpoint 5 full SHA:** `0aaaa1da6fe643b8164df645113322adc889075d`
 
 **Checkpoint 4A is intermediate, not Checkpoint 4.** Week 4 is delivered in two PRs. 4A marks the
 verified deterministic engine; **Checkpoint 4 is reserved for Week 4 as a whole** and is
@@ -179,6 +181,93 @@ recorded as the intermediate deterministic checkpoint.
 **Checkpoint 5A is intermediate, not Checkpoint 5.** Week 5 is delivered in two PRs. 5A marks the
 verified deterministic matching engine (service only); **Checkpoint 5 is reserved for Week 5 as a
 whole** and is established only after PR 5B (recommendations) is merged and verified.
+
+**Checkpoint 5 established 2026-09-19** at `0aaaa1d`, after PR 5B was merged and verified. 5A
+remains recorded as the intermediate matching-engine checkpoint.
+
+### Checkpoint 5 — verification record (final Week 5)
+
+**Phase:** Week 5 — Matching Engine (final: PR 5A + PR 5B)
+**Commit on `main`:** `0aaaa1d` — the PR #15 merge commit, parents `4ee8e0c` (previous `main`, the
+Checkpoint 5A record) and `f761588` (PR 5B branch head). Real merge; the nine PR 5B commits are
+preserved.
+**Merged by:** `Lakshya172` on GitHub at 2026-09-19T17:22:56Z, after review and a correction pass.
+The post-merge gate confirmed the merged tree is identical to the reviewed head `f761588`.
+
+**Git history of Week 5:**
+
+| Step | Merge on `main` |
+|---|---|
+| Week 5A implementation (PR #13) — Checkpoint 5A | `05534affced482f6bc5e188ac465144dd425f9a7` |
+| Week 5A checkpoint record (PR #14) | `4ee8e0c0bacdecbbf7c224bf5fded63a7c20ac14` |
+| Week 5B implementation (PR #15) — **Checkpoint 5** | `0aaaa1da6fe643b8164df645113322adc889075d` |
+
+**Week 5 capability at this checkpoint:**
+
+- **5A — deterministic matching engine** (`app/services/matching_engine.py`, ADR-020, ADR-021):
+  skill normalization and comparison by canonical key, skill coverage, custom tokenizer with a
+  separate `skill:` namespace, TF-IDF fitted on the whole catalogue with the candidate never in
+  the corpus, cosine similarity reported as a 0–100 score (or `null` when there is nothing to
+  compare), deterministic ordering, template explanations, no persistence, framework-independent.
+- **5B — recommendation orchestration** (`POST /api/v1/recommendations`, ADR-022):
+  eligibility-first reuse of Week 4 eligibility and Week 5A matching; groups `ranked`,
+  `needs_review`, `not_eligible`, `not_open`; 50-job cap; default ACTIVE + UNKNOWN scope;
+  explicit CLOSED/EXPIRED retrieval; deterministic truncation disclosure; corpus fingerprint;
+  composed explanations; no new AI, no database change, no persistence.
+
+**Invariants recorded at this checkpoint:**
+
+- **Eligibility authority.** Deterministic hard failures remain `NOT_ELIGIBLE`; AI cannot override
+  them (ADR-017, ADR-019). Recommendation grouping never rewrites a verdict — each item embeds the
+  Week 4 `JobEligibility` unchanged.
+- **`not_open`.** Explicitly requested CLOSED/EXPIRED jobs enter `not_open`, which takes precedence
+  over every eligibility state. `not_open` is unranked, ordered by `job_id`, and keeps its match
+  score and match data whatever its verdict. Only the `not_eligible` group withholds the score.
+- **Corpus.** The TF-IDF corpus is the whole catalogue; recommendation scope is separate; candidate
+  data never enters the corpus.
+- **Fingerprint.** Deterministic SHA-256 over the ordered public job matching documents:
+  candidate-independent, sensitive to job content and catalogue order, insensitive to
+  `last_verified_at`, never persisted.
+- **Ranking.** `ranked` and `needs_review`: score descending, null scores last, `job_id` ascending.
+  `not_eligible` and `not_open`: `rank = null`, `job_id` ascending. No combined eligibility/matching
+  score.
+- **Architecture.** `router → recommendation service → eligibility + matching`; neither the
+  matching engine nor eligibility imports recommendations.
+
+| Check | Result |
+|---|---|
+| PR #15 merged on GitHub | `merged: true`, `merge_commit_sha` = `0aaaa1da6fe643b8164df645113322adc889075d` |
+| Tree on `main` vs reviewed PR head `f761588` | **Identical** |
+| Scope | 17 files: recommendation schemas, service, router, corpus fingerprint, tests, ADR-022, ADR-020 amendment, context. Week 4 eligibility engine and AI stage, eligibility schemas, `app/ai/**`, models, migrations, adapters, `requirements.txt` and CI untouched. |
+| Working tree / `origin/main` | Clean; local `main` = `origin/main` = `0aaaa1d` |
+| Full suite from `main` | **850 total — 850 passed, 0 failed, 0 skipped**, offline (no `ELIGICORE_*`, proxies to a dead port) |
+| Regression | Test files as of Checkpoint 5A: **747 passed** (the 736 unchanged plus 11 fingerprint additions); no test removed or weakened |
+| CI on `0aaaa1d` | `test` completed, conclusion `success` (run `35457917009`) |
+| Mutation testing from `main` | Week 5B **40/40** · Week 5A **36/36** · Week 4 **27/27**; sources restored byte-identical |
+| Live API (uvicorn, file database) | **61/61** checks: 200; `GET` → 405; `/api/v1/matching/score` → 404; malformed, empty and 51-id bodies → 422 without echo; duplicates, unknown and mixed ids; all 13 response fields; grouping, `not_open`, scope, corpus, fingerprint A–E, ranking, explanations, privacy |
+| Migration chain | Unchanged — head `b3e8d2c61a47`; no Week 5 migration; models unchanged; fresh `upgrade head` + `alembic check` clean |
+| Tables | Exactly `jobs`, `ingestion_state` (+ `alembic_version`); no candidate, evaluation or recommendation table |
+| Privacy | No candidate or recommendation persistence, no cache, no file writes; database byte-identical across recommendation requests; no candidate PII in logs or errors; counts-only recommendation log with no terms or per-job scores |
+| Performance (local, synthetic, mock AI) | 50 catalogue jobs ≈ 27 ms, 500 ≈ 194 ms median — not a production capacity claim |
+
+**Gates:** QG-001 PASS · QG-004 PASS · QG-005 PASS · QG-002 N/A (no eligibility change) · QG-003 N/A
+(no AI change) · QG-006 N/A (no model or migration) · QG-007 N/A · QG-008 N/A.
+
+**Reviewers:** api, qa, architect, security, documentation PASS; performance CONDITIONAL PASS
+(whole catalogue loaded per request — re-measure before an order-of-magnitude catalogue growth).
+
+**Known limitations:**
+- The whole catalogue is loaded and fitted per recommendation request; bounded at Phase 1 scale.
+- Recommendations inherit Week 4 AI cost and latency for ambiguous fields (≤ 50 jobs per request,
+  including explicitly requested closed jobs).
+- A 5-job curated catalogue gives coarse IDF; scores and the fingerprint change when the catalogue
+  changes.
+- English stop words only, no stemming; projects and certifications are not matched.
+- Carried from Checkpoint 4: Gemini's live calls and model identifier unverified; PostgreSQL
+  unverified.
+
+**Week 5C has not started.** No `/api/v1/matching/score`, no Week 5C branch or PR, no further
+matching features.
 
 ### Checkpoint 5A — verification record (intermediate)
 
@@ -456,13 +545,14 @@ Notes that remove the ambiguities this registry exists to close:
 
 | Priority | Checkpoint | Commit | Role |
 |---|---|---|---|
-| **1st** | Checkpoint 5A — Week 5 deterministic matching engine | `05534af` | **Current stable point.** If PR 5B introduces a regression, this is the immediate rollback reference. |
-| **2nd** | Checkpoint 4 — Week 4 Eligibility Intelligence | `f56d7df` | Last state before any matching code. Reached by reverting the PR #13 merge; no database step (scikit-learn leaves `requirements.txt` with it). |
-| **3rd** | Checkpoint 4A — Week 4 deterministic engine | `4a5cb84` | Deterministic eligibility without the AI stage. Reached by also reverting the PR #11 merge; no database step. |
-| **4th** | Checkpoint 3 — Week 3 | `2cfd4f0` | Last state before any eligibility code. |
-| **5th** | Checkpoint 2 — Week 2 | `91dd31d` | Known-good state before the job catalogue. |
-| **6th** | Checkpoint 1 — Week 1 | `2e79454` | Remains available indefinitely as a historical recovery point. |
-| **7th** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
+| **1st** | Checkpoint 5 — Week 5 Matching Engine (final) | `0aaaa1d` | **Current stable point.** If Week 6 introduces a regression, this is the immediate rollback reference. |
+| **2nd** | Checkpoint 5A — Week 5 deterministic matching engine | `05534af` | Matching engine without the recommendations endpoint. Reached by reverting the PR #15 merge; no database step. |
+| **3rd** | Checkpoint 4 — Week 4 Eligibility Intelligence | `f56d7df` | Last state before any matching code. Reached by also reverting the PR #13 merge; no database step (scikit-learn leaves `requirements.txt` with it). |
+| **4th** | Checkpoint 4A — Week 4 deterministic engine | `4a5cb84` | Deterministic eligibility without the AI stage. Reached by also reverting the PR #11 merge; no database step. |
+| **5th** | Checkpoint 3 — Week 3 | `2cfd4f0` | Last state before any eligibility code. |
+| **6th** | Checkpoint 2 — Week 2 | `91dd31d` | Known-good state before the job catalogue. |
+| **7th** | Checkpoint 1 — Week 1 | `2e79454` | Remains available indefinitely as a historical recovery point. |
+| **8th** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
 
 **Recovering from Checkpoint 4A to Checkpoint 3 requires `alembic downgrade 7c2f1a9b4d30`**,
 which drops only `jobs.min_degree_level` (verified with existing rows preserved and the existing

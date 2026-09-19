@@ -14,7 +14,24 @@ dossier considers the system complete and demoable. No release is claimed before
 
 ## [Unreleased]
 
-### Week 5 — PR 5B: Recommendations endpoint *(in review, not merged)*
+Nothing pending. **Week 5C and Week 6 have not started.**
+
+---
+
+## Checkpoint 5 — Week 5: Matching Engine (final)
+
+**Date:** 2026-09-19 · **Commit on `main`:** `0aaaa1d` · **Status:** Stable
+**Produced by:** PR #13 (`05534af`, matching engine — see Checkpoint 5A) + PR #15 (`0aaaa1d`,
+recommendations)
+**Full SHA:** `0aaaa1da6fe643b8164df645113322adc889075d` · **CI:** `test` success ·
+**Tests:** 850 passing from `main` (0 failed, 0 skipped) · **Mutations:** 5B 40/40 · 5A 36/36 ·
+Week 4 27/27
+
+Week 5 as a whole: a deterministic, explainable matching engine and a recommendations endpoint that
+puts Week 4 eligibility verdicts and relevance scores side by side — grouped, never combined, and
+never able to override eligibility. Checkpoint 5A below records the matching-engine half.
+
+### PR 5B — Recommendations endpoint
 
 #### Added
 
