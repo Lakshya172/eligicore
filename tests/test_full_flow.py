@@ -2,8 +2,9 @@
 
 One test file walks the dossier's §7 journey across the real HTTP API: résumé → parsed profile →
 the candidate completing the gaps (step 3) → validation and normalization → eligibility →
-recommendations → Excel tracker. It uses the seeded 40-job catalogue and the mock AI provider, and
-a socket guard fails the run if anything reaches for the network.
+recommendations → **a prepared application package** (§7 STEP 8) → Excel tracker. It uses the
+seeded 40-job catalogue and the mock AI provider, and a socket guard fails the run if anything
+reaches for the network.
 
 Two distinct synthetic profiles are exercised, because §17 asks for recommendations that rank
 sensibly *across* profiles: an IT graduate and a mechanical engineer see different catalogues.
@@ -243,6 +244,15 @@ def tracker_records(flow: Flow, body: dict[str, Any]) -> list[dict[str, Any]]:
     return records
 
 
+def prepare(flow: Flow, profile: dict[str, Any], job_id: str, **overrides: Any) -> dict[str, Any]:
+    """Dossier §7 STEP 8: a reviewable package for one job the candidate picked."""
+    body: dict[str, Any] = {"profile": profile, "job_id": job_id}
+    body.update(overrides)
+    response = flow.client.post("/api/v1/applications/prepare", json=body)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 # ---------------------------------------------------------------------------------------
 # Profile A — the whole journey
 # ---------------------------------------------------------------------------------------
@@ -320,7 +330,37 @@ def test_profile_a_walks_the_full_flow(flow: Flow) -> None:
     assert no_terms and no_terms[0]["match"]["match_score"] is None
     assert no_terms[0]["match"]["score_basis"] == "NO_JOB_TERMS"
 
-    # 7. Excel tracker export.
+    # 7. An application package for the top-ranked job — generated, then truthfulness-checked.
+    top_job_id = body["ranked"][0]["eligibility"]["job_id"]
+    package = prepare(
+        flow,
+        profile,
+        top_job_id,
+        questions=[{"id": "why", "text": "Why do you want this role?", "max_words": 60}],
+    )
+    assert package["job_id"] == top_job_id
+    assert package["company_name"] == body["ranked"][0]["eligibility"]["company_name"]
+    assert package["review_required"] is True, "a package is never a submission"
+    assert package["generation_outcome"] == "GENERATED"
+    assert package["status"] in {"COMPLETE", "PARTIAL"}
+    assert package["cover_letter"] and package["answers"][0]["answer"]
+    assert package["provider"] == "mock", "generation is mock-only in this build"
+    assert package["method"] == "ai_reasoning" and package["confidence"] in {"MEDIUM", "LOW"}
+    # Whatever the generator wrote, what comes back is traceable to the profile that was sent.
+    assert any(skill in package["cover_letter"] for skill in profile["skills"])
+    for excluded in ("CGPA", "backlog", "@", "Institute"):
+        assert excluded not in package["cover_letter"], excluded
+    # The package is a dead end for state: preparing one changes nothing for the next call.
+    assert prepare(flow, profile, top_job_id)["job_id"] == top_job_id
+
+    # A job the catalogue does not hold is a 404, not an invented package.
+    missing = flow.client.post(
+        "/api/v1/applications/prepare",
+        json={"profile": profile, "job_id": "no-such-job-id"},
+    )
+    assert missing.status_code == 404 and missing.json()["error"] == "HTTP_ERROR"
+
+    # 8. Excel tracker export.
     records = tracker_records(flow, body)
     assert len(records) == 40
     export = flow.client.post("/api/v1/applications/export", json={"records": records})
@@ -361,6 +401,14 @@ def test_profile_b_flows_through_to_an_export(flow: Flow) -> None:
     top = body["ranked"][0]
     assert top["match"]["match_score"] > body["ranked"][1]["match"]["match_score"]
     assert {t["term"] for t in top["match"]["top_terms"]} & {"SolidWorks", "AutoCAD", "MATLAB"}
+
+    package = prepare(flow, PROFILE_B, body["ranked"][0]["eligibility"]["job_id"])
+    assert package["status"] in {"COMPLETE", "PARTIAL"}
+    assert package["cover_letter"] and "SolidWorks" in package["cover_letter"]
+    assert "Python" in package["cover_letter"] or "MATLAB" in package["cover_letter"]
+    assert package["removed_claims"] == [] or all(
+        claim["scope"] == "COVER_LETTER" for claim in package["removed_claims"]
+    )
 
     export = flow.client.post(
         "/api/v1/applications/export", json={"records": tracker_records(flow, body)}
@@ -446,10 +494,17 @@ def test_the_flow_stores_nothing_and_logs_no_candidate_data(
         flow.client.post("/api/v1/candidates/validate", json=profile)
         flow.client.post("/api/v1/candidates/normalize", json=profile)
         body = recommend(flow, profile)
+        package = prepare(
+            flow,
+            profile,
+            body["ranked"][0]["eligibility"]["job_id"],
+            questions=[{"id": "q1", "text": "Tell us about yourself."}],
+        )
         export = flow.client.post(
             "/api/v1/applications/export", json={"records": tracker_records(flow, body)}
         )
     assert export.status_code == 200
+    assert package["review_required"] is True
 
     assert dump(flow.engine) == before, "no candidate data reached the database"
     assert set(Base.metadata.tables) == ALLOWED_OPERATIONAL_TABLES
@@ -460,6 +515,9 @@ def test_the_flow_stores_nothing_and_logs_no_candidate_data(
         assert marker not in logged, marker
         assert marker not in export.text
         assert marker not in json.dumps(body)
+        assert marker not in json.dumps(package), "no identity reaches a prepared package"
+    # Neither does the generated prose reach a log line: preparation logs counts only.
+    assert package["cover_letter"] and package["cover_letter"][:40] not in logged
 
 
 # ---------------------------------------------------------------------------------------
@@ -486,6 +544,9 @@ def test_this_file_still_guards_the_network_and_the_golden_results() -> None:
     profile_a = inspect.getsource(test_profile_a_walks_the_full_flow)
     for golden in ("== A_RANKED", "== A_NEEDS_REVIEW", "== A_NOT_ELIGIBLE"):
         assert golden in profile_a, golden
+    # The §7 STEP 8 leg is part of the journey, not an optional extra.
+    for step in ('prepare(', 'package["review_required"] is True', "status_code == 404"):
+        assert step in profile_a, step
     assert "== B_RANKED" in inspect.getsource(test_profile_b_flows_through_to_an_export)
     assert "== A_LIKELY_WHEN_RELATED" in inspect.getsource(
         test_pinned_related_answer_produces_likely_eligible

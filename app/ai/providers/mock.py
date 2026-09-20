@@ -257,7 +257,9 @@ class MockAIProvider(AIProvider):
         """
         paragraphs = ["Dear Hiring Team,"]
         body = [
-            f"I am writing to apply for the {job.role_title} role at {job.company_name}.",
+            self._sentence(
+                f"I am writing to apply for the {job.role_title} role at {job.company_name}"
+            ),
             *self._skill_sentences(evidence, job),
             *self._history_sentences(evidence),
             "I would welcome the chance to discuss this role with you.",
@@ -319,6 +321,11 @@ class MockAIProvider(AIProvider):
         if fields:
             sentences.append(f"My studies are in {fields[0]}.")
         return sentences
+
+    @staticmethod
+    def _sentence(text: str) -> str:
+        """End a sentence with exactly one full stop, even when a value already carries one."""
+        return f"{text.rstrip('.').rstrip()}."
 
     @staticmethod
     def _join(items: list[str]) -> str:
