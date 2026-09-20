@@ -222,28 +222,109 @@ unexplainable score is self-defeating.
 
 ---
 
-## Development setup
+## Quickstart
+
+Runs entirely on your machine: SQLite, a synthetic job catalogue, and a deterministic mock AI
+provider. **No API key, no network and no configuration are required** — deployment and the
+public documentation are Week 9.
+
+**Requires Python 3.11 or newer** (built and tested on 3.12).
+
+**1. Clone and create a virtual environment**
 
 ```bash
 git clone https://github.com/Lakshya172/eligicore.git
 cd eligicore
-
 python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
-
-pip install -r requirements.txt
-
-cp .env.example .env           # then fill in local values
+source .venv/bin/activate
 ```
 
-Run the API:
+On Windows PowerShell, activate it with:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+**2. Install the dependencies**
+
+```bash
+pip install -r requirements.txt
+```
+
+**3. Configure (optional)**
+
+The defaults — SQLite at `./eligicore.db` and the mock AI provider — need no `.env`. Copy the
+example only if you want to change them:
+
+```bash
+cp .env.example .env
+```
+
+**4. Create the database and load the catalogue**
+
+```bash
+alembic upgrade head
+python -m app.cli seed-catalogue
+```
+
+The seed command loads 40 synthetic postings through the normal adapter and ingestion path. It is
+idempotent — run it again and it reports every job unchanged — and it deletes nothing. It refuses
+to run unless the schema is at the latest migration, so if you have an `eligicore.db` from an
+earlier checkout, run `alembic upgrade head` first (or delete the file and start again; it holds
+only public job data).
+
+There is deliberately **no HTTP endpoint that writes the catalogue**: seeding is local tooling.
+
+**5. Start the API**
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-Interactive API documentation is then at `http://127.0.0.1:8000/docs` — generated from the code
-itself, so it is always accurate.
+**6. Open the interactive documentation**
+
+`http://127.0.0.1:8000/docs` — generated from the code itself, so it is always accurate. Every
+endpoint can be tried from that page.
+
+### Try the flow
+
+The API is stateless: you send a profile, you get a result back, and **nothing about the candidate
+is stored**. This example uses an obviously synthetic profile.
+
+**Recommendations** — eligibility verdicts and relevance scores side by side:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/recommendations \
+  -H "Content-Type: application/json" \
+  -d '{"profile": {"candidate_id": "demo-1",
+       "education": [{"degree": "B.Tech", "level": "BACHELORS",
+                      "field_of_study": "Information Technology",
+                      "grad_year": 2027, "cgpa": 8.2, "scale": "SCALE_10"}],
+       "skills": ["Python", "SQL", "Docker", "Git"],
+       "backlogs": 0}}'
+```
+
+The response groups every job: `ranked`, `needs_review`, `not_eligible` (kept, with reasons, never
+scored) and `not_open`. Each item carries the per-requirement breakdown that explains its verdict.
+
+**Excel tracker** — turn rows you keep on your side into a workbook:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/applications/export \
+  -H "Content-Type: application/json" \
+  -o eligicore-tracker.xlsx \
+  -d '{"records": [{"job_id": "demo-job-1", "company_name": "Example Co",
+       "role_title": "Backend Engineering Intern", "eligibility_state": "ELIGIBLE",
+       "match_score": 73.2, "application_status": "APPLIED"}]}'
+```
+
+**Résumé parsing** (`POST /api/v1/resumes/parse`) accepts a PDF or DOCX, returns a structured
+profile with per-field confidence, and deletes the file as soon as parsing finishes. With the
+default mock provider the extraction is deterministic and offline; set `ELIGICORE_AI_PROVIDER` and
+a key to use a real provider.
+
+To see the whole journey — parse, complete the profile, check eligibility, recommend, export — read
+`tests/test_full_flow.py`, which exercises exactly that against the seeded catalogue.
 
 ### Testing
 
