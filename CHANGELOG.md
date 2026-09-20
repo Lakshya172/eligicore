@@ -15,8 +15,11 @@ tag is created for it.
 
 ## [Unreleased]
 
-No work is pending. **Week 7 has not started.** The entry below is already merged on `main`; it is
-a follow-up to Week 6, not a new phase, and it creates no new checkpoint.
+No work is pending. **Week 7 is in progress and has produced no checkpoint:** its design gate is
+ruled (ADR-025) and Slice 7A — the deterministic truthfulness validator — is merged (PR #24);
+Slice 7B, the application-preparation endpoint, has not started. The entry below is already
+merged on `main`; it is a follow-up to Week 6, not a new phase, and it creates no new
+checkpoint.
 
 ### Changed — after Checkpoint 6
 
