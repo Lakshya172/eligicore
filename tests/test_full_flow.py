@@ -14,6 +14,7 @@ outcome must update them in the same change — that is the point.
 
 from __future__ import annotations
 
+import inspect
 import io
 import json
 import logging
@@ -459,6 +460,38 @@ def test_the_flow_stores_nothing_and_logs_no_candidate_data(
         assert marker not in logged, marker
         assert marker not in export.text
         assert marker not in json.dumps(body)
+
+
+# ---------------------------------------------------------------------------------------
+# The guards this file relies on
+# ---------------------------------------------------------------------------------------
+
+
+def test_this_file_still_guards_the_network_and_the_golden_results() -> None:
+    """Pin the two safeguards a weakened edit would otherwise remove silently.
+
+    A test that no longer guards anything still passes, so the guards themselves are
+    asserted: the socket patch that keeps the flow offline, and the golden group
+    comparisons. Loosening either must fail here (memory D-26).
+
+    Each check reads the source of the *function it is about*, never this file as a whole —
+    the strings below would otherwise satisfy the search by being written here.
+    """
+    guard_source = inspect.getsource(no_network.__wrapped__)  # type: ignore[attr-defined]
+    for patched in ('socket.socket, "connect"', 'socket.socket, "connect_ex"',
+                    'socket, "create_connection"'):
+        assert f"monkeypatch.setattr({patched}" in guard_source, patched
+    assert "raise AssertionError" in guard_source
+
+    profile_a = inspect.getsource(test_profile_a_walks_the_full_flow)
+    for golden in ("== A_RANKED", "== A_NEEDS_REVIEW", "== A_NOT_ELIGIBLE"):
+        assert golden in profile_a, golden
+    assert "== B_RANKED" in inspect.getsource(test_profile_b_flows_through_to_an_export)
+    assert "== A_LIKELY_WHEN_RELATED" in inspect.getsource(
+        test_pinned_related_answer_produces_likely_eligible
+    )
+    assert len(A_RANKED) == 19 and len(A_NEEDS_REVIEW) == 12 and len(A_NOT_ELIGIBLE) == 9
+    assert len(B_RANKED) == 6 and len(A_LIKELY_WHEN_RELATED) == 6
 
 
 def test_openapi_status_matches_the_repository_state(flow: Flow) -> None:
