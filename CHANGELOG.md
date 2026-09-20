@@ -15,7 +15,39 @@ tag is created for it.
 
 ## [Unreleased]
 
-Nothing pending. **PR 6B (Week 6 polish) has not started.**
+### Week 6 — PR 6B: demo path and full-flow test (in review, not merged)
+
+#### Added
+
+- **Curated catalogue expanded to 40 synthetic jobs.** The original five entries are preserved
+  byte-for-byte; 35 were appended covering 14 role families, internships and full-time roles,
+  `SCALE_10`/`SCALE_4`/`PERCENTAGE` and scale-less cutoffs, graduation windows across 2025–2029,
+  no-degree/`BACHELORS`/`MASTERS`, exact/ambiguous/unrestricted permitted fields, backlog limits
+  0/1/2 and unstated, and one listing with no matching terms. Fictional companies,
+  `example.com` links, no contacts.
+- **`python -m app.cli seed-catalogue`** — local setup command that loads the catalogue through
+  the existing adapter and ingestion service. Idempotent, deletes nothing, refuses a database
+  that is missing or behind the Alembic head, never migrates or creates tables, takes no
+  candidate input, prints counts only. **No HTTP equivalent is added.**
+- **`tests/test_full_flow.py`** — the Phase 1 journey end to end and offline: résumé parse →
+  profile completion → validate → normalize → eligibility → recommendations → Excel export,
+  for two distinct synthetic profiles, with a socket guard and golden group expectations.
+- **README quickstart** — clone to working export in four commands; verified from a fresh clone
+  in 87 seconds.
+- **ADR-024** Week 6 MVP scope (C-30..C-34).
+
+#### Changed
+
+- Three catalogue-coupled assertions now derive their counts from the dataset and scope the
+  golden verdict map to the original five ids (C-31). No golden expectation changed.
+- The OpenAPI status now names the curated catalogue and the seed command; it still reads
+  "Week 6 is underway" until Checkpoint 6 is recorded (C-32).
+
+#### Not included
+
+- No new endpoint, AI, provider, prompt, model, migration or dependency. No `/matching/score`,
+  `/jobs/ingest` or `/applications/prepare`. No eligibility or matching logic change, no status
+  inference from deadlines, no candidate persistence. **Checkpoint 6 is not yet recorded.**
 
 ---
 

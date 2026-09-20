@@ -7,8 +7,10 @@ wrong — so each is asserted directly.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from datetime import date
+from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -565,11 +567,21 @@ def test_find_existing_returns_none_for_a_new_job(session: Session) -> None:
 # ---------------------------------------------------------------------------------------
 
 
+def _curated_entry_count() -> int:
+    """How many jobs the curated file holds.
+
+    Derived rather than hardcoded: the catalogue grew to 40 in Week 6B (ADR-024 §2) and will
+    grow again. What must hold is that ingestion sees and creates every entry.
+    """
+    path = Path(__file__).resolve().parent.parent / "app" / "data" / "curated_jobs.json"
+    return len(json.loads(path.read_text(encoding="utf-8")))
+
+
 def test_curated_dataset_ingests(session: Session) -> None:
     outcome = ingest_source(session, CuratedJobAdapter())
 
-    assert outcome.jobs_seen == 5
-    assert outcome.jobs_created == 5
+    assert outcome.jobs_seen == _curated_entry_count()
+    assert outcome.jobs_created == _curated_entry_count()
     assert outcome.jobs_deactivated == 0
 
 
@@ -578,7 +590,7 @@ def test_curated_dataset_is_idempotent(session: Session) -> None:
     outcome = ingest_source(session, CuratedJobAdapter())
 
     assert outcome.jobs_created == 0
-    assert outcome.jobs_unchanged == 5
+    assert outcome.jobs_unchanged == _curated_entry_count()
 
 
 def test_curated_job_without_a_stated_scale_keeps_it_null(session: Session) -> None:

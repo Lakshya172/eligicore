@@ -74,13 +74,14 @@ runs, and is tested. The authoritative, always-current state lives in
   produces a scale-independent view of each grade
 - **`POST /api/v1/resumes/parse`** — parses a PDF or DOCX resume into a structured profile with per-field confidence. The uploaded file is deleted after processing, on both the success and failure paths.
 - **AI provider abstraction** — one interface, a mandatory deterministic mock, and a Google Gemini Flash implementation for Phase 1. Swapping providers is a configuration change.
-- **`GET /api/v1/jobs`, `GET /api/v1/jobs/{id}`** — the job catalogue, ingested from a pluggable source adapter with canonical deduplication. Closed postings are kept and stay retrievable with their reason, never deleted.
+- **`GET /api/v1/jobs`, `GET /api/v1/jobs/{id}`** — the job catalogue: 40 synthetic postings ingested from a pluggable source adapter with canonical deduplication, loaded locally with `python -m app.cli seed-catalogue`. Closed postings are kept and stay retrievable with their reason, never deleted.
 - **`POST /api/v1/eligibility/check`** — evaluates a supplied profile against up to 50 catalogue jobs' stated requirements (minimum CGPA, graduation year window, backlog limit, minimum qualification level, permitted fields) and returns a verdict with a per-requirement breakdown. A field of study that is not an exact match is judged by an AI provider — sent only the field and the permitted fields — and the result is labelled `ai_reasoning`, capped at MEDIUM confidence, and can never make a candidate `NOT_ELIGIBLE`. Nothing is stored.
 - **`GET /api/v1/health`** — liveness
 - **Matching engine** — deterministic TF-IDF cosine similarity between a candidate's skills and experience and the job catalogue, with skill coverage, the shared terms behind each score and a template explanation. It reads no eligibility data and stores nothing.
 - **`POST /api/v1/recommendations`** — eligibility verdicts and relevance scores side by side: eligible jobs ranked by match score, borderline jobs flagged separately, ineligible and closed jobs listed with their reasons but never ranked. The two are never combined into one number. Nothing is stored.
 - **`POST /api/v1/applications/export`** — turns the tracking rows a client sends into an Excel tracker, built entirely in memory. Nothing that could run as a formula survives, and nothing is stored.
-- **1075 tests**, running offline with no credentials and no network
+- **1133 tests**, running offline with no credentials and no network — including a full-flow
+  integration test that walks résumé → profile → eligibility → recommendations → Excel export
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
 - Repository workflow: branching, conventional commits, PR standard, CI, checkpoint discipline
 
@@ -98,7 +99,7 @@ asserts none exists. Uploaded resumes exist only for the duration of processing.
 | 3 | Job schema, source adapters, ingestion, deduplication | **Complete** |
 | 4 | Eligibility engine — deterministic rules plus AI for ambiguity | **Complete** — deterministic engine (PR #9) + AI field relatedness (PR #11), Checkpoint 4 |
 | 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | **Complete** — matching engine (PR #13) + recommendations endpoint (PR #15), Checkpoint 5 |
-| 6 | **Polish, Excel export, testing — complete demoable MVP** | **In progress** — Excel export complete (PR #17, Checkpoint 6A); polish (PR 6B) not started |
+| 6 | **Polish, Excel export, testing — complete demoable MVP** | **In progress** — Excel export complete (PR #17, Checkpoint 6A); demo path and full-flow test in review (PR 6B) |
 | 7 | Application preparation with truthfulness validation | Not started |
 | 8 | Caching and AI cost logging | Not started |
 | 9 | Documentation and deployment | Not started |
@@ -222,28 +223,109 @@ unexplainable score is self-defeating.
 
 ---
 
-## Development setup
+## Quickstart
+
+Runs entirely on your machine: SQLite, a synthetic job catalogue, and a deterministic mock AI
+provider. **No API key, no network and no configuration are required** — deployment and the
+public documentation are Week 9.
+
+**Requires Python 3.11 or newer** (built and tested on 3.12).
+
+**1. Clone and create a virtual environment**
 
 ```bash
 git clone https://github.com/Lakshya172/eligicore.git
 cd eligicore
-
 python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
-
-pip install -r requirements.txt
-
-cp .env.example .env           # then fill in local values
+source .venv/bin/activate
 ```
 
-Run the API:
+On Windows PowerShell, activate it with:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+**2. Install the dependencies**
+
+```bash
+pip install -r requirements.txt
+```
+
+**3. Configure (optional)**
+
+The defaults — SQLite at `./eligicore.db` and the mock AI provider — need no `.env`. Copy the
+example only if you want to change them:
+
+```bash
+cp .env.example .env
+```
+
+**4. Create the database and load the catalogue**
+
+```bash
+alembic upgrade head
+python -m app.cli seed-catalogue
+```
+
+The seed command loads 40 synthetic postings through the normal adapter and ingestion path. It is
+idempotent — run it again and it reports every job unchanged — and it deletes nothing. It refuses
+to run unless the schema is at the latest migration, so if you have an `eligicore.db` from an
+earlier checkout, run `alembic upgrade head` first (or delete the file and start again; it holds
+only public job data).
+
+There is deliberately **no HTTP endpoint that writes the catalogue**: seeding is local tooling.
+
+**5. Start the API**
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-Interactive API documentation is then at `http://127.0.0.1:8000/docs` — generated from the code
-itself, so it is always accurate.
+**6. Open the interactive documentation**
+
+`http://127.0.0.1:8000/docs` — generated from the code itself, so it is always accurate. Every
+endpoint can be tried from that page.
+
+### Try the flow
+
+The API is stateless: you send a profile, you get a result back, and **nothing about the candidate
+is stored**. This example uses an obviously synthetic profile.
+
+**Recommendations** — eligibility verdicts and relevance scores side by side:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/recommendations \
+  -H "Content-Type: application/json" \
+  -d '{"profile": {"candidate_id": "demo-1",
+       "education": [{"degree": "B.Tech", "level": "BACHELORS",
+                      "field_of_study": "Information Technology",
+                      "grad_year": 2027, "cgpa": 8.2, "scale": "SCALE_10"}],
+       "skills": ["Python", "SQL", "Docker", "Git"],
+       "backlogs": 0}}'
+```
+
+The response groups every job: `ranked`, `needs_review`, `not_eligible` (kept, with reasons, never
+scored) and `not_open`. Each item carries the per-requirement breakdown that explains its verdict.
+
+**Excel tracker** — turn rows you keep on your side into a workbook:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/v1/applications/export \
+  -H "Content-Type: application/json" \
+  -o eligicore-tracker.xlsx \
+  -d '{"records": [{"job_id": "demo-job-1", "company_name": "Example Co",
+       "role_title": "Backend Engineering Intern", "eligibility_state": "ELIGIBLE",
+       "match_score": 73.2, "application_status": "APPLIED"}]}'
+```
+
+**Résumé parsing** (`POST /api/v1/resumes/parse`) accepts a PDF or DOCX, returns a structured
+profile with per-field confidence, and deletes the file as soon as parsing finishes. With the
+default mock provider the extraction is deterministic and offline; set `ELIGICORE_AI_PROVIDER` and
+a key to use a real provider.
+
+To see the whole journey — parse, complete the profile, check eligibility, recommend, export — read
+`tests/test_full_flow.py`, which exercises exactly that against the seeded catalogue.
 
 ### Testing
 

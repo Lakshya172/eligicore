@@ -11,15 +11,15 @@
 
 | Field | Value |
 |---|---|
-| **Date** | 2026-09-19 |
-| **Phase** | **Week 6 — Polish, Excel export, testing · IN PROGRESS** — PR 6A merged and recorded as Checkpoint 6A; PR 6B not started |
-| **Roadmap position** | Weeks 1–5 complete and merged. **Week 6: PR 6A (Excel tracker export) merged and verified — Checkpoint 6A; PR 6B NOT started.** `/matching/score` and HTTP `/jobs/ingest` explicitly deferred (C-25, ADR-023 §11). |
-| **Health** | 🟢 GREEN — 1075 tests passing on `main`; mutations 30/30 (6A), 40/40 (5B), 36/36 (5A), 27/27 (Week 4); CI green; Microsoft Excel compatibility verified; no open blockers |
+| **Date** | 2026-09-20 |
+| **Phase** | **Week 6 — Polish, Excel export, testing · IN PROGRESS** — PR 6A merged (Checkpoint 6A); **PR 6B open, NOT merged** |
+| **Roadmap position** | Weeks 1–5 complete and merged. **Week 6: PR 6A (Excel tracker export) merged as Checkpoint 6A; PR 6B (catalogue, seed command, quickstart, full-flow test) in review, NOT merged.** `/matching/score`, HTTP `/jobs/ingest` and `/applications/prepare` explicitly deferred (C-25, ADR-023 §11, ADR-024). |
+| **Health** | 🟢 GREEN — 1075 tests passing on `main`, 1133 on `feature/week-6-polish`; mutations 23/23 (6B), 30/30 (6A), 40/40 (5B), 36/36 (5A), 27/27 (Week 4); CI green; quickstart verified from a fresh clone in 87 s; no open blockers |
 | **Stable branch** | `main` |
 | **Current checkpoint** | **Checkpoint 6A** — Week 6 Excel Export (intermediate) — `0125703ad9464216b1622c14941664ec32ac9bac` |
 | **Produced by** | PR #17 (`0125703`, Excel tracker export), **MERGED** 2026-09-19. Checkpoint 5 (`0aaaa1d`, PR #13 + PR #15) remains the final Week 5 checkpoint. |
 | **Rollback target** | Checkpoint 6A first; Checkpoint 5 by reverting PR #17 (no database step); Checkpoint 5A by also reverting PR #15 (no database step); Checkpoint 4 by also reverting PR #13; Checkpoint 4A by also reverting PR #11; Checkpoint 3 also needs `alembic downgrade 7c2f1a9b4d30`; below Checkpoint 3 also needs `alembic downgrade base`. |
-| **Next milestone** | PR 6B — Week 6 polish (catalogue expansion, local demo command, README quickstart, full-flow test) → **Checkpoint 6** (final Week 6 MVP). **PR 6B not started, not authorized.** Not a release, tag or version (C-28). |
+| **Next milestone** | Review and merge of PR 6B → post-merge verification → **Checkpoint 6** (final Week 6 MVP), the declared safe stopping point. Not a release, tag or version (C-28). |
 | **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
@@ -78,6 +78,9 @@
 | **Week 6 PR 6A — tracker export** *(merged, PR #17)* | `POST /api/v1/applications/export`: client-supplied tracker rows (1–500, unique `job_id`) rendered in memory to `.xlsx` — `Tracker` sheet in request order, optional `Requirements` sheet; nullable score as an empty cell; real Excel dates; formula-injection defence; fixed metadata and filename; binary 200 (documented API exception, C-23), standard JSON errors. No database, AI, engine or model change. `openpyxl==3.1.5`, `et-xmlfile==2.0.0`. OpenAPI status text corrected (C-29). |
 | **Week 6 PR 6A — tests** *(merged, PR #17)* | 225 new (1075 total); 850 existing unchanged. 30/30 mutations caught. Opened cleanly in Microsoft Excel. |
 | **Checkpoint 6A** | Intermediate Week 6 checkpoint at `0125703`, verified post-merge (see `context/workflow.md`). |
+| **Week 6B design gate** | Approved 2026-09-20; rulings C-30..C-34 and A-37..A-52 recorded as **ADR-024** (Week 6 MVP scope: local seed command, 40-job catalogue, full-flow test, quickstart). |
+| **Week 6 PR 6B — demo path** *(PR open, NOT merged)* | Curated catalogue expanded to **40 synthetic jobs** (original five byte-identical); `python -m app.cli seed-catalogue` loads them through the existing adapter and ingestion service, refusing a database behind the Alembic head; offline full-flow test across the public API for two distinct profiles; README quickstart. No new endpoint, AI, model, migration or dependency. |
+| **Week 6 PR 6B — tests** *(PR open, NOT merged)* | 58 new (1133 total); three catalogue-coupled assertions updated (C-31), no other existing test touched. 23/23 mutations caught. |
 
 ## Partial
 
@@ -86,7 +89,7 @@
 | Skill alias map (`app/services/candidate_normalizer.py`) | A deliberate **seed** of ~60 common variants, not an ontology. Extend it as real resumes reveal real variants. Unknown skills pass through with their casing intact. |
 | Operational database | Foundation only — engine, session factory, `Base`. No models, no migrations. First table is the job catalogue in Week 3. |
 | `get_db()` dependency | Written and exercised by no endpoint. Week 1 and 2 endpoints are stateless by design; it exists so Week 3 has a session source. |
-| **Jobs API trigger for ingestion** | `POST /api/v1/jobs/ingest` is in dossier §11 but **not** in the approved Week 3 API scope. Ingestion is implemented and tested as a service; no trigger endpoint is exposed. Deferred, not dropped — and **explicitly kept deferred by the Week 6 design gate** (C-25, ADR-023 §11). PR 6B adds a local command for setup instead. |
+| **Jobs API trigger for ingestion** | `POST /api/v1/jobs/ingest` is in dossier §11 but **not** in the approved API scope: an unauthenticated route that writes the catalogue is an abuse surface. Deferred, not dropped (C-25, ADR-023 §11, ADR-024 §1). **PR 6B supplies the local trigger instead:** `python -m app.cli seed-catalogue`. |
 | **Gemini provider** | Implemented and fully tested through `httpx.MockTransport`, but **never executed against the live Gemini service** — no API key exists in this environment and the suite must run without one. The default model identifier is a configured default, not a verified one (ADR-013 § Unverified). First live use is an outstanding integration step. |
 | **Traceability checking** | Covers skills only. Free-text fields (job descriptions, project summaries) are legitimately paraphrased during extraction and cannot be verified by substring matching. Documented in the service docstring as a known limitation. |
 | **spaCy fallback** | Not implemented. The dossier lists it as a deterministic cost-saver for predictable fields (emails, phones, dates). Currently every parse makes an AI call. Deferred, not forgotten. |
@@ -102,7 +105,7 @@
 | Recommendations (eligibility + matching, `POST /api/v1/recommendations`) | 5 | **COMPLETE** — PR #15, Checkpoint 5 (ADR-022) |
 | Single-pair match scoring (`POST /api/v1/matching/score`, dossier §11) | 5C | **DEFERRED** — explicitly, by the Week 6 design gate (C-25, ADR-023 §11) |
 | Excel export (openpyxl, `POST /api/v1/applications/export`) | 6 | **COMPLETE** — PR #17, Checkpoint 6A (ADR-023) |
-| Week 6 polish: 30–50 curated jobs, local setup/demo command, README quickstart, full-flow test | 6 | NOT STARTED — PR 6B, after Checkpoint 6A (C-26, C-27) |
+| Week 6 polish: 40 curated jobs, local seed command, README quickstart, full-flow test | 6 | **IN REVIEW** — PR 6B open, not merged (ADR-024) |
 | Deterministic **eligibility** test suite (boundary/missing/invalid per constraint) | 4 | **COMPLETE** — PR #9 |
 | Application preparation + truthfulness validator | 7 | NOT STARTED |
 | Caching, AI cost logging | 8 | NOT STARTED |
@@ -121,9 +124,12 @@ demoable. Weeks 7–10 are enhancement.
   recorded as intermediate **Checkpoint 6A**. `POST /api/v1/applications/export` renders
   client-supplied tracking rows as an `.xlsx` file, entirely in memory; the one documented binary
   response in the API (C-23). Also corrected the stale OpenAPI status text (C-29).
-- **PR 6B — Week 6 polish.** **Not started, not authorized**; no branch or PR exists.
-  Catalogue expansion to 30–50 synthetic jobs (C-26), a local setup/demo command (C-27), README
-  quickstart, full-flow test. Then **Checkpoint 6** (final) — not a release, tag or version (C-28).
+- **PR 6B — Week 6 polish.** **Open, NOT merged** (`feature/week-6-polish`). Curated catalogue
+  expanded to 40 synthetic jobs with the original five preserved (C-26, C-31); `python -m app.cli
+  seed-catalogue` as the local setup path, guarded by an Alembic-head check (C-27, C-33); an
+  offline full-flow integration test across the public API for two distinct profiles; a README
+  quickstart verified from a fresh clone. Recorded in **ADR-024**. On merge and verification:
+  **Checkpoint 6** (final Week 6 MVP) — not a release, tag or version (C-28).
 
 `/api/v1/matching/score` and HTTP `/api/v1/jobs/ingest` stay **explicitly deferred** (C-25) — no
 stub routes.
@@ -220,6 +226,11 @@ never silently fixed. These are internal to the dossier.
 | **C-27** | A fresh clone has no documented migration step and no way to load the catalogue. | dossier §17 vs README | **RULED 2026-09-19.** Local setup/demo command and README quickstart in PR 6B. |
 | **C-28** | CHANGELOG calls the Week 6 checkpoint a release milestone; the workflow says a checkpoint is not a release, version or tag. | CHANGELOG vs `context/workflow.md` | **RULED 2026-09-19.** Checkpoint only — no release, tag or version. |
 | **C-29** | The OpenAPI description still said Week 5 was in progress. | `app/main.py` vs this file | **RULED 2026-09-19.** Corrected in PR 6A, guarded by a test. |
+| **C-30** | Status diversity was wanted in the catalogue, but `RawJob` has no status and ingestion makes every job ACTIVE. ADR-014's review condition (are `EXPIRED`/`UNKNOWN` used?) had come due. | adapter contract vs demo wish | **RULED 2026-09-20 — ADR-024 §3.** No `RawJob` status field; curated jobs stay ACTIVE. The enum is **kept**: `CLOSED` comes from authoritative disappearance, `EXPIRED`/`UNKNOWN` are reserved for future sources. `not_open` stays covered by test fixtures. |
+| **C-31** | Expanding the catalogue breaks three existing assertions that assume five jobs. | Week 3–4 tests vs C-26 | **RULED 2026-09-20 — ADR-024 §4.** Exactly those three assertions change; the golden verdicts themselves are unchanged. |
+| **C-32** | A merged test pins the OpenAPI status sentence, which would go stale when Week 6 closes. | `tests/test_tracker_export_endpoint.py` vs `app/main.py` | **RULED 2026-09-20 — ADR-024 §6.** The sentence stays until Checkpoint 6, so that assertion is untouched; a new test pins the seed sentence and rejects premature claims. |
+| **C-33** | Dossier §8.2's folder structure lists no CLI, but setup without HTTP needs one. | dossier §8.2 vs C-25 | **RULED 2026-09-20 — ADR-024 §1.** `app/cli.py` is local tooling holding no business logic. |
+| **C-34** | §17's "stranger in under 10 minutes" overlaps Week 9 documentation. | dossier §17 vs §15 | **RULED 2026-09-20 — ADR-024 §6.** PR 6B ships a local quickstart only; deployment and full documentation stay in Week 9. |
 
 ### Still open — not to be resolved without instruction
 
@@ -236,6 +247,7 @@ Full index in `context/decisions.md`.
 
 | ADR | Title | Date |
 |---|---|---|
+| ADR-024 | Week 6 MVP scope: local setup, curated catalogue, full-flow test (C-30..C-34) | 2026-09-20 |
 | ADR-023 | Tracker export contract (C-23..C-29) | 2026-09-19 |
 | ADR-022 | Recommendation orchestration (C-19..C-22) | 2026-09-19 |
 | ADR-021 | Skill comparison for matching (C-17) | 2026-09-17 |
@@ -323,9 +335,9 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Await explicit instruction before starting PR 6B.** Checkpoint 6A is recorded; PR 6B
-   (catalogue expansion, local demo command, README quickstart, full-flow test) and the final
-   Checkpoint 6 remain pending. No phase rolls into the next automatically.
+1. **PR 6B is open for review. Do not merge without explicit human approval.** After merge:
+   post-merge verification, then the Checkpoint 6 record PR — the final Week 6 MVP and the
+   declared safe stopping point. No phase rolls into the next automatically.
 2. Before relying on live AI: exercise Gemini's `assess_field_relatedness` (and
    `extract_resume`) against the real service once, and confirm the model identifier.
 3. Before deployment (Week 9 / QG-007): verify the migration chain against PostgreSQL.
@@ -336,9 +348,9 @@ has never run against the live service. Confirm the model identifier and exercis
 relying on live extraction.
 
 **Weeks 1–5 are complete; Week 6 is in progress — PR 6A merged as Checkpoint 6A (`0125703`),
-PR 6B not started; Weeks 7–10 have not started.** Checkpoint 5 (`0aaaa1d`) remains the final
-Week 5 checkpoint. No `/matching/score`, no `/jobs/ingest` route, no `/applications/prepare`, and
-no application-preparation code exists anywhere in the repository.
+PR 6B open and not merged; Weeks 7–10 have not started.** Checkpoint 6A remains the current
+checkpoint until PR 6B is merged and verified. No `/matching/score`, no `/jobs/ingest` route, no
+`/applications/prepare`, and no application-preparation code exists anywhere in the repository.
 
 **Doc drift corrected:** the OpenAPI "Current status" string in `app/main.py` said the AI
 field-relatedness stage was not yet implemented. The docs-only Checkpoint 4 record PR corrected the

@@ -131,7 +131,9 @@ candidate record.
 - `/applications/export` is the **only binary response** (ADR-023 §8, C-23): a successful
   export returns the `.xlsx` file; its request and every error stay Pydantic/JSON.
 - `/matching/score` and `/jobs/ingest` are listed by the dossier but **deferred** (ADR-023 §11,
-  C-25). Neither route exists.
+  C-25). Neither route exists. Ingestion is triggered locally instead, by
+  `python -m app.cli seed-catalogue` (ADR-024 §1) — setup tooling, not a product surface, and
+  the only writer of the catalogue outside the tests.
 
 ---
 
