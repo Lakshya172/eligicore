@@ -461,6 +461,16 @@ def test_the_flow_stores_nothing_and_logs_no_candidate_data(
         assert marker not in json.dumps(body)
 
 
+def test_openapi_status_matches_the_repository_state(flow: Flow) -> None:
+    """The published status must not run ahead of the checkpoints (C-32)."""
+    description = flow.client.get("/openapi.json").json()["info"]["description"]
+    assert "Weeks 1–5 of a 10-week build are complete and Week 6 is underway" in description
+    assert "python -m app.cli seed-catalogue" in description
+    assert "HTTP-triggered job ingestion and application preparation are not implemented" in description
+    for premature in ("Week 6 is complete", "Weeks 1–6", "Week 7"):
+        assert premature not in description, premature
+
+
 def test_invalid_payloads_in_the_flow_do_not_echo_candidate_data(flow: Flow) -> None:
     broken = {**PROFILE_B, "education": [{**PROFILE_B["education"][0], "cgpa": "not-a-number"}]}
     for url, payload in (

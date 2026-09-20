@@ -113,8 +113,10 @@ app = FastAPI(
         "order them within a group by a deterministic TF-IDF relevance score; the two are "
         "never combined. The tracker export renders client-supplied tracking rows as an "
         "Excel workbook. No candidate data, evaluation, recommendation or tracking row is "
-        "stored. Single-pair match scoring, HTTP-triggered job ingestion and application "
-        "preparation are not implemented."
+        "stored.\n\n"
+        "The job catalogue is a curated synthetic dataset, loaded locally with "
+        "`python -m app.cli seed-catalogue`. Single-pair match scoring, HTTP-triggered job "
+        "ingestion and application preparation are not implemented."
     ),
     openapi_tags=[
         {
