@@ -192,9 +192,22 @@ validation**. No AI failure produces a 5xx (ADR-019 §5).
 | Malformed request | 422 | — | — |
 | Unhandled fault | 500 | — | — |
 
-A question answerable only from excluded data yields `answer: null` with
-`outcome: REQUIRES_EXCLUDED_DATA` and a `removed_claims` entry reasoned
-`ANSWER_REQUIRES_EXCLUDED_DATA`. Timeout needs no new setting: `ai_timeout_seconds = 30.0` and
+**An excluded-data answer is derived from what the validator did, never predicted from what
+the question asked.** `RemovalReason.ANSWER_REQUIRES_EXCLUDED_DATA` stays in the enum and is
+**unused in Week 7B** — neither removed nor repurposed. When the deterministic Slice 7A
+validator removes a knowledge-boundary claim, the removal carries
+`category: EXCLUDED_DATA` and `reason: CLAIM_OUTSIDE_KNOWLEDGE_BOUNDARY`, which is the
+validator's own vocabulary and the only reason it produces. The answer then reports
+`outcome: REQUIRES_EXCLUDED_DATA` with `answer: null` **only when both hold**: the validator
+removed at least one `EXCLUDED_DATA` claim, **and** nothing survived validation.
+
+A question that asks for excluded information but draws no such claim out of the provider is
+an ordinary answer: the system must **not** invent `REQUIRES_EXCLUDED_DATA` from the wording of
+the question. There is **no question pre-classification**, no keyword heuristic and no pre-scan,
+and no excluded profile field is sent to the provider at all (D10) — so the outcome can only
+ever be read off a removal that actually happened.
+
+Timeout needs no new setting: `ai_timeout_seconds = 30.0` and
 `ai_max_retries = 2` already exist, and the Gemini provider already translates
 `httpx.TimeoutException` into `AIProviderUnavailableError`. Across every path, no candidate value,
 prompt fragment, provider message or generated prose appears in a response body or a log line;
