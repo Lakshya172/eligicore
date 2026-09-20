@@ -105,18 +105,28 @@ app = FastAPI(
         "server-side key.\n\n"
         "### Current status\n"
         "Weeks 1–6 of a 10-week build are complete. Candidate "
-        "profile, resume parsing, job catalogue, eligibility, recommendation and tracker "
-        "export endpoints exist. Eligibility requirements "
+        "profile, resume parsing, job catalogue, eligibility, recommendation, tracker "
+        "export and application-preparation endpoints exist. Eligibility requirements "
         "are checked deterministically; a field of study that is not an exact match for a "
         "permitted field may be assessed by an AI second stage, which cannot override a "
         "deterministic failure. Recommendations group jobs by that eligibility verdict and "
         "order them within a group by a deterministic TF-IDF relevance score; the two are "
         "never combined. The tracker export renders client-supplied tracking rows as an "
-        "Excel workbook. No candidate data, evaluation, recommendation or tracking row is "
-        "stored.\n\n"
+        "Excel workbook.\n\n"
+        "### Application packages are drafts\n"
+        "`/applications/prepare` writes a cover letter and answers for one catalogue job, "
+        "then **removes every claim it cannot trace** to the profile supplied in the same "
+        "request, disclosing each removal. `review_required` is always true: nothing is ever "
+        "submitted, no employer form is filled and no browser is driven. The generator sees a "
+        "narrow projection of the profile — never name, contact details, location, "
+        "institution, grades, backlog count, languages, employer names or résumé text — so a "
+        "claim about any of those is untraceable by construction. **Generation currently runs "
+        "on the mock provider only**; selecting a live provider returns an empty package "
+        "rather than an invented one. No candidate data, evaluation, recommendation, tracking "
+        "row, draft or prepared package is stored.\n\n"
         "The job catalogue is a curated synthetic dataset, loaded locally with "
-        "`python -m app.cli seed-catalogue`. Single-pair match scoring, HTTP-triggered job "
-        "ingestion and application preparation are not implemented."
+        "`python -m app.cli seed-catalogue`. Single-pair match scoring and HTTP-triggered job "
+        "ingestion are not implemented."
     ),
     openapi_tags=[
         {
@@ -154,8 +164,9 @@ app = FastAPI(
         {
             "name": "applications",
             "description": (
-                "Stateless tracker export: application-tracking rows supplied by the client, "
-                "returned as an Excel workbook. Nothing is stored."
+                "Stateless application support: a tracker export of client-supplied rows as "
+                "an Excel workbook, and truthfulness-validated application packages prepared "
+                "for human review. Nothing is submitted and nothing is stored."
             ),
         },
         {"name": "system", "description": "Operational endpoints."},

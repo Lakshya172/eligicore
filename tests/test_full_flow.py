@@ -499,7 +499,13 @@ def test_openapi_status_matches_the_repository_state(flow: Flow) -> None:
     description = flow.client.get("/openapi.json").json()["info"]["description"]
     assert "Weeks 1–6 of a 10-week build are complete." in description
     assert "python -m app.cli seed-catalogue" in description
-    assert "HTTP-triggered job ingestion and application preparation are not implemented" in description
+    assert "Single-pair match scoring and HTTP-triggered job ingestion are not implemented" in description
+    # Preparation exists now (ADR-025 Slice 7B), and the status must say what it actually is:
+    # a draft pipeline, running on the mock provider, that removes what it cannot trace.
+    assert "application preparation are not implemented" not in description
+    assert "**Generation currently runs on the mock provider only**" in description
+    assert "removes every claim it cannot trace" in description
+    assert "`review_required` is always true" in description
     for stale in ("Weeks 1–5", "Week 6 is underway"):
         assert stale not in description, stale
     for premature in ("Week 7", "Weeks 1–7", "Week 8", "10-week build is complete"):
