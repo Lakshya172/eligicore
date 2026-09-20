@@ -16,7 +16,7 @@
 | **Roadmap position** | **Weeks 1–6 complete and merged.** Week 6 delivered as PR 6A (Checkpoint 6A) + PR 6B (Checkpoint 6). **Weeks 7–10 NOT started.** `/matching/score`, HTTP `/jobs/ingest` and `/applications/prepare` explicitly deferred (C-25, ADR-023 §11, ADR-024). |
 | **Health** | 🟢 GREEN — 1133 tests passing on `main`; mutations 23/23 (6B), 30/30 (6A), 40/40 (5B), 36/36 (5A), 27/27 (Week 4); 33/33 live checks; CI green; quickstart verified from a fresh clone of `main` in 72 s; no open blockers |
 | **Stable branch** | `main` |
-| **Current checkpoint** | **Checkpoint 6** — Week 6 MVP (final) — `13eb8325149cab60a039534631265803250b767a` |
+| **Current checkpoint** | **Checkpoint 6** — Week 6 MVP (final) — `13eb8325149cab60a039534631265803250b767a`. `main` is one follow-up ahead at `932d71984491c5b00fcecb4aacc875f14f9ec6ab` (PR #21 — final OpenAPI status wording; no behaviour change, no new checkpoint). |
 | **Produced by** | PR #17 (`0125703`, Excel tracker export) + PR #19 (`13eb832`, demo path and full-flow test), both **MERGED**. Checkpoint 6A remains the intermediate Week 6 checkpoint; Checkpoint 5 (`0aaaa1d`) remains the final Week 5 checkpoint. |
 | **Rollback target** | Checkpoint 6 first; Checkpoint 6A by reverting PR #19 (no database step); Checkpoint 5 by also reverting PR #17 (no database step); Checkpoint 5A by also reverting PR #15 (no database step); Checkpoint 4 by also reverting PR #13; Checkpoint 4A by also reverting PR #11; Checkpoint 3 also needs `alembic downgrade 7c2f1a9b4d30`; below Checkpoint 3 also needs `alembic downgrade base`. |
 | **Next milestone** | **Week 7 — application preparation and the truthfulness validator. Not started, not authorized**; it begins with a design gate. Everything after Week 6 is enhancement (dossier §15). |
@@ -137,6 +137,12 @@ Design gates approved 2026-09-19 (ADR-023) and 2026-09-20 (ADR-024). Two PRs:
   guarded by an Alembic-head check (C-27, C-33); an offline full-flow integration test across
   the public API for two distinct profiles; a README quickstart verified from a fresh clone.
   Recorded in **ADR-024**. Not a release, tag or version (C-28).
+- **Week 6 follow-up — final OpenAPI status (C-32).** **Merged** as PR #21 (`932d719`) after
+  Checkpoint 6 and verified post-merge. The published status now reads **"Weeks 1–6 of a 10-week
+  build are complete."**; the two tests that pin the sentence reject the stale wording and Week
+  7-era claims. Three files — `app/main.py` and those two tests; no route, schema, model,
+  migration, dependency or behaviour change. **Checkpoint 6 (`13eb832`) remains the Week 6 record**
+  — the follow-up created no new checkpoint, tag or release.
 
 `/api/v1/matching/score` and HTTP `/api/v1/jobs/ingest` stay **explicitly deferred** (C-25) — no
 stub routes.
@@ -235,7 +241,7 @@ never silently fixed. These are internal to the dossier.
 | **C-29** | The OpenAPI description still said Week 5 was in progress. | `app/main.py` vs this file | **RULED 2026-09-19.** Corrected in PR 6A, guarded by a test. |
 | **C-30** | Status diversity was wanted in the catalogue, but `RawJob` has no status and ingestion makes every job ACTIVE. ADR-014's review condition (are `EXPIRED`/`UNKNOWN` used?) had come due. | adapter contract vs demo wish | **RULED 2026-09-20 — ADR-024 §3.** No `RawJob` status field; curated jobs stay ACTIVE. The enum is **kept**: `CLOSED` comes from authoritative disappearance, `EXPIRED`/`UNKNOWN` are reserved for future sources. `not_open` stays covered by test fixtures. |
 | **C-31** | Expanding the catalogue breaks three existing assertions that assume five jobs. | Week 3–4 tests vs C-26 | **RULED 2026-09-20 — ADR-024 §4.** Exactly those three assertions change; the golden verdicts themselves are unchanged. |
-| **C-32** | A merged test pins the OpenAPI status sentence, which would go stale when Week 6 closes. | `tests/test_tracker_export_endpoint.py` vs `app/main.py` | **RULED 2026-09-20 — ADR-024 §6.** The sentence stays until Checkpoint 6, so that assertion is untouched; a new test pins the seed sentence and rejects premature claims. |
+| **C-32** | A merged test pins the OpenAPI status sentence, which would go stale when Week 6 closes. | `tests/test_tracker_export_endpoint.py` vs `app/main.py` | **RULED 2026-09-20 — ADR-024 §6.** The sentence stays until Checkpoint 6, so that assertion is untouched; a new test pins the seed sentence and rejects premature claims. **CLOSED 2026-09-20 in PR #21** (`932d719`): with Week 6 closed, the status became "Weeks 1–6 of a 10-week build are complete." and both pinned assertions were re-aimed at Week 7-era claims. |
 | **C-33** | Dossier §8.2's folder structure lists no CLI, but setup without HTTP needs one. | dossier §8.2 vs C-25 | **RULED 2026-09-20 — ADR-024 §1.** `app/cli.py` is local tooling holding no business logic. |
 | **C-34** | §17's "stranger in under 10 minutes" overlaps Week 9 documentation. | dossier §17 vs §15 | **RULED 2026-09-20 — ADR-024 §6.** PR 6B ships a local quickstart only; deployment and full documentation stay in Week 9. |
 
@@ -347,13 +353,10 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Await explicit instruction before starting Week 7.** Week 6 is complete and recorded as
-   Checkpoint 6, the declared safe stopping point. Week 7 (application preparation, truthfulness
-   validator) begins with a design gate. No phase rolls into the next automatically.
-2. **Outstanding documentation fix:** the OpenAPI "Current status" text in `app/main.py` still
-   reads *"Weeks 1–5 … Week 6 is underway"*. Correcting it touches application code and the two
-   tests that pin the sentence, so it was kept out of the documentation-only Checkpoint 6 record
-   and needs its own small approved change.
+1. **Await explicit instruction before starting Week 7. The next authorized action is the Week 7
+   Design Gate.** Week 6 is complete and recorded as Checkpoint 6, the declared safe stopping
+   point; its OpenAPI status follow-up is closed. Week 7 (application preparation, truthfulness
+   validator) begins with that design gate. No phase rolls into the next automatically.
 2. Before relying on live AI: exercise Gemini's `assess_field_relatedness` (and
    `extract_resume`) against the real service once, and confirm the model identifier.
 3. Before deployment (Week 9 / QG-007): verify the migration chain against PostgreSQL.
@@ -364,7 +367,9 @@ has never run against the live service. Confirm the model identifier and exercis
 relying on live extraction.
 
 **Weeks 1–6 are complete; Weeks 7–10 have not started.** Checkpoint 6 (`13eb832`) is the final
-Week 6 record and the declared safe stopping point; Checkpoint 6A remains the intermediate one.
+Week 6 record, **Stable — current**, and the declared safe stopping point; Checkpoint 6A remains
+the intermediate one. **The OpenAPI status is finalized** — it reads "Weeks 1–6 of a 10-week build
+are complete." and matches Checkpoint 6 (C-32 closed in PR #21).
 No `/matching/score`, no `/jobs/ingest` route, no `/applications/prepare`, and no
 application-preparation, truthfulness, caching or cost-logging code exists anywhere in the
 repository.
