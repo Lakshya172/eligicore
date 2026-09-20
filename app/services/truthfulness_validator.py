@@ -207,9 +207,9 @@ def _duration_months(text: str) -> int | None:
 class _Evidence:
     """Everything the profile actually says, in the forms the detectors compare against.
 
-    Built once per :func:`validate` call and never mutated. ``resume_raw_text`` is part of the
-    corpus because it is the richest evidence available — and it is used **here only**, never
-    sent to a provider (ADR-025 D11).
+    Built once per :func:`validate` call and never mutated. The evidence corpus contains
+    provider-visible structured fields only. ``resume_raw_text`` is not validator evidence; it
+    is never sent to a provider, never logged, and never returned (ADR-025 D11, D12).
     """
 
     skill_keys: frozenset[str]
