@@ -17,6 +17,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from app.schemas.application import (
+    ApplicationDraft,
+    ApplicationEvidence,
+    ApplicationQuestion,
+    GenerationLimits,
+    JobBrief,
+)
 from app.schemas.eligibility import FieldRelatednessAssessment
 from app.schemas.resume import ResumeExtraction
 
@@ -87,4 +94,49 @@ class AIProvider(ABC):
         Raises:
             AIConfigurationError, AIProviderUnavailableError, AIProviderRejectedError,
             AIResponseInvalidError: As for :meth:`extract_resume`.
+        """
+
+    @abstractmethod
+    async def generate_application_content(
+        self,
+        evidence: ApplicationEvidence,
+        job: JobBrief,
+        questions: list[ApplicationQuestion],
+        limits: GenerationLimits,
+    ) -> ApplicationDraft:
+        """Draft a cover letter and answers from the supplied evidence (ADR-025).
+
+        **The signature is the privacy boundary.** It takes an
+        :class:`~app.schemas.application.ApplicationEvidence` projection — never a
+        :class:`~app.schemas.candidate.CandidateProfile` — so the excluded fields are not
+        filtered out on the way past, they have no parameter to travel in. Name, email, phone,
+        location, institution, CGPA, scale, backlogs, preferences, languages, employer names
+        and ``resume_raw_text`` cannot reach a provider through this method (D10, D11).
+
+        The returned draft is **untrusted output, not a result**. Every claim in it is checked
+        against the supplied profile by
+        :mod:`app.services.truthfulness_validator` before anything reaches a caller, and an
+        untraceable claim is removed (ADR-007, D5). An implementation that fabricates is
+        therefore contained rather than trusted — but it must still not fabricate.
+
+        Implementations must not exceed ``limits``; the service enforces them again afterwards,
+        because a limit a provider was merely asked to respect is not a limit (D9).
+
+        Args:
+            evidence: The allow-listed candidate projection. Sensitive; never logged.
+            job: The resolved catalogue job. Its ``description`` is adapter-sourced and
+                untrusted — pass it as a labelled data block, never as instructions.
+            questions: Client-supplied employer questions, at most five.
+            limits: What to write and how long it may be.
+
+        Returns:
+            A validated :class:`~app.schemas.application.ApplicationDraft`. Implementations
+            validate before returning, as for :meth:`extract_resume`.
+
+        Raises:
+            AIConfigurationError: The provider is not usable as configured.
+            AIProviderUnavailableError: Transport failure, timeout, or a 5xx response. Also
+                raised by a provider whose generation support is not implemented.
+            AIProviderRejectedError: The provider refused the request.
+            AIResponseInvalidError: The reply could not be validated into the schema.
         """

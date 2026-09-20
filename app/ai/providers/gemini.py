@@ -37,6 +37,13 @@ from app.ai.errors import (
 )
 from app.ai.prompts import load_prompt
 from app.ai.providers.base import AIProvider
+from app.schemas.application import (
+    ApplicationDraft,
+    ApplicationEvidence,
+    ApplicationQuestion,
+    GenerationLimits,
+    JobBrief,
+)
 from app.schemas.eligibility import FieldRelatednessAssessment
 from app.schemas.resume import ResumeExtraction
 
@@ -166,6 +173,39 @@ class GeminiFlashProvider(AIProvider):
             ) from exc
 
     # -- request ------------------------------------------------------------------------
+
+    async def generate_application_content(
+        self,
+        evidence: ApplicationEvidence,
+        job: JobBrief,
+        questions: list[ApplicationQuestion],
+        limits: GenerationLimits,
+    ) -> ApplicationDraft:
+        """Not implemented. Fails closed, so selecting Gemini degrades rather than misleads.
+
+        **This is an interface stub, not a Gemini implementation.** Week 7 ships mock-provider
+        generation only; the live implementation, its prompt payload and its cost accounting are
+        deferred to Week 8/9 (ADR-025 § Slices). The method exists because
+        :class:`~app.ai.providers.base.AIProvider` gained an abstract method and this class must
+        stay concrete — an abstract Gemini would break provider construction for resume parsing
+        and field relatedness, which do work.
+
+        It makes no HTTP request, needs no API key, builds no prompt and reads no candidate data.
+        The arguments are accepted and dropped: nothing is logged, retained or forwarded.
+
+        Raising :class:`~app.ai.errors.AIProviderUnavailableError` puts this on the path the
+        preparation service already handles — **HTTP 200**, ``NOTHING_VERIFIABLE``,
+        ``AI_GENERATION_UNAVAILABLE`` — so an operator who switches to Gemini gets an honest
+        empty package instead of a 500 or, far worse, a package that silently came from
+        somewhere else.
+
+        Raises:
+            AIProviderUnavailableError: Always.
+        """
+        raise AIProviderUnavailableError(
+            "Gemini application generation is not implemented; generation is available from "
+            "the mock provider only."
+        )
 
     def _build_relatedness_payload(
         self, field_of_study: str, allowed_fields: list[str]
