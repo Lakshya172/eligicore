@@ -15,7 +15,17 @@ tag is created for it.
 
 ## [Unreleased]
 
-Nothing pending. **Week 7 has not started.**
+No work is pending. **Week 7 has not started.** The entry below is already merged on `main`; it is
+a follow-up to Week 6, not a new phase, and it creates no new checkpoint.
+
+### Changed — after Checkpoint 6
+
+- **Final Week 6 OpenAPI status (C-32 closed).** PR #21 (`932d719`, merged 2026-09-20) replaced
+  *"Weeks 1–5 of a 10-week build are complete and Week 6 is underway"* with **"Weeks 1–6 of a
+  10-week build are complete."**, and updated the two tests that pin that sentence so they reject
+  both the stale wording and Week 7-era claims. Three files — one description string and two tests.
+  No route, schema, model, migration, dependency or behaviour change; 1133 tests passing, CI green.
+  Week 6 stays closed at **Checkpoint 6** (`13eb832`).
 
 ---
 
@@ -62,22 +72,25 @@ database or AI architecture was expanded.**
 
 - Three catalogue-coupled assertions now derive their counts from the dataset and scope the
   golden verdict map to the original five ids (C-31). No golden expectation changed.
-- The OpenAPI status now names the curated catalogue and the seed command. It still reads
-  "Week 6 is underway": correcting that sentence touches application code and the two tests
-  that pin it, so it is deliberately outside the documentation-only checkpoint record and is
-  tracked as the next small change (C-32).
+- The OpenAPI status now names the curated catalogue and the seed command. As merged in this PR
+  it still read "Week 6 is underway": correcting that sentence touches application code and the
+  two tests that pin it, so it was deliberately kept outside the documentation-only checkpoint
+  record and tracked as the next small change (C-32). **C-32 has since been completed** — PR #21
+  (`932d719`, merged 2026-09-20, after Week 6 was closed at Checkpoint 6) set the final wording,
+  *"Weeks 1–6 of a 10-week build are complete."*
 
 #### Not included
 
 - No new endpoint, AI, provider, prompt, model, migration or dependency. No `/matching/score`,
   `/jobs/ingest` or `/applications/prepare`. No eligibility or matching logic change, no status
-  inference from deadlines, no candidate persistence. **Checkpoint 6 is not yet recorded.**
+  inference from deadlines, no candidate persistence. **This PR did not itself record the
+  checkpoint**; Checkpoint 6 was recorded separately in PR #20 (`151df06`).
 
 ---
 
 ## Checkpoint 6A — Week 6 Excel Export (intermediate)
 
-**Date:** 2026-09-19 · **Commit on `main`:** `0125703` · **Status:** Stable — current
+**Date:** 2026-09-19 · **Commit on `main`:** `0125703` · **Status:** Stable — intermediate
 **Produced by:** PR #17 (`feature/week-6-excel-export`)
 **Full SHA:** `0125703ad9464216b1622c14941664ec32ac9bac` · **CI:** `test` success ·
 **Tests:** 1075 passing from `main` (0 failed, 0 skipped) · **Mutations:** 6A 30/30 · 5B 40/40 ·
