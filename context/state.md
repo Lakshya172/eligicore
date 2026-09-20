@@ -11,15 +11,15 @@
 
 | Field | Value |
 |---|---|
-| **Date** | 2026-09-20 |
-| **Phase** | **Week 6 — Polish, Excel export, testing · COMPLETE** — the dossier's declared safe stopping point (§15) |
-| **Roadmap position** | **Weeks 1–6 complete and merged.** Week 6 delivered as PR 6A (Checkpoint 6A) + PR 6B (Checkpoint 6). **Weeks 7–10 NOT started.** `/matching/score`, HTTP `/jobs/ingest` and `/applications/prepare` explicitly deferred (C-25, ADR-023 §11, ADR-024). |
-| **Health** | 🟢 GREEN — 1133 tests passing on `main`; mutations 23/23 (6B), 30/30 (6A), 40/40 (5B), 36/36 (5A), 27/27 (Week 4); 33/33 live checks; CI green; quickstart verified from a fresh clone of `main` in 72 s; no open blockers |
+| **Date** | 2026-09-21 |
+| **Phase** | **Week 7 — Application preparation · IN PROGRESS.** Slice 7A (deterministic truthfulness validator) is **complete and merged**; Slice 7B (`POST /api/v1/applications/prepare`) is **NOT started**. Week 6 remains the dossier's declared safe stopping point (§15), and **Checkpoint 6 remains the current checkpoint** — Week 7 has produced none. |
+| **Roadmap position** | **Weeks 1–6 complete and merged.** Week 6 delivered as PR 6A (Checkpoint 6A) + PR 6B (Checkpoint 6). **Week 7 is partially delivered:** its design gate is ruled (**ADR-025**, PR #23, amended by PR #25) and **Slice 7A is merged** (PR #24); **Slice 7B is NOT started**. **Weeks 8–10 NOT started.** `/matching/score` and HTTP `/jobs/ingest` remain explicitly deferred (C-25, ADR-023 §11, ADR-024); `/applications/prepare` is specified by ADR-025 and unimplemented. |
+| **Health** | 🟢 GREEN — 1259 tests passing on `main`; mutations 42/42 (7A), 23/23 (6B), 30/30 (6A), 40/40 (5B), 36/36 (5A), 27/27 (Week 4); 33/33 live checks; CI green; quickstart verified from a fresh clone of `main` in 72 s; no open blockers |
 | **Stable branch** | `main` |
-| **Current checkpoint** | **Checkpoint 6** — Week 6 MVP (final) — `13eb8325149cab60a039534631265803250b767a`. `main` is one follow-up ahead at `932d71984491c5b00fcecb4aacc875f14f9ec6ab` (PR #21 — final OpenAPI status wording; no behaviour change, no new checkpoint). |
+| **Current checkpoint** | **Checkpoint 6** — Week 6 MVP (final) — `13eb8325149cab60a039534631265803250b767a`. `main` is six merges ahead at `f5b81f0de65d28b8418b7ba0283e20a9a295cf44` — PR #21 (OpenAPI status), PR #22 (Week 6 state cleanup), PR #23 (ADR-025), PR #24 (Slice 7A validator), PR #25 (ADR-025 evidence-boundary correction), PR #26 (docstring correction), all merged. **None created a checkpoint: there is no Checkpoint 7.** |
 | **Produced by** | PR #17 (`0125703`, Excel tracker export) + PR #19 (`13eb832`, demo path and full-flow test), both **MERGED**. Checkpoint 6A remains the intermediate Week 6 checkpoint; Checkpoint 5 (`0aaaa1d`) remains the final Week 5 checkpoint. |
 | **Rollback target** | Checkpoint 6 first; Checkpoint 6A by reverting PR #19 (no database step); Checkpoint 5 by also reverting PR #17 (no database step); Checkpoint 5A by also reverting PR #15 (no database step); Checkpoint 4 by also reverting PR #13; Checkpoint 4A by also reverting PR #11; Checkpoint 3 also needs `alembic downgrade 7c2f1a9b4d30`; below Checkpoint 3 also needs `alembic downgrade base`. |
-| **Next milestone** | **Week 7 — application preparation and the truthfulness validator. Not started, not authorized**; it begins with a design gate. Everything after Week 6 is enhancement (dossier §15). |
+| **Next milestone** | **Week 7 Slice 7B — the `POST /api/v1/applications/prepare` endpoint and package orchestration. Designed (ADR-025) but NOT started and NOT authorized**; it begins only on explicit instruction. Everything after Week 6 is enhancement (dossier §15). |
 | **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
@@ -82,6 +82,9 @@
 | **Week 6 PR 6B — demo path** *(merged, PR #19)* | Curated catalogue expanded to **40 synthetic jobs** (original five byte-identical); `python -m app.cli seed-catalogue` loads them through the existing adapter and ingestion service, refusing a database behind the Alembic head; offline full-flow test across the public API for two distinct profiles; README quickstart. No new endpoint, AI, model, migration or dependency. |
 | **Week 6 PR 6B — tests** *(merged, PR #19)* | 58 new (1133 total); three catalogue-coupled assertions updated (C-31), no other existing test touched. 23/23 mutations caught. |
 | **Checkpoint 6** | Final Week 6 checkpoint at `13eb832`, verified post-merge (see `context/workflow.md`). The dossier's declared safe stopping point. |
+| **Week 7 design gate** | Approved 2026-09-20; rulings C-3, C-35..C-40 and A-53..A-70 recorded as **ADR-025** (application preparation and truthfulness validation), merged as PR #23 and amended by PR #25 so the evidence boundary is stated exactly. Split into Slice 7A (validator) and Slice 7B (endpoint). |
+| **Week 7 Slice 7A — truthfulness validator** *(merged, PR #24)* | `app/services/truthfulness_validator.py` and `app/schemas/application.py` — deterministic, AI-free, framework-free claim validation; remove-by-default with a structured removal list; evidence is the provider-visible structured profile only, never `resume_raw_text` (ADR-025 D11, D12). No route, schema-for-request, model, migration, dependency or AI change, and **no checkpoint**. |
+| **Week 7 Slice 7A — tests** *(merged, PR #24)* | 124 new (1259 total); 1135 existing unchanged. 42/42 mutations caught. Docs-only PR #26 (`f5b81f0`) then corrected a stale `_Evidence` docstring with no executable change (AST identical ignoring docstrings). |
 
 ## Partial
 
@@ -108,7 +111,8 @@
 | Excel export (openpyxl, `POST /api/v1/applications/export`) | 6 | **COMPLETE** — PR #17, Checkpoint 6A (ADR-023) |
 | Week 6 polish: 40 curated jobs, local seed command, README quickstart, full-flow test | 6 | **COMPLETE** — PR #19, Checkpoint 6 (ADR-024) |
 | Deterministic **eligibility** test suite (boundary/missing/invalid per constraint) | 4 | **COMPLETE** — PR #9 |
-| Application preparation + truthfulness validator | 7 | NOT STARTED |
+| Truthfulness validator (deterministic service, no endpoint) | 7 | **COMPLETE** — PR #24, Slice 7A (ADR-025); no checkpoint |
+| Application preparation endpoint (`POST /api/v1/applications/prepare`) | 7 | NOT STARTED — designed as Slice 7B in ADR-025, not authorized |
 | Caching, AI cost logging | 8 | NOT STARTED |
 | Deployment (Render/Railway), README, docs | 9 | NOT STARTED |
 
@@ -119,9 +123,24 @@ demoable. Weeks 7–10 are enhancement.
 
 ## Next approved phase
 
-**None. Week 7 — application preparation and the truthfulness validator — is NOT started and NOT
+**None. Week 7 Slice 7B — the application-preparation endpoint — is NOT started and NOT
 authorized.** Week 6 is the dossier's declared safe stopping point (§15): everything after it is
-enhancement, and the next step is a Week 7 design gate.
+enhancement. The Week 7 design gate is ruled (ADR-025) and Slice 7A is merged; Slice 7B begins
+only on explicit instruction.
+
+### Week 7 — Application preparation · IN PROGRESS (no checkpoint)
+
+Design gate approved 2026-09-20 and recorded as **ADR-025** (PR #23, `c205770`), amended by
+PR #25 (`5e90636`) so the ruling states the evidence boundary exactly. Two slices:
+
+- **Slice 7A — truthfulness validator.** **Merged** as PR #24 (`365e7a4`) and verified
+  post-merge. `app/services/truthfulness_validator.py` and `app/schemas/application.py`: deterministic
+  and AI-free, with no FastAPI, database, filesystem or network dependency; remove-by-default with a
+  structured removal list; evidence is the provider-visible structured profile only — never
+  `resume_raw_text` (ADR-025 D11, D12). No route, model, migration, dependency or AI change, and
+  **no checkpoint**. Docs-only PR #26 (`f5b81f0`) then corrected a stale `_Evidence` docstring.
+- **Slice 7B — `POST /api/v1/applications/prepare`.** **NOT started, NOT authorized.** Designed in
+  ADR-025; no endpoint, request/response schema, provider generation method or prompt exists.
 
 ### Week 6 — Polish, Excel export, testing · COMPLETE
 
@@ -244,12 +263,13 @@ never silently fixed. These are internal to the dossier.
 | **C-32** | A merged test pins the OpenAPI status sentence, which would go stale when Week 6 closes. | `tests/test_tracker_export_endpoint.py` vs `app/main.py` | **RULED 2026-09-20 — ADR-024 §6.** The sentence stays until Checkpoint 6, so that assertion is untouched; a new test pins the seed sentence and rejects premature claims. **CLOSED 2026-09-20 in PR #21** (`932d719`): with Week 6 closed, the status became "Weeks 1–6 of a 10-week build are complete." and both pinned assertions were re-aimed at Week 7-era claims. |
 | **C-33** | Dossier §8.2's folder structure lists no CLI, but setup without HTTP needs one. | dossier §8.2 vs C-25 | **RULED 2026-09-20 — ADR-024 §1.** `app/cli.py` is local tooling holding no business logic. |
 | **C-34** | §17's "stranger in under 10 minutes" overlaps Week 9 documentation. | dossier §17 vs §15 | **RULED 2026-09-20 — ADR-024 §6.** PR 6B ships a local quickstart only; deployment and full documentation stay in Week 9. |
+| **C-3** | §12.3 says generated content is checked "against the **stored** candidate profile." Under local-first nothing is stored server-side; §11 confirms the profile travels in the request body. Wording predates the local-first revision. | dossier §12.3 vs §8.1a/§11 | **RULED 2026-09-20 — [ADR-025](../artifacts/decisions/ADR-025-week-7-application-preparation.md) D1.** Closed as stale wording: truthfulness validation runs against the profile **supplied in the request**. Nothing is stored or read server-side. |
 
 ### Still open — not to be resolved without instruction
 
-| # | Contradiction | Where | Status |
-|---|---|---|---|
-| C-3 | §12.3 says generated content is checked "against the **stored** candidate profile." Under local-first nothing is stored server-side; §11 confirms the profile travels in the request body. Wording predates the local-first revision. | dossier §12.3 vs §8.1a/§11 | **OPEN — low impact, not urgent.** Reads as stale wording rather than a design conflict. Relevant at Week 7. |
+**None recorded here.** C-3, the last entry, was ruled by ADR-025 (D1) and moved to the
+resolved table above. The Week 7 design gate also raised C-35..C-40 and A-53..A-70; **ADR-025 is
+the authoritative record of those rulings** and they have not been transcribed into this register.
 
 
 ---
@@ -260,6 +280,7 @@ Full index in `context/decisions.md`.
 
 | ADR | Title | Date |
 |---|---|---|
+| ADR-025 | Week 7 application preparation and truthfulness validation (C-3, C-35..C-40, A-53..A-70) | 2026-09-20 |
 | ADR-024 | Week 6 MVP scope: local setup, curated catalogue, full-flow test (C-30..C-34) | 2026-09-20 |
 | ADR-023 | Tracker export contract (C-23..C-29) | 2026-09-19 |
 | ADR-022 | Recommendation orchestration (C-19..C-22) | 2026-09-19 |
@@ -353,10 +374,11 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Await explicit instruction before starting Week 7. The next authorized action is the Week 7
-   Design Gate.** Week 6 is complete and recorded as Checkpoint 6, the declared safe stopping
-   point; its OpenAPI status follow-up is closed. Week 7 (application preparation, truthfulness
-   validator) begins with that design gate. No phase rolls into the next automatically.
+1. **Await explicit instruction before starting Week 7 Slice 7B.** The Week 7 design gate is ruled
+   (ADR-025) and Slice 7A — the deterministic truthfulness validator — is merged and verified
+   (PR #24). Slice 7B, the `POST /api/v1/applications/prepare` endpoint, is designed but **not
+   started and not authorized**. Checkpoint 6 remains the current checkpoint and no Checkpoint 7
+   exists. No phase or slice rolls into the next automatically.
 2. Before relying on live AI: exercise Gemini's `assess_field_relatedness` (and
    `extract_resume`) against the real service once, and confirm the model identifier.
 3. Before deployment (Week 9 / QG-007): verify the migration chain against PostgreSQL.
@@ -366,13 +388,16 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 has never run against the live service. Confirm the model identifier and exercise one real call before
 relying on live extraction.
 
-**Weeks 1–6 are complete; Weeks 7–10 have not started.** Checkpoint 6 (`13eb832`) is the final
-Week 6 record, **Stable — current**, and the declared safe stopping point; Checkpoint 6A remains
-the intermediate one. **The OpenAPI status is finalized** — it reads "Weeks 1–6 of a 10-week build
-are complete." and matches Checkpoint 6 (C-32 closed in PR #21).
-No `/matching/score`, no `/jobs/ingest` route, no `/applications/prepare`, and no
-application-preparation, truthfulness, caching or cost-logging code exists anywhere in the
-repository.
+**Weeks 1–6 are complete; Week 7 is in progress — Slice 7A merged, Slice 7B not started;
+Weeks 8–10 have not started.** Checkpoint 6 (`13eb832`) is the final Week 6 record,
+**Stable — current**, and the declared safe stopping point; Checkpoint 6A remains the
+intermediate one. **Week 7 has produced no checkpoint.** **The OpenAPI status is finalized** — it
+reads "Weeks 1–6 of a 10-week build are complete." and matches Checkpoint 6 (C-32 closed in
+PR #21); Slice 7A added no API surface, so that published status is still correct.
+No `/matching/score` route, no `/jobs/ingest` route and no `/applications/prepare` route exists.
+The truthfulness validator exists as a **service only** (PR #24); no application-preparation
+endpoint, provider generation method, prompt, caching or cost-logging code exists anywhere in
+the repository.
 
 **Doc drift corrected:** the OpenAPI "Current status" string in `app/main.py` said the AI
 field-relatedness stage was not yet implemented. The docs-only Checkpoint 4 record PR corrected the
