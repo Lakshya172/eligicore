@@ -49,8 +49,11 @@ from app.schemas.application import (
     MAX_ANSWER_WORDS,
     MAX_COVER_LETTER_WORDS,
     MAX_JOB_DESCRIPTION_CHARS,
+    MAX_QUESTION_ID,
     MAX_QUESTION_TEXT,
     MAX_QUESTIONS,
+    MIN_ANSWER_WORDS,
+    MIN_COVER_LETTER_WORDS,
     ApplicationDraft,
     ApplicationEvidence,
     ApplicationPrepareRequest,
@@ -351,6 +354,34 @@ def test_tab_and_newline_survive_in_a_question() -> None:
     assert parsed.questions[0].text == "First line\n\tSecond"
 
 
+def test_the_published_bounds_are_the_ones_adr_025_names() -> None:
+    """Literals, deliberately (ADR-025 D9).
+
+    A bound test that writes ``MAX_QUESTIONS + 1`` asserts only that the code agrees with
+    itself: raise the constant and it still passes. These are the numbers the ADR fixed, so
+    they are written out, and a request carrying six questions is rejected because six is more
+    than five — not because of whatever the constant happens to say.
+    """
+    assert MAX_QUESTIONS == 5
+    assert MAX_QUESTION_TEXT == 500
+    assert MAX_QUESTION_ID == 64
+    assert (MIN_ANSWER_WORDS, MAX_ANSWER_WORDS) == (20, 250)
+    assert (MIN_COVER_LETTER_WORDS, MAX_COVER_LETTER_WORDS) == (50, 400)
+    assert MAX_JOB_DESCRIPTION_CHARS == 4000
+
+    fields = ApplicationPrepareRequest.model_fields
+    assert fields["cover_letter_max_words"].default == 400
+    assert fields["answer_max_words"].default == 250
+    assert fields["include_cover_letter"].default is True
+
+
+def test_six_questions_are_too_many(harness: Harness) -> None:
+    six = [question(f"q{index}") for index in range(6)]
+    assert harness.post(questions=six).status_code == 422
+    assert harness.post(questions=six[:5]).status_code == 200
+    assert harness.provider.generation_call_count == 1, "only the accepted request generated"
+
+
 def test_question_text_is_stripped_before_it_is_bounded() -> None:
     parsed = ApplicationPrepareRequest(
         profile={}, job_id="j", questions=[{"id": "q1", "text": "  Why us?  "}]
@@ -630,6 +661,24 @@ def test_answers_keep_request_order(harness: Harness) -> None:
     assert [answer["question_id"] for answer in body["answers"]] == ids
 
 
+def test_answers_keep_request_order_when_some_are_missing(harness: Harness) -> None:
+    """Order is the request's, not "answered first". A client reads answers positionally."""
+    ids = ["q1", "q2", "q3"]
+    harness.use(
+        MockAIProvider(
+            return_draft=ApplicationDraft(
+                cover_letter="I have experience with Python.",
+                # Only the middle question is answered; the other two must keep their places.
+                answers=[DraftAnswer(question_id="q2", text="I built Campus Ledger.")],
+            )
+        )
+    )
+    body = harness.post(questions=[question(qid) for qid in ids]).json()
+    assert [answer["question_id"] for answer in body["answers"]] == ids
+    outcomes = [answer["outcome"] for answer in body["answers"]]
+    assert outcomes == ["EMPTY", "GENERATED", "EMPTY"]
+
+
 # ---------------------------------------------------------------------------------------
 # Structural draft validation (§11)
 # ---------------------------------------------------------------------------------------
@@ -686,6 +735,40 @@ def test_a_non_draft_reply_is_invalid_not_an_exception(harness: Harness) -> None
     assert body["generation_outcome"] == "AI_GENERATION_INVALID"
     assert body["status"] == "NOTHING_VERIFIABLE"
     assert "Anything at all" not in json.dumps(body)
+
+
+@pytest.mark.anyio
+async def test_the_service_checks_the_reply_type_without_help() -> None:
+    """Defence in depth, asserted separately at each layer.
+
+    The orchestration must not rely on ``AIService`` having rejected a wrongly shaped reply, and
+    ``AIService`` must not rely on the orchestration doing it — so each is exercised against a
+    counterpart that does no checking at all. Two guards that only work together are one guard.
+    """
+
+    class NotAService:
+        """Stands in for an AI service that returns whatever the provider handed it."""
+
+        async def generate_application_content(self, *args: Any, **kwargs: Any) -> Any:
+            return {"cover_letter": "A dict is not a draft."}
+
+    outcome, draft = await application_prep._generate(
+        NotAService(), ApplicationEvidence(), brief(), [], GenerationLimits()
+    )
+    assert outcome.value == "AI_GENERATION_INVALID"
+    assert draft is None
+
+
+@pytest.mark.anyio
+async def test_the_ai_service_checks_the_reply_type_without_help() -> None:
+    class WrongTypeProvider(MockAIProvider):
+        async def generate_application_content(self, *args: Any, **kwargs: Any) -> Any:
+            return {"cover_letter": "A dict is not a draft."}
+
+    with pytest.raises(AIResponseInvalidError):
+        await AIService(WrongTypeProvider()).generate_application_content(
+            ApplicationEvidence(), brief(), [], GenerationLimits()
+        )
 
 
 def test_an_over_length_item_is_discarded_alone(harness: Harness) -> None:
