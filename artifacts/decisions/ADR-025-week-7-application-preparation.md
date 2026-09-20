@@ -100,14 +100,24 @@ Job brief: `role_title`, `company_name`, `description` (truncated to 4000 charac
 a labelled JSON **data** block, never as instructions (the ADR-019 §7 pattern), because
 adapter-sourced description text is untrusted.
 
-**D11 — `resume_raw_text` never leaves the service (A-70).** It is used only locally, inside the
-deterministic validator, as corroborating evidence. It is the richest evidence available and the
-most sensitive payload in the profile; sending it would defeat the entire allow-list in one field.
+**D11 — `resume_raw_text` is not validator evidence, and never leaves the service (A-70).**
+It is never sent to any provider, never logged, and never returned. It is also **not part of
+the validator's traceability evidence**: it may corroborate what the structured profile already
+says, which changes no verdict, but it can never create evidence. It is the most sensitive
+payload in the profile, and it is the one field the generator is guaranteed not to have seen,
+so a claim only it supports is a claim the model could not have known.
 
-**D12 — Knowledge boundary.** A claim in a category the model was **not given** is untraceable by
-construction and is removed unconditionally, even when it matches the local profile. The model
-never saw the CGPA, the backlog count or the employer name, so any such claim is a guess — and a
-guess that happens to be correct is still a fabrication.
+**D12 — Knowledge boundary. Provider-visible structured evidence is the knowledge boundary.**
+A claim in a category the model was **not given** is untraceable by construction and is removed
+unconditionally, even when it matches the local profile. The model never saw the CGPA, the
+backlog count or the employer name, so any such claim is a guess — and a guess that happens to
+be correct is still a fabrication.
+
+A claim may pass **only** when its evidence is represented in the provider-visible structured
+allow-list of D10. The validator may not use hidden local evidence — `resume_raw_text` above
+all — to pass a claim the provider could not have known. Concretely, `resume_raw_text` cannot
+create a project, skill, role, duration, credential or quantity claim, and cannot rescue an
+excluded-data claim.
 
 **D13 — No persistence (C-40).** No model, table, column, index, constraint or migration. The
 Alembic head stays `b3e8d2c61a47`. No file is written. A test asserts the table set is unchanged,
@@ -196,8 +206,9 @@ The removal unit is the **sentence**, or the **list item** inside an enumerated 
 smaller, because clause surgery produces ungrammatical or subtly altered meaning. Claim categories:
 `SKILL`, `PROJECT`, `EMPLOYMENT`, `DURATION`, `CREDENTIAL`, `QUANTITY`, `EXCLUDED_DATA`.
 
-Matching is normalized containment over the local evidence corpus (`skills`, `experience[].*`,
-`projects[].*`, `certifications[].*`, `education[].*` and `resume_raw_text`), with **canonical
+Matching is normalized containment over the evidence corpus, which holds the **provider-visible
+structured fields only** (`skills`, `experience[].*`, `projects[].*`, `certifications[].*` and
+`education[].*` — never `resume_raw_text`, per D11 and D12), with **canonical
 equality** for skills — `Java` must not satisfy a `JavaScript` claim — exact equality for numbers,
 and `claim ≤ evidence` within ±1 month for durations, where a claim above the evidence is
 `CLAIM_EXCEEDS_PROFILE_VALUE` and unparseable evidence is a removal. Skill canonicalization reuses
