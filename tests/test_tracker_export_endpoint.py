@@ -304,7 +304,8 @@ def test_openapi_status_text_is_current() -> None:
     description = TestClient(app).get("/openapi.json").json()["info"]["description"]
     assert "Week 5 of a 10-week build is in progress" not in description
     assert "export are not yet implemented" not in description
-    assert "Weeks 1–5 of a 10-week build are complete and Week 6 is underway" in description
+    assert "Weeks 1–6 of a 10-week build are complete." in description
+    assert "Week 6 is underway" not in description
     assert "tracker export" in description
 
 

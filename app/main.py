@@ -104,7 +104,7 @@ app = FastAPI(
         "table. `candidate_id` is a client-generated correlation identifier, not a "
         "server-side key.\n\n"
         "### Current status\n"
-        "Weeks 1–5 of a 10-week build are complete and Week 6 is underway. Candidate "
+        "Weeks 1–6 of a 10-week build are complete. Candidate "
         "profile, resume parsing, job catalogue, eligibility, recommendation and tracker "
         "export endpoints exist. Eligibility requirements "
         "are checked deterministically; a field of study that is not an exact match for a "
