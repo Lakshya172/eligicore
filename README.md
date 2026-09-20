@@ -48,11 +48,13 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 
 ## Project status
 
-**Pre-release development. Weeks 1–5 of a 10-week solo build complete; Week 6 in progress.**
+**Pre-release development. Weeks 1–6 of a 10-week solo build complete.**
 
-Current stable checkpoint: **Checkpoint 6A** (`0125703`) — Week 6 Excel Export (intermediate): a
-stateless Excel tracker export built entirely in memory, on top of Checkpoint 5's matching engine
-and recommendations. Week 6 polish (PR 6B) and the final Week 6 checkpoint are still pending.
+Current stable checkpoint: **Checkpoint 6** (`13eb832`) — Week 6 MVP (final): the complete,
+demoable Phase 1 product. A résumé becomes a profile, the profile becomes explained eligibility
+verdicts and ranked recommendations over a 40-job synthetic catalogue, and those become an Excel
+tracker — all locally, with a mock AI provider and no candidate data stored anywhere on the
+server. **This is the dossier's declared safe stopping point; Weeks 7–10 are enhancement.**
 
 > **Not production-ready.** The Gemini Flash provider has not been exercised against the live
 > API — no key is configured and the test suite runs without one. The provider contract is
@@ -99,7 +101,7 @@ asserts none exists. Uploaded resumes exist only for the duration of processing.
 | 3 | Job schema, source adapters, ingestion, deduplication | **Complete** |
 | 4 | Eligibility engine — deterministic rules plus AI for ambiguity | **Complete** — deterministic engine (PR #9) + AI field relatedness (PR #11), Checkpoint 4 |
 | 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | **Complete** — matching engine (PR #13) + recommendations endpoint (PR #15), Checkpoint 5 |
-| 6 | **Polish, Excel export, testing — complete demoable MVP** | **In progress** — Excel export complete (PR #17, Checkpoint 6A); demo path and full-flow test in review (PR 6B) |
+| 6 | **Polish, Excel export, testing — complete demoable MVP** | **Complete** — Excel export (PR #17, Checkpoint 6A) + demo path and full-flow test (PR #19), Checkpoint 6 |
 | 7 | Application preparation with truthfulness validation | Not started |
 | 8 | Caching and AI cost logging | Not started |
 | 9 | Documentation and deployment | Not started |

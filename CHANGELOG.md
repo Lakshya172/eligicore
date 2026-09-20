@@ -15,7 +15,29 @@ tag is created for it.
 
 ## [Unreleased]
 
-### Week 6 — PR 6B: demo path and full-flow test (in review, not merged)
+Nothing pending. **Week 7 has not started.**
+
+---
+
+## Checkpoint 6 — Week 6: MVP (final)
+
+**Date:** 2026-09-20 · **Commit on `main`:** `13eb832` · **Status:** Stable — current
+**Produced by:** PR #17 (`0125703`, Excel tracker export — see Checkpoint 6A) + PR #19
+(`13eb832`, demo path and full-flow test)
+**Full SHA:** `13eb8325149cab60a039534631265803250b767a` · **CI:** `test` success ·
+**Tests:** 1133 passing from `main` (0 failed, 0 skipped) · **Mutations:** 6B 23/23 · 6A 30/30 ·
+5B 40/40 · 5A 36/36 · Week 4 27/27 · **Live:** 33/33 · **Quickstart:** fresh clone in ~72 s
+
+Week 6 as a whole: the Excel tracker export plus the demo path that makes the system runnable
+by a stranger. **This is the dossier's declared safe stopping point (§15)** — the Phase 1
+product is complete and demoable. The implementation was merged and verified post-merge: the
+demo path works from a fresh clone, the catalogue holds 40 synthetic jobs, the local seed CLI
+and the offline full-flow test are in place, and the Excel export is unchanged from 6A. **No
+database or AI architecture was expanded.**
+
+**This is a checkpoint, not a release. No tag and no version bump.**
+
+### PR 6B — demo path and full-flow test
 
 #### Added
 
@@ -40,8 +62,10 @@ tag is created for it.
 
 - Three catalogue-coupled assertions now derive their counts from the dataset and scope the
   golden verdict map to the original five ids (C-31). No golden expectation changed.
-- The OpenAPI status now names the curated catalogue and the seed command; it still reads
-  "Week 6 is underway" until Checkpoint 6 is recorded (C-32).
+- The OpenAPI status now names the curated catalogue and the seed command. It still reads
+  "Week 6 is underway": correcting that sentence touches application code and the two tests
+  that pin it, so it is deliberately outside the documentation-only checkpoint record and is
+  tracked as the next small change (C-32).
 
 #### Not included
 
