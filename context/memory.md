@@ -391,6 +391,20 @@ A string starting with `=` is stored as a formula, and a string equal to an Exce
 **What to do:** write client text through one function that both neutralises the prefix and
 sets `cell.data_type = "s"`.
 
+### D-33 · A test that reads its own file can satisfy its own assertion
+A guard test asserted `"monkeypatch.setattr(socket.socket, ...)" in Path(__file__).read_text()`.
+Deleting the real guard did not fail it: the string still appeared — inside the assertion that
+was looking for it. The mutation run is what exposed it.
+**What to do:** assert on the source of the *specific function* (`inspect.getsource(fn)`), never
+on the whole file from inside that file.
+
+### D-34 · Catalogue ids are per-seed UUIDs, so golden ordering is not stable
+Unranked recommendation groups order by `job_id`, and so do score ties. A job id is a UUID
+minted at ingestion, so the order of those groups differs between seeded databases while the
+membership does not.
+**What to do:** assert group *membership* against curated `source_job_id`s, and assert ordering
+separately on scores and ranks. Only compare positions where the score is unique.
+
 ---
 
 ## Lessons

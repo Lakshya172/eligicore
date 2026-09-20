@@ -74,13 +74,14 @@ runs, and is tested. The authoritative, always-current state lives in
   produces a scale-independent view of each grade
 - **`POST /api/v1/resumes/parse`** — parses a PDF or DOCX resume into a structured profile with per-field confidence. The uploaded file is deleted after processing, on both the success and failure paths.
 - **AI provider abstraction** — one interface, a mandatory deterministic mock, and a Google Gemini Flash implementation for Phase 1. Swapping providers is a configuration change.
-- **`GET /api/v1/jobs`, `GET /api/v1/jobs/{id}`** — the job catalogue, ingested from a pluggable source adapter with canonical deduplication. Closed postings are kept and stay retrievable with their reason, never deleted.
+- **`GET /api/v1/jobs`, `GET /api/v1/jobs/{id}`** — the job catalogue: 40 synthetic postings ingested from a pluggable source adapter with canonical deduplication, loaded locally with `python -m app.cli seed-catalogue`. Closed postings are kept and stay retrievable with their reason, never deleted.
 - **`POST /api/v1/eligibility/check`** — evaluates a supplied profile against up to 50 catalogue jobs' stated requirements (minimum CGPA, graduation year window, backlog limit, minimum qualification level, permitted fields) and returns a verdict with a per-requirement breakdown. A field of study that is not an exact match is judged by an AI provider — sent only the field and the permitted fields — and the result is labelled `ai_reasoning`, capped at MEDIUM confidence, and can never make a candidate `NOT_ELIGIBLE`. Nothing is stored.
 - **`GET /api/v1/health`** — liveness
 - **Matching engine** — deterministic TF-IDF cosine similarity between a candidate's skills and experience and the job catalogue, with skill coverage, the shared terms behind each score and a template explanation. It reads no eligibility data and stores nothing.
 - **`POST /api/v1/recommendations`** — eligibility verdicts and relevance scores side by side: eligible jobs ranked by match score, borderline jobs flagged separately, ineligible and closed jobs listed with their reasons but never ranked. The two are never combined into one number. Nothing is stored.
 - **`POST /api/v1/applications/export`** — turns the tracking rows a client sends into an Excel tracker, built entirely in memory. Nothing that could run as a formula survives, and nothing is stored.
-- **1075 tests**, running offline with no credentials and no network
+- **1133 tests**, running offline with no credentials and no network — including a full-flow
+  integration test that walks résumé → profile → eligibility → recommendations → Excel export
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
 - Repository workflow: branching, conventional commits, PR standard, CI, checkpoint discipline
 
@@ -98,7 +99,7 @@ asserts none exists. Uploaded resumes exist only for the duration of processing.
 | 3 | Job schema, source adapters, ingestion, deduplication | **Complete** |
 | 4 | Eligibility engine — deterministic rules plus AI for ambiguity | **Complete** — deterministic engine (PR #9) + AI field relatedness (PR #11), Checkpoint 4 |
 | 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | **Complete** — matching engine (PR #13) + recommendations endpoint (PR #15), Checkpoint 5 |
-| 6 | **Polish, Excel export, testing — complete demoable MVP** | **In progress** — Excel export complete (PR #17, Checkpoint 6A); polish (PR 6B) not started |
+| 6 | **Polish, Excel export, testing — complete demoable MVP** | **In progress** — Excel export complete (PR #17, Checkpoint 6A); demo path and full-flow test in review (PR 6B) |
 | 7 | Application preparation with truthfulness validation | Not started |
 | 8 | Caching and AI cost logging | Not started |
 | 9 | Documentation and deployment | Not started |

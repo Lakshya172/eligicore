@@ -21,8 +21,8 @@ project:
   api_namespace: /api/v1
   env_prefix: ELIGICORE_
   database_name: eligicore
-  phase: "Week 6 — Polish, Excel export, testing (IN PROGRESS — Checkpoint 6A recorded; PR 6B not started)"
-  next_approved_phase: "PR 6B — Week 6 polish (not started, not authorized). /matching/score and /jobs/ingest deferred (ADR-023)"
+  phase: "Week 6 — Polish, Excel export, testing (IN PROGRESS — Checkpoint 6A recorded; PR 6B open, not merged)"
+  next_approved_phase: "Review and merge of PR 6B, then Checkpoint 6 (final Week 6 MVP). /matching/score, /jobs/ingest and /applications/prepare deferred (ADR-023, ADR-024)"
   source_of_truth: EligiCore_Dossier_update.md
   ai_provider_phase_1: gemini-flash   # ADR-013. Concrete implementation, not a dependency.
   vcs:
