@@ -232,9 +232,18 @@ def _collect_numbers(values: list[str]) -> set[float]:
 def build_evidence(profile: CandidateProfile) -> _Evidence:
     """Project a profile into the evidence the validator traces claims against.
 
-    Grades, backlog counts, institutions, contact details and employer names are **not** gathered:
-    they are outside the generator's knowledge boundary, so a claim touching them is removed
-    without a lookup (D12). Gathering them would turn a lucky guess into a pass.
+    Two exclusions, both load-bearing, both from the knowledge boundary (D12):
+
+    **Data outside the allow-list is never gathered** — grades, backlog counts, institutions,
+    contact details, locations, languages and employer names. Gathering them would turn a lucky
+    guess into a pass.
+
+    **``resume_raw_text`` is not evidence.** It may corroborate what the structured profile
+    already says, and corroborating something already true changes no verdict — but it can never
+    *create* evidence, because the generator was given the allow-listed structured fields and
+    nothing else (D10). A project, skill, role, credential, duration or number that appears only
+    in the résumé was never in front of the model, so a sentence asserting it is a guess. The
+    text stays local either way: it is not read here and it is never sent anywhere (D11).
     """
     texts: list[str] = []
     for entry in profile.experience:
@@ -248,8 +257,6 @@ def build_evidence(profile: CandidateProfile) -> _Evidence:
         if education.grad_year is not None:
             texts.append(str(education.grad_year))
     texts.extend(profile.skills)
-    if profile.resume_raw_text:
-        texts.append(profile.resume_raw_text)
 
     durations = tuple(
         months
@@ -385,11 +392,11 @@ def _skill_failure(unit: str, evidence: _Evidence, listed: bool = False) -> Fail
 def _traceable_by_containment(
     candidate: str, names: tuple[str, ...], corpus: str = ""
 ) -> bool:
-    """True when a named thing appears in the profile's own words.
+    """True when a named thing appears in the structured profile.
 
-    ``corpus`` is the normalized local evidence, résumé text included: a project the candidate
-    described in their résumé but never added to ``projects[]`` is still their project. That text
-    is used **here only** and never leaves the service (ADR-025 D11).
+    ``corpus`` is the normalized text of the **allow-listed structured fields only** (D10): the
+    same evidence the generator was given, so a description that mentions a project by name
+    counts, and a résumé that mentions one the profile never listed does not.
     """
     normalized = _normalize(candidate)
     if not normalized:
@@ -499,7 +506,8 @@ def _split_units(paragraph: str) -> _Segment:
         items = listed.group("items")
         separator = ";" if ";" in items else ","
         parts = [part.strip() for part in items.split(separator) if part.strip()]
-        if len(parts) > 1:
+        # A one-item list is still a list: "My tools: Kubernetes." asserts Kubernetes.
+        if parts:
             return _Segment(
                 units=tuple(parts),
                 joiner=f"{separator} ",

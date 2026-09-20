@@ -211,30 +211,225 @@ def test_an_empty_profile_traces_nothing(profile: CandidateProfile) -> None:
     assert run("I have experience with Python.", profile)[0]
 
 
-def test_resume_text_is_evidence_for_a_project_the_profile_never_listed() -> None:
-    """The résumé is the candidate's own words, and it stays local (ADR-025 D11, A-70)."""
-    profile = CandidateProfile.model_validate(
-        {
-            "education": [],
-            "skills": [],
-            "projects": [],
-            "resume_raw_text": "Campus Ledger: a service for tracking hostel dues.",
-        }
-    )
+# ---------------------------------------------------------------------------------------
+# The knowledge boundary and resume_raw_text (ADR-025 D10, D11, D12)
+#
+# The resume may corroborate what the structured profile already says. It may never create
+# evidence: the generator was given the allow-listed structured fields and nothing else, so a
+# claim that only the resume supports was never in front of the model.
+# ---------------------------------------------------------------------------------------
+
+
+def resume_only(**overrides: Any) -> CandidateProfile:
+    """A profile whose structured fields are bare and whose resume says everything."""
+    base: dict[str, Any] = {
+        "education": [],
+        "skills": [],
+        "projects": [],
+        "experience": [],
+        "certifications": [],
+        "resume_raw_text": (
+            "Campus Ledger, a hostel dues service. Proficient in Kubernetes. "
+            "Backend Engineering Intern for 3 years at Acme Robotics. "
+            "AWS Certified Cloud Practitioner. Improved latency by 44%. "
+            "CGPA 9.1. No backlogs. Example Institute of Technology. "
+            "sample.candidate@example.com. +1 555 0100. Based in Example City. "
+            "Fluent in Spanish."
+        ),
+    }
+    base.update(overrides)
+    return CandidateProfile.model_validate(base)
+
+
+def test_case_a_a_resume_only_project_is_removed() -> None:
+    kept, removed = run("I built Campus Ledger.", resume_only())
+
+    assert kept == ""
+    assert removed[0].category is ClaimCategory.PROJECT
+    assert removed[0].reason is RemovalReason.CLAIM_NOT_TRACEABLE
+
+
+def test_case_b_a_structured_project_with_resume_corroboration_passes() -> None:
+    profile = resume_only(projects=[{"name": "Campus Ledger", "description": "Hostel dues."}])
     kept, removed = run("I built Campus Ledger.", profile)
 
     assert kept == "I built Campus Ledger."
     assert removed == []
 
 
-def test_resume_text_is_not_a_blanket_pass() -> None:
-    profile = CandidateProfile.model_validate(
-        {"education": [], "skills": [], "resume_raw_text": "Campus Ledger."}
-    )
-    kept, removed = run("I built Orbital Freight Tracker.", profile)
+def test_case_c_a_resume_only_skill_is_removed() -> None:
+    kept, removed = run("I am proficient in Kubernetes.", resume_only())
 
     assert kept == ""
-    assert removed[0].category is ClaimCategory.PROJECT
+    assert removed[0].category is ClaimCategory.SKILL
+
+
+def test_case_c_a_resume_only_skill_is_removed_inside_a_list() -> None:
+    """The list path has its own containment check; it must not become a side door."""
+    kept, removed = run("My tools: Kubernetes.", resume_only())
+
+    assert kept == ""
+    assert removed[0].category is ClaimCategory.SKILL
+
+
+def test_case_d_a_resume_only_duration_is_removed() -> None:
+    kept, removed = run("I spent three years on backend work.", resume_only())
+
+    assert kept == ""
+    assert removed[0].category is ClaimCategory.DURATION
+
+
+def test_case_d_a_resume_only_quantity_is_removed() -> None:
+    kept, removed = run("I improved latency by 44%.", resume_only())
+
+    assert kept == ""
+    assert removed[0].category is ClaimCategory.QUANTITY
+
+
+def test_case_d_a_resume_only_role_title_is_removed() -> None:
+    kept, removed = run("I worked as a Backend Engineering Intern.", resume_only())
+
+    assert kept == ""
+    assert removed[0].category in {ClaimCategory.EMPLOYMENT, ClaimCategory.EXCLUDED_DATA}
+
+
+def test_case_d_a_resume_only_credential_is_removed() -> None:
+    kept, removed = run("I am AWS Certified Cloud Practitioner.", resume_only())
+
+    assert kept == ""
+    assert removed[0].category is ClaimCategory.CREDENTIAL
+
+
+@pytest.mark.parametrize(
+    ("claim", "note"),
+    [
+        ("I worked at Acme Robotics.", "employer"),
+        ("My CGPA is 9.1.", "grade"),
+        ("I have no backlogs.", "backlogs"),
+        ("I studied at Example Institute of Technology.", "institution"),
+        ("You can reach me at sample.candidate@example.com.", "email"),
+        ("Call me on +1 555 0100.", "phone"),
+        ("I am based in Example City.", "location"),
+    ],
+)
+def test_case_e_the_resume_never_rescues_an_excluded_data_claim(claim: str, note: str) -> None:
+    """Every one of these is true of the candidate. None was given to the generator (D12)."""
+    kept, removed = run(claim, resume_only())
+
+    assert kept == "", note
+    assert removed[0].category is ClaimCategory.EXCLUDED_DATA
+    assert removed[0].reason is RemovalReason.CLAIM_OUTSIDE_KNOWLEDGE_BOUNDARY
+
+
+def test_case_e_a_resume_only_language_claim_is_not_rescued() -> None:
+    """Languages were excluded from the provider input by owner decision B."""
+    kept, _ = run("I am fluent in Spanish.", resume_only())
+
+    assert kept == ""
+
+
+@pytest.mark.parametrize(
+    ("claim", "structured"),
+    [
+        ("I built Campus Ledger.", {"projects": [{"name": "Campus Ledger"}]}),
+        ("I am proficient in Kubernetes.", {"skills": ["Kubernetes"]}),
+        (
+            "I worked as a Backend Engineering Intern.",
+            {"experience": [{"title": "Backend Engineering Intern", "duration": "6 months"}]},
+        ),
+        (
+            "I am AWS Certified Cloud Practitioner.",
+            {"certifications": [{"name": "AWS Certified Cloud Practitioner"}]},
+        ),
+        (
+            "I spent six months on backend work.",
+            {"experience": [{"title": "Intern", "duration": "6 months"}]},
+        ),
+        (
+            "I improved latency by 44%.",
+            {"experience": [{"title": "Intern", "description": "Improved latency by 44%."}]},
+        ),
+    ],
+    ids=["project", "skill", "role", "credential", "duration", "quantity"],
+)
+def test_case_f_structured_evidence_passes_with_the_resume_corroborating(
+    claim: str, structured: dict[str, Any]
+) -> None:
+    """Positive direction: the structured field carries the claim; the resume merely agrees."""
+    kept, removed = run(claim, resume_only(**structured))
+
+    assert kept == claim
+    assert removed == []
+
+
+def test_the_evidence_corpus_holds_only_provider_visible_structured_fields() -> None:
+    """The corpus is what the generator saw; the resume is not part of it (D10)."""
+    evidence = tv.build_evidence(resume_only())
+
+    assert evidence.corpus == ""
+    assert evidence.numbers == frozenset()
+    assert evidence.project_names == () and evidence.role_titles == ()
+
+
+def test_structured_fields_still_build_the_corpus(profile: CandidateProfile) -> None:
+    evidence = tv.build_evidence(profile)
+
+    assert "campusledger" in evidence.corpus
+    assert 30.0 in evidence.numbers and 500.0 in evidence.numbers
+    assert 8.2 not in evidence.numbers
+    assert "examplecorp" not in evidence.corpus
+
+
+# ---------------------------------------------------------------------------------------
+# Employer history versus the company being applied to
+#
+# 7A has no job parameter and must not gain one: it tells the two apart by whether the sentence
+# makes an employment-history claim, not by knowing which company is the target.
+# ---------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "I previously worked at Acme Robotics.",
+        "I interned at Acme Robotics.",
+        "During my time at Acme Robotics I shipped weekly releases.",
+    ],
+)
+def test_employment_history_at_a_named_company_is_removed(
+    claim: str, profile: CandidateProfile
+) -> None:
+    kept, removed = run(claim, profile)
+
+    assert kept == ""
+    assert removed[0].category is ClaimCategory.EXCLUDED_DATA
+    assert removed[0].reason is RemovalReason.CLAIM_OUTSIDE_KNOWLEDGE_BOUNDARY
+
+
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "I am applying to Acme Robotics.",
+        "I hope to contribute to Acme Robotics.",
+        "I am excited about the opportunity at Acme Robotics.",
+    ],
+)
+def test_forward_looking_company_language_survives(
+    claim: str, profile: CandidateProfile
+) -> None:
+    kept, removed = run(claim, profile)
+
+    assert kept == claim
+    assert removed == []
+
+
+def test_the_validator_takes_no_job_or_company_parameter() -> None:
+    """Slice 7A must not become aware of a target company (owner instruction)."""
+    import inspect
+
+    parameters = list(inspect.signature(tv.validate).parameters)
+
+    assert parameters == ["content", "profile", "scope", "question_id"]
 
 
 def test_validation_is_deterministic(profile: CandidateProfile) -> None:
