@@ -497,10 +497,12 @@ def test_this_file_still_guards_the_network_and_the_golden_results() -> None:
 def test_openapi_status_matches_the_repository_state(flow: Flow) -> None:
     """The published status must not run ahead of the checkpoints (C-32)."""
     description = flow.client.get("/openapi.json").json()["info"]["description"]
-    assert "Weeks 1–5 of a 10-week build are complete and Week 6 is underway" in description
+    assert "Weeks 1–6 of a 10-week build are complete." in description
     assert "python -m app.cli seed-catalogue" in description
     assert "HTTP-triggered job ingestion and application preparation are not implemented" in description
-    for premature in ("Week 6 is complete", "Weeks 1–6", "Week 7"):
+    for stale in ("Weeks 1–5", "Week 6 is underway"):
+        assert stale not in description, stale
+    for premature in ("Week 7", "Weeks 1–7", "Week 8", "10-week build is complete"):
         assert premature not in description, premature
 
 
