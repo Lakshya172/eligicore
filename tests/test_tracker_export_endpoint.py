@@ -292,12 +292,18 @@ def test_openapi_documents_the_binary_response() -> None:
 
 def test_deferred_endpoints_do_not_exist(server: Server) -> None:
     spec = server.client.get("/openapi.json").json()
-    for path in ("/api/v1/matching/score", "/api/v1/jobs/ingest", "/api/v1/applications/prepare"):
+    for path in ("/api/v1/matching/score", "/api/v1/jobs/ingest"):
         assert path not in spec["paths"], path
     assert server.client.post("/api/v1/matching/score", json={}).status_code == 404
-    assert server.client.post("/api/v1/applications/prepare", json={}).status_code == 404
     # /jobs/ingest has no route of its own: the path only matches GET /jobs/{job_id}.
     assert server.client.post("/api/v1/jobs/ingest", json={}).status_code == 405
+
+    # Application preparation stopped being deferred in Slice 7B (ADR-025) and is the only
+    # endpoint added with it. It is a POST, and it is not a second binary response.
+    assert set(spec["paths"]["/api/v1/applications/prepare"]) == {"post"}
+    assert "application/json" in (
+        spec["paths"]["/api/v1/applications/prepare"]["post"]["responses"]["200"]["content"]
+    )
 
 
 def test_openapi_status_text_is_current() -> None:

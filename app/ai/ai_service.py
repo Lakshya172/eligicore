@@ -23,6 +23,13 @@ from app.ai.errors import AIConfigurationError, AIError, AIResponseInvalidError
 from app.ai.providers.base import AIProvider
 from app.ai.providers.mock import MockAIProvider
 from app.config import AIProviderName, Settings, get_settings
+from app.schemas.application import (
+    ApplicationDraft,
+    ApplicationEvidence,
+    ApplicationQuestion,
+    GenerationLimits,
+    JobBrief,
+)
 from app.schemas.eligibility import FieldRelatednessAssessment
 from app.schemas.resume import ResumeExtraction
 
@@ -192,6 +199,56 @@ class AIService:
             provider.name,
             provider.model,
             len(allowed_fields),
+            (time.perf_counter() - started) * 1000,
+        )
+        return result
+
+
+    async def generate_application_content(
+        self,
+        evidence: ApplicationEvidence,
+        job: JobBrief,
+        questions: list[ApplicationQuestion],
+        limits: GenerationLimits,
+    ) -> ApplicationDraft:
+        """Ask the provider for an application draft, logging only safe metadata.
+
+        Logs provider, model, outcome, the **number** of questions and timing. Never the
+        evidence, the job text, a question, the draft, or any length that could characterize
+        one candidate's content — counts only (INV-4, ADR-025 § Failure semantics).
+
+        Raises:
+            AIError: Construction or provider failure, or a reply that is not a validated
+                :class:`~app.schemas.application.ApplicationDraft`.
+        """
+        started = time.perf_counter()
+        provider = self._get_provider()
+        try:
+            result = await provider.generate_application_content(
+                evidence, job, list(questions), limits
+            )
+            if not isinstance(result, ApplicationDraft):
+                raise AIResponseInvalidError(
+                    "Provider returned an unvalidated application draft."
+                )
+        except AIError as exc:
+            logger.warning(
+                "ai_call provider=%s model=%s operation=generate_application_content "
+                "outcome=error error_type=%s questions=%d duration_ms=%.1f",
+                provider.name,
+                provider.model,
+                type(exc).__name__,
+                len(questions),
+                (time.perf_counter() - started) * 1000,
+            )
+            raise
+
+        logger.info(
+            "ai_call provider=%s model=%s operation=generate_application_content "
+            "outcome=success questions=%d duration_ms=%.1f",
+            provider.name,
+            provider.model,
+            len(questions),
             (time.perf_counter() - started) * 1000,
         )
         return result

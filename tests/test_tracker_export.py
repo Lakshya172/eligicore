@@ -666,10 +666,24 @@ def test_nothing_else_imports_the_export(path: str) -> None:
         assert "tracker" not in module and "applications" not in module, (path, module)
 
 
-def test_router_takes_no_database_or_ai_dependency() -> None:
+def test_export_takes_no_database_or_ai_dependency() -> None:
+    """Asserted on the handler, because the module now holds a second endpoint.
+
+    ``/applications/prepare`` legitimately takes a session and an AI service (ADR-025), so a
+    module-level import check would pass for the wrong reason. The guarantee that matters is
+    per-endpoint: the export reads nothing and calls no provider, so its signature has one
+    parameter — the request — and no dependency at all.
+    """
+    import inspect
+
+    from app.routers.applications import export
+
+    assert set(inspect.signature(export).parameters) == {"request"}
+
+    # Whatever else lands in this module, the export's neighbours stay out of it: no endpoint
+    # here may reach eligibility, matching or recommendations (ADR-023 §11, ADR-025 D7).
     modules = imported_modules(pathlib.Path("app/routers/applications.py"))
-    assert not any(m.startswith(("sqlalchemy", "app.database", "app.models", "app.ai",
-                                 "app.services.recommendations", "app.services.matching_engine",
+    assert not any(m.startswith(("app.services.recommendations", "app.services.matching_engine",
                                  "app.services.eligibility")) for m in modules), modules
 
 

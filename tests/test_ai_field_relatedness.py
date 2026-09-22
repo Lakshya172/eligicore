@@ -53,8 +53,22 @@ def test_interface_takes_only_field_and_allowed_fields() -> None:
 
 
 def test_there_is_no_generic_eligibility_method() -> None:
+    """The interface stays a list of narrow tasks, never a general-purpose model handle.
+
+    ``generate_application_content`` joined it in Slice 7B (ADR-025). It is not an eligibility
+    method and cannot become one: it returns an application draft, it is given an
+    ``ApplicationEvidence`` projection rather than a profile, and no verdict is derived from it.
+    """
     methods = {name for name in dir(AIProvider) if not name.startswith("_")}
-    assert methods == {"assess_field_relatedness", "extract_resume", "model", "name"}
+    assert methods == {
+        "assess_field_relatedness",
+        "extract_resume",
+        "generate_application_content",
+        "model",
+        "name",
+    }
+    for generic in ("evaluate", "assess_eligibility", "check", "complete", "chat", "ask", "run"):
+        assert generic not in methods, generic
 
 
 def test_assessment_schema_is_strict() -> None:

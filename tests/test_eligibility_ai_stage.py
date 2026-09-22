@@ -86,6 +86,9 @@ class SpyProvider(AIProvider):
     async def extract_resume(self, resume_text: str) -> Any:
         raise AssertionError("eligibility must never call resume extraction")
 
+    async def generate_application_content(self, *args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("eligibility must never call application generation")
+
     async def assess_field_relatedness(
         self, field_of_study: str, allowed_fields: list[str]
     ) -> FieldRelatednessAssessment:
