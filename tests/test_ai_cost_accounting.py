@@ -228,8 +228,13 @@ USAGE = {"promptTokenCount": 120, "candidatesTokenCount": 30, "totalTokenCount":
 
 
 @pytest.mark.anyio
-async def test_usage_survives_two_failed_attempts_before_success() -> None:
-    """The requirement: a third-attempt success still accounts for the call."""
+async def test_usage_survives_two_bodiless_failures_before_success() -> None:
+    """A retried call still reports the successful attempt.
+
+    Note what this does *not* prove: the failures here carry no usage block, so passing it
+    says nothing about whether a retryable reply that *does* report usage is accumulated.
+    That is the next test, and its absence is what let a real defect through review.
+    """
     attempts: list[int] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -599,7 +604,7 @@ def test_record_usage_marks_a_missing_metadata_block_unreadable() -> None:
 
     sink = UsageSink()
     sink.record(prompt_tokens=10, completion_tokens=2, total_tokens=12)
-    _record_usage(sink, {"candidates": []})
+    _record_usage(sink, {"candidates": []}, tokens_certain=True)
     assert sink.usage == AIUsage()
 
 
@@ -608,14 +613,14 @@ def test_record_usage_survives_any_shape_of_metadata(metadata: Any) -> None:
     from app.ai.providers.gemini import _record_usage
 
     sink = UsageSink()
-    _record_usage(sink, {"usageMetadata": metadata} if metadata is not None else {})
+    _record_usage(sink, {"usageMetadata": metadata} if metadata is not None else {}, tokens_certain=True)
     assert sink.usage == AIUsage()
 
 
 def test_record_usage_without_a_sink_does_nothing() -> None:
     from app.ai.providers.gemini import _record_usage
 
-    _record_usage(None, {"usageMetadata": USAGE})
+    _record_usage(None, {"usageMetadata": USAGE}, tokens_certain=True)
 
 
 @pytest.mark.anyio
@@ -627,3 +632,253 @@ async def test_gemini_resume_extraction_reports_usage_too() -> None:
         RESUME, usage=sink
     )
     assert sink.usage == AIUsage(prompt_tokens=120, completion_tokens=30, total_tokens=150)
+
+
+# ---------------------------------------------------------------------------------------
+# Accumulation across retryable *responses* — ADR-026 D4
+#
+# A retried call may be billed for each attempt. Counting only the last one under-reports
+# exactly the calls that cost the most, which is the failure D4 exists to prevent.
+# ---------------------------------------------------------------------------------------
+
+
+def _error(status: int, usage: dict[str, Any] | None = None) -> httpx.Response:
+    body: dict[str, Any] = {"error": {"code": status, "status": "UNAVAILABLE"}}
+    if usage is not None:
+        body["usageMetadata"] = usage
+    return httpx.Response(status, json=body)
+
+
+def _usage(prompt: int, completion: int) -> dict[str, int]:
+    return {
+        "promptTokenCount": prompt,
+        "candidatesTokenCount": completion,
+        "totalTokenCount": prompt + completion,
+    }
+
+
+@pytest.mark.anyio
+async def test_a_throttled_attempt_that_reports_usage_is_counted() -> None:
+    """429 with a usage block. The body is read before the status is translated."""
+    sink = UsageSink()
+    with pytest.raises(AIProviderUnavailableError):
+        await _gemini(lambda r: _error(429, _usage(7, 3)), max_retries=0).assess_field_relatedness(
+            FIELD, ALLOWED, usage=sink
+        )
+    assert sink.usage == AIUsage(prompt_tokens=7, completion_tokens=3, total_tokens=10)
+
+
+@pytest.mark.anyio
+async def test_a_server_error_that_reports_usage_is_counted() -> None:
+    sink = UsageSink()
+    with pytest.raises(AIProviderUnavailableError):
+        await _gemini(lambda r: _error(503, _usage(9, 4)), max_retries=0).assess_field_relatedness(
+            FIELD, ALLOWED, usage=sink
+        )
+    assert sink.usage == AIUsage(prompt_tokens=9, completion_tokens=4, total_tokens=13)
+
+
+@pytest.mark.anyio
+async def test_a_rejected_attempt_that_reports_usage_is_counted() -> None:
+    """Not retried, but still billable. A rejection is not automatically free."""
+    sink = UsageSink()
+    with pytest.raises(Exception):
+        await _gemini(lambda r: _error(400, _usage(5, 1)), max_retries=0).assess_field_relatedness(
+            FIELD, ALLOWED, usage=sink
+        )
+    assert sink.usage.total_tokens == 6
+
+
+@pytest.mark.anyio
+async def test_every_reporting_attempt_is_summed_across_a_retried_call() -> None:
+    """The arithmetic the requirement asks for: total == a1 + a2 + a3."""
+    attempts: list[int] = []
+    first, second, third = _usage(100, 10), _usage(200, 20), _usage(300, 30)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts.append(1)
+        if len(attempts) == 1:
+            return _error(429, first)
+        if len(attempts) == 2:
+            return _error(503, second)
+        return _reply(RELATED, third)
+
+    sink = UsageSink()
+    result = await _gemini(handler).assess_field_relatedness(FIELD, ALLOWED, usage=sink)
+
+    assert len(attempts) == 3
+    assert result.result.value == "RELATED"
+    assert sink.usage.prompt_tokens == 100 + 200 + 300
+    assert sink.usage.completion_tokens == 10 + 20 + 30
+    assert sink.usage.total_tokens == 110 + 220 + 330
+
+
+@pytest.mark.anyio
+async def test_accumulated_cost_bills_every_reporting_attempt() -> None:
+    """A three-attempt call must cost more than the same call that succeeded first time."""
+    attempts: list[int] = []
+
+    def retried(request: httpx.Request) -> httpx.Response:
+        attempts.append(1)
+        return _reply(RELATED, _usage(1000, 1000)) if len(attempts) == 3 else _error(
+            503, _usage(1000, 1000)
+        )
+
+    retried_sink, clean_sink = UsageSink(), UsageSink()
+    await _gemini(retried).assess_field_relatedness(FIELD, ALLOWED, usage=retried_sink)
+    await _gemini(lambda r: _reply(RELATED, _usage(1000, 1000)), max_retries=0).assess_field_relatedness(
+        FIELD, ALLOWED, usage=clean_sink
+    )
+
+    assert cost_micros(retried_sink.usage, 100, 400) == 3 * cost_micros(clean_sink.usage, 100, 400)
+
+
+@pytest.mark.anyio
+async def test_a_reporting_error_does_not_hide_behind_an_unreadable_one() -> None:
+    """A usage-less failure must not poison a later attempt's real total.
+
+    This is the trap in the fix: had a usage-less error been recorded as *unreadable*, one
+    empty 503 would have turned a successful attempt's genuine count into ``unknown`` —
+    worse than the gap being closed.
+    """
+    attempts: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts.append(1)
+        return _reply(RELATED, _usage(300, 30)) if len(attempts) == 3 else httpx.Response(503)
+
+    sink = UsageSink()
+    await _gemini(handler).assess_field_relatedness(FIELD, ALLOWED, usage=sink)
+    assert sink.usage == AIUsage(prompt_tokens=300, completion_tokens=30, total_tokens=330)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(503),
+        httpx.Response(503, text="<html>502 Bad Gateway</html>"),
+        httpx.Response(503, json={"error": "no usage here"}),
+        httpx.Response(503, json=["not", "an", "object"]),
+        httpx.Response(429, json={"usageMetadata": "not a block"}),
+    ],
+)
+async def test_an_error_body_without_usable_usage_contributes_nothing(
+    response: httpx.Response,
+) -> None:
+    """Including bodies that are not JSON at all. Reading one must never replace the error."""
+    sink = UsageSink()
+    with pytest.raises(AIProviderUnavailableError):
+        await _gemini(lambda r: response, max_retries=0).assess_field_relatedness(
+            FIELD, ALLOWED, usage=sink
+        )
+    assert sink.usage == AIUsage()
+
+
+@pytest.mark.anyio
+async def test_reading_an_error_body_does_not_change_which_error_is_raised() -> None:
+    """Error translation is unchanged: the same status still yields the same exception."""
+    from app.ai.errors import AIProviderRejectedError
+
+    for status, expected in (
+        (500, AIProviderUnavailableError),
+        (503, AIProviderUnavailableError),
+        (429, AIProviderUnavailableError),
+        (401, AIProviderRejectedError),
+        (403, AIProviderRejectedError),
+        (400, AIProviderRejectedError),
+    ):
+        with pytest.raises(expected):
+            await _gemini(
+                lambda r, s=status: _error(s, _usage(1, 1)), max_retries=0
+            ).assess_field_relatedness(FIELD, ALLOWED, usage=UsageSink())
+
+
+@pytest.mark.anyio
+async def test_reading_an_error_body_does_not_change_retry_eligibility_or_count() -> None:
+    """A 4xx carrying usage is still not retried; a 5xx still gets exactly max_retries + 1."""
+    rejected: list[int] = []
+
+    def reject(request: httpx.Request) -> httpx.Response:
+        rejected.append(1)
+        return _error(400, _usage(1, 1))
+
+    with pytest.raises(Exception):
+        await _gemini(reject, max_retries=2).assess_field_relatedness(
+            FIELD, ALLOWED, usage=UsageSink()
+        )
+    assert len(rejected) == 1
+
+    attempts: list[int] = []
+
+    def unavailable(request: httpx.Request) -> httpx.Response:
+        attempts.append(1)
+        return _error(503, _usage(1, 1))
+
+    with pytest.raises(AIProviderUnavailableError):
+        await _gemini(unavailable, max_retries=2).assess_field_relatedness(
+            FIELD, ALLOWED, usage=UsageSink()
+        )
+    assert len(attempts) == 3
+
+
+def test_an_error_reply_missing_usage_is_not_marked_unreadable() -> None:
+    """The distinction directly: a success asserts tokens were spent, an error does not."""
+    from app.ai.providers.gemini import _record_usage
+
+    after_error = UsageSink()
+    after_error.record(prompt_tokens=10, completion_tokens=2, total_tokens=12)
+    _record_usage(after_error, {"error": {"code": 503}}, tokens_certain=False)
+    assert after_error.usage == AIUsage(prompt_tokens=10, completion_tokens=2, total_tokens=12)
+
+    after_success = UsageSink()
+    after_success.record(prompt_tokens=10, completion_tokens=2, total_tokens=12)
+    _record_usage(after_success, {"candidates": []}, tokens_certain=True)
+    assert after_success.usage == AIUsage()
+
+
+@pytest.mark.anyio
+async def test_exhausted_retries_that_all_reported_usage_still_bill_for_them() -> None:
+    sink = UsageSink()
+    with pytest.raises(AIProviderUnavailableError):
+        await _gemini(lambda r: _error(503, _usage(10, 1)), max_retries=2).assess_field_relatedness(
+            FIELD, ALLOWED, usage=sink
+        )
+    assert sink.usage == AIUsage(prompt_tokens=30, completion_tokens=3, total_tokens=33)
+
+
+@pytest.mark.anyio
+async def test_resume_extraction_accumulates_across_retries_too() -> None:
+    """Both instrumented operations share the path; both must show it."""
+    attempts: list[int] = []
+    payload = {"name": "Test Candidate", "skills": ["Python"], "field_confidence": {}}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts.append(1)
+        return _reply(payload, _usage(50, 5)) if len(attempts) == 2 else _error(503, _usage(50, 5))
+
+    sink = UsageSink()
+    await _gemini(handler).extract_resume(RESUME, usage=sink)
+    assert sink.usage == AIUsage(prompt_tokens=100, completion_tokens=10, total_tokens=110)
+
+
+@pytest.mark.anyio
+async def test_a_success_missing_usage_invalidates_what_earlier_attempts_reported() -> None:
+    """The success/error asymmetry, through the provider rather than the helper.
+
+    A 200 that reports nothing still consumed tokens, so the call's total is *unknown*.
+    Reporting the earlier attempts' 110 would under-report a call that also ran a whole
+    successful generation — which is the mistake the ``tokens_certain`` flag prevents.
+    """
+    attempts: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts.append(1)
+        return _reply(RELATED, None) if len(attempts) == 2 else _error(503, _usage(100, 10))
+
+    sink = UsageSink()
+    result = await _gemini(handler).assess_field_relatedness(FIELD, ALLOWED, usage=sink)
+
+    assert len(attempts) == 2
+    assert result.result.value == "RELATED"
+    assert sink.usage == AIUsage(), "a silent success must not be billed at the retries' rate"
