@@ -25,6 +25,7 @@ from app.ai.errors import (
     AIResponseInvalidError,
 )
 from app.ai.providers.base import AIProvider
+from app.ai.usage import UsageSink
 from app.schemas.application import (
     ApplicationDraft,
     ApplicationEvidence,
@@ -137,7 +138,9 @@ class MockAIProvider(AIProvider):
     def model(self) -> str:
         return "mock-deterministic-v1"
 
-    async def extract_resume(self, resume_text: str) -> ResumeExtraction:
+    async def extract_resume(
+        self, resume_text: str, *, usage: UsageSink | None = None
+    ) -> ResumeExtraction:
         """Extract a structured profile using deterministic pattern matching."""
         self.call_count += 1
         self.received_text_lengths.append(len(resume_text))
@@ -156,7 +159,11 @@ class MockAIProvider(AIProvider):
         return self._extract(resume_text)
 
     async def assess_field_relatedness(
-        self, field_of_study: str, allowed_fields: list[str]
+        self,
+        field_of_study: str,
+        allowed_fields: list[str],
+        *,
+        usage: UsageSink | None = None,
     ) -> FieldRelatednessAssessment:
         """Return the pinned assessment, or the conservative ``UNCERTAIN`` default."""
         self.relatedness_call_count += 1

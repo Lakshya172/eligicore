@@ -46,10 +46,50 @@ def assessment(
 
 
 def test_interface_takes_only_field_and_allowed_fields() -> None:
-    """The signature is the privacy boundary: nothing else can reach a provider."""
+    """The signature is the privacy boundary: nothing else can reach a provider.
+
+    Slice 8A added a keyword-only ``usage`` sink (ADR-026 D3), so this pins two things
+    rather than one: the **data** parameters are still exactly the field of study and the
+    permitted fields, and the only other parameter is an *output* channel — keyword-only,
+    defaulting to ``None``, and annotated as a sink. A sink carries counts outward; it is
+    not a route for a profile, an identifier or a grade to travel inward.
+    """
     for cls in (AIProvider, MockAIProvider, GeminiFlashProvider):
-        params = list(inspect.signature(cls.assess_field_relatedness).parameters)
-        assert params == ["self", "field_of_study", "allowed_fields"], cls
+        signature = inspect.signature(cls.assess_field_relatedness)
+        data_params = [
+            name
+            for name, p in signature.parameters.items()
+            if p.kind is not inspect.Parameter.KEYWORD_ONLY
+        ]
+        assert data_params == ["self", "field_of_study", "allowed_fields"], cls
+
+        extra = [
+            name
+            for name, p in signature.parameters.items()
+            if p.kind is inspect.Parameter.KEYWORD_ONLY
+        ]
+        assert extra == ["usage"], cls
+        sink = signature.parameters["usage"]
+        assert sink.default is None, cls
+        assert "UsageSink" in str(sink.annotation), cls
+        assert signature.parameters["usage"].kind is inspect.Parameter.KEYWORD_ONLY, cls
+
+
+def test_resume_extraction_takes_only_text_and_an_output_sink() -> None:
+    """The same boundary on the other instrumented method (ADR-026 D3)."""
+    for cls in (AIProvider, MockAIProvider, GeminiFlashProvider):
+        signature = inspect.signature(cls.extract_resume)
+        data_params = [
+            name
+            for name, p in signature.parameters.items()
+            if p.kind is not inspect.Parameter.KEYWORD_ONLY
+        ]
+        assert data_params == ["self", "resume_text"], cls
+        assert [
+            name
+            for name, p in signature.parameters.items()
+            if p.kind is inspect.Parameter.KEYWORD_ONLY
+        ] == ["usage"], cls
 
 
 def test_there_is_no_generic_eligibility_method() -> None:

@@ -37,6 +37,7 @@ from app.ai.errors import (
 )
 from app.ai.prompts import load_prompt
 from app.ai.providers.base import AIProvider
+from app.ai.usage import UsageSink
 from app.schemas.application import (
     ApplicationDraft,
     ApplicationEvidence,
@@ -118,6 +119,33 @@ _RELATEDNESS_SCHEMA: dict[str, Any] = {
 }
 
 
+def _record_usage(sink: UsageSink | None, raw: dict[str, Any]) -> None:
+    """Record one reply's token counts into ``sink``, if there are any to read.
+
+    Gemini reports usage in ``usageMetadata``. Provider output is untrusted, so the block is
+    read defensively and the sink itself rejects anything that is not a non-negative integer.
+    A reply with no usable metadata is recorded as **unreadable** rather than as zero: a
+    response that arrived did consume tokens, and the count being missing is not the same
+    fact as the count being nothing (ADR-026 D5).
+
+    Reads counts only. No part of the reply's content is touched, and nothing is logged here
+    — ``AIService`` is the single logging point (dossier §9.2).
+    """
+    if sink is None:
+        return
+
+    metadata = raw.get("usageMetadata")
+    if not isinstance(metadata, dict):
+        sink.record_unreadable()
+        return
+
+    sink.record(
+        prompt_tokens=metadata.get("promptTokenCount"),
+        completion_tokens=metadata.get("candidatesTokenCount"),
+        total_tokens=metadata.get("totalTokenCount"),
+    )
+
+
 class GeminiFlashProvider(AIProvider):
     """Structured resume extraction and field-relatedness assessment via the Gemini API."""
 
@@ -151,18 +179,24 @@ class GeminiFlashProvider(AIProvider):
     def model(self) -> str:
         return self._model
 
-    async def extract_resume(self, resume_text: str) -> ResumeExtraction:
+    async def extract_resume(
+        self, resume_text: str, *, usage: UsageSink | None = None
+    ) -> ResumeExtraction:
         """Extract a structured profile from resume text."""
         payload = self._build_payload(resume_text)
-        raw = await self._post_with_retries(payload)
+        raw = await self._post_with_retries(payload, usage)
         return self._parse_response(raw)
 
     async def assess_field_relatedness(
-        self, field_of_study: str, allowed_fields: list[str]
+        self,
+        field_of_study: str,
+        allowed_fields: list[str],
+        *,
+        usage: UsageSink | None = None,
     ) -> FieldRelatednessAssessment:
         """Judge whether a field of study falls within a job's permitted fields."""
         payload = self._build_relatedness_payload(field_of_study, allowed_fields)
-        raw = await self._post_with_retries(payload)
+        raw = await self._post_with_retries(payload, usage)
         data = self._response_object(raw)
         try:
             return FieldRelatednessAssessment.model_validate(data)
@@ -248,8 +282,20 @@ class GeminiFlashProvider(AIProvider):
             },
         }
 
-    async def _post_with_retries(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """POST to the API, retrying only failures that a retry could plausibly fix."""
+    async def _post_with_retries(
+        self, payload: dict[str, Any], usage: UsageSink | None = None
+    ) -> dict[str, Any]:
+        """POST to the API, retrying only failures that a retry could plausibly fix.
+
+        Retry eligibility, the attempt cap and the error translation below are unchanged by
+        usage accounting (ADR-026 D4): the sink is written to, never consulted.
+
+        Usage is recorded from **every attempt that returned a body**, and recorded here
+        rather than after validation, so tokens spent on a reply that later fails schema
+        validation or arrives truncated are still accounted for. An attempt that returned no
+        body — a timeout, a transport failure, a rejection — reports nothing, because no
+        token count was given and inventing one would be a guess, not accounting.
+        """
         url = f"{self._api_base}/models/{self._model}:generateContent"
         # The key travels as a header, never in the URL — a query string lands in access
         # logs and proxy logs (standards/security_privacy.md, privacy rules).
@@ -261,7 +307,7 @@ class GeminiFlashProvider(AIProvider):
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
             try:
-                return await self._post_once(url, headers, payload)
+                raw = await self._post_once(url, headers, payload)
             except AIProviderUnavailableError as exc:
                 # Retryable: transport failure, timeout, or 5xx.
                 last_error = exc
@@ -274,6 +320,9 @@ class GeminiFlashProvider(AIProvider):
             except AIProviderRejectedError:
                 # Not retryable: the same request produces the same rejection.
                 raise
+            else:
+                _record_usage(usage, raw)
+                return raw
 
         raise AIProviderUnavailableError(
             f"Gemini request failed after {self._max_retries + 1} attempt(s)."
