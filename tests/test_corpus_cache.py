@@ -168,3 +168,171 @@ def test_caller_errors_are_raised_on_a_warm_cache_too() -> None:
         score_jobs(ALICE, CATALOGUE, job_ids=["missing"])
     with pytest.raises(ValueError):
         score_jobs(ALICE, [job("a", ("Python",)), job("a", ("SQL",))])
+
+
+# ---------------------------------------------------------------------------------------
+# 3 & 10. The key is the fingerprint; a changed catalogue misses
+# ---------------------------------------------------------------------------------------
+
+
+def test_the_cache_key_is_exactly_the_existing_corpus_fingerprint() -> None:
+    result = score_jobs(ALICE, CATALOGUE)
+    assert CORPUS_CACHE.fingerprints() == (result.corpus_fingerprint,)
+    assert result.corpus_fingerprint == corpus_fingerprint(CATALOGUE)
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        pytest.param([*CATALOGUE[:2], job("c", ("Go",), "Operations", "logistics and scheduling")], id="terms"),
+        pytest.param([*CATALOGUE, job("d", ("Rust",), "Systems", "low level")], id="membership"),
+        pytest.param(CATALOGUE[:2], id="removal"),
+        pytest.param([CATALOGUE[1], CATALOGUE[0], CATALOGUE[2]], id="order"),
+        pytest.param([job("a2", ("Python", "SQL"), "Backend Intern", "data pipelines and reporting"), *CATALOGUE[1:]], id="identity"),
+    ],
+)
+def test_a_changed_catalogue_misses_and_is_fitted_afresh(changed: list[JobMatchInput]) -> None:
+    original = score_jobs(ALICE, CATALOGUE)
+    updated = score_jobs(ALICE, changed)
+
+    assert updated.corpus_fingerprint != original.corpus_fingerprint
+    assert len(CORPUS_CACHE) == 2, "a changed catalogue must add an entry, not replace one"
+
+    CORPUS_CACHE.clear()
+    assert full_shape(score_jobs(ALICE, changed)) == full_shape(updated)
+
+
+def test_the_old_entry_still_serves_the_old_catalogue() -> None:
+    first = score_jobs(ALICE, CATALOGUE)
+    score_jobs(ALICE, [*CATALOGUE, job("d", ("Rust",))])
+    assert full_shape(score_jobs(ALICE, CATALOGUE)) == full_shape(first)
+
+
+def test_formatting_that_leaves_terms_unchanged_still_hits() -> None:
+    """The fingerprint's semantics are unchanged by 8B, and this pins that."""
+    restated = [
+        job("a", ("python", "SQL"), "Backend Intern", "data pipelines and reporting"),
+        *CATALOGUE[1:],
+    ]
+    if corpus_fingerprint(restated) != corpus_fingerprint(CATALOGUE):
+        pytest.skip("casing changes this catalogue's terms; not a fingerprint claim to make")
+    score_jobs(ALICE, CATALOGUE)
+    score_jobs(ALICE, restated)
+    assert len(CORPUS_CACHE) == 1
+
+
+def test_no_timestamp_or_ttl_participates_in_the_key() -> None:
+    """Invalidation is the fingerprint. A second mechanism could disagree with the first.
+
+    Checked against the syntax tree rather than the text, because the class docstring says
+    the words "no TTL, no timestamp" and a substring search would match its own denial.
+    """
+    tree = ast.parse(textwrap.dedent(inspect.getsource(CorpusCache)))
+    names = {n.id.lower() for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    names |= {n.attr.lower() for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+    for forbidden in ("time", "ttl", "expire", "expiry", "datetime", "monotonic", "perf_counter", "now"):
+        assert forbidden not in names, forbidden
+
+
+# ---------------------------------------------------------------------------------------
+# 4, 5 & 6. Candidate isolation
+# ---------------------------------------------------------------------------------------
+
+
+def test_two_candidates_share_the_corpus_and_nothing_else() -> None:
+    alice_cold = score_jobs(ALICE, CATALOGUE)
+    bob_warm = score_jobs(BOB, CATALOGUE)
+    assert len(CORPUS_CACHE) == 1, "a second candidate must not add a cache entry"
+
+    CORPUS_CACHE.clear()
+    bob_cold = score_jobs(BOB, CATALOGUE)
+    assert full_shape(bob_warm) == full_shape(bob_cold)
+
+    assert [m.match_score for m in alice_cold.matches] != [m.match_score for m in bob_warm.matches]
+
+
+def test_a_candidate_cannot_reach_the_cache_key() -> None:
+    before = CORPUS_CACHE.fingerprints()
+    score_jobs(ALICE, CATALOGUE)
+    key = CORPUS_CACHE.fingerprints()[0]
+    assert before == ()
+
+    for other in (BOB, candidate(("Haskell", "Erlang"), ("entirely different history",))):
+        score_jobs(other, CATALOGUE)
+        assert CORPUS_CACHE.fingerprints() == (key,), "the key must not vary with the candidate"
+
+
+def test_the_cached_value_holds_only_catalogue_derived_fields() -> None:
+    assert {f.name for f in fields(CorpusArtifacts)} == {
+        "vectorizer",
+        "job_matrix",
+        "features",
+        "row_of",
+        "has_vocabulary",
+    }
+
+
+def test_fit_corpus_cannot_see_a_candidate() -> None:
+    """The boundary is the signature: there is no parameter a candidate could arrive in."""
+    assert list(inspect.signature(fit_corpus).parameters) == ["catalogue"]
+
+
+def test_no_candidate_marker_appears_anywhere_in_the_cache() -> None:
+    marker_skill, marker_text = "CacheMarkerSkill", "CACHE-MARKER-TEXT-8b"
+    marked = candidate((marker_skill,), (marker_text,))
+    score_jobs(marked, CATALOGUE)
+
+    corpus = CORPUS_CACHE.get_or_fit(corpus_fingerprint(CATALOGUE), lambda: fit_corpus(CATALOGUE))
+    blob = pickle.dumps(
+        (
+            sorted(corpus.vectorizer.vocabulary_),
+            list(corpus.features),
+            corpus.row_of,
+            corpus.has_vocabulary,
+            CORPUS_CACHE.fingerprints(),
+        )
+    )
+    for marker in (marker_skill, marker_text, marker_skill.lower(), "cachemarkerskill"):
+        assert marker.encode() not in blob, marker
+
+
+def test_a_candidate_id_is_not_available_to_this_layer_at_all() -> None:
+    """Matching's narrow inputs predate 8B; the cache cannot leak what never arrives."""
+    assert "candidate_id" not in {f.name for f in fields(CandidateMatchInput)}
+    assert "candidate_id" not in inspect.getsource(CorpusCache)
+    assert "candidate_id" not in inspect.getsource(fit_corpus)
+
+
+def test_the_candidate_vector_is_computed_per_call_and_never_stored() -> None:
+    """Counts transforms directly: one per scoring call, warm or cold."""
+    corpus = fit_corpus(CATALOGUE)
+    calls: list[str] = []
+    real = corpus.vectorizer.transform
+
+    def counting(documents: Any, *args: Any, **kwargs: Any) -> Any:
+        calls.extend(documents)
+        return real(documents, *args, **kwargs)
+
+    corpus.vectorizer.transform = counting  # type: ignore[method-assign]
+    CORPUS_CACHE.clear()
+    CORPUS_CACHE.get_or_fit(corpus_fingerprint(CATALOGUE), lambda: corpus)
+
+    score_jobs(ALICE, CATALOGUE)
+    assert calls == [candidate_terms(ALICE)]
+
+    score_jobs(BOB, CATALOGUE)
+    assert calls == [candidate_terms(ALICE), candidate_terms(BOB)]
+
+    score_jobs(ALICE, CATALOGUE)
+    assert calls == [candidate_terms(ALICE), candidate_terms(BOB), candidate_terms(ALICE)], (
+        "a repeated candidate must be transformed again, not served from a cache"
+    )
+
+
+def test_the_cache_stores_no_score_and_no_vector() -> None:
+    score_jobs(ALICE, CATALOGUE)
+    corpus = CORPUS_CACHE.get_or_fit(corpus_fingerprint(CATALOGUE), lambda: fit_corpus(CATALOGUE))
+    names = {f.name for f in fields(CorpusArtifacts)}
+    for forbidden in ("score", "scores", "candidate", "candidate_vector", "matches", "result"):
+        assert forbidden not in names, forbidden
+    assert corpus.job_matrix.shape[0] == len(CATALOGUE), "one row per job, none for a candidate"
