@@ -329,6 +329,16 @@ def test_the_candidate_vector_is_computed_per_call_and_never_stored() -> None:
     )
 
 
+def test_the_corpus_has_one_row_per_job_in_both_branches() -> None:
+    """Never a row for a candidate — including the no-vocabulary corpus, whose matrix is a
+    placeholder. An unused value still has a correct shape, and a wrong one is a latent bug
+    for whoever next reads it."""
+    for catalogue in (CATALOGUE, [job("x"), job("y"), job("z")], []):
+        corpus = fit_corpus(catalogue)
+        assert corpus.job_matrix.shape[0] == len(catalogue), catalogue
+        assert len(corpus.row_of) == len(catalogue), catalogue
+
+
 def test_the_cache_stores_no_score_and_no_vector() -> None:
     score_jobs(ALICE, CATALOGUE)
     corpus = CORPUS_CACHE.get_or_fit(corpus_fingerprint(CATALOGUE), lambda: fit_corpus(CATALOGUE))
