@@ -669,3 +669,137 @@ def test_slice_8c_added_no_persistence_and_no_new_logging_subsystem() -> None:
     for forbidden in ("open(", "session.add", "commit(", "logging.FileHandler", "logging.handlers"):
         assert forbidden not in source, forbidden
     assert source.count('logging.getLogger("eligicore")') == 1, "one logger, not a subsystem"
+
+
+# ---------------------------------------------------------------------------------------
+# Severity and measurement — closing the gaps that let level and timing mutants survive
+# ---------------------------------------------------------------------------------------
+
+
+def records_named(caplog: pytest.LogCaptureFixture, needle: str) -> list[logging.LogRecord]:
+    return [r for r in caplog.records if needle in r.getMessage()]
+
+
+def test_a_request_record_is_emitted_at_info_not_debug(
+    client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A request record at DEBUG is invisible in any normal deployment, which is the same
+    as not recording it. ``ELIGICORE_LOG_LEVEL`` defaults to INFO."""
+    with caplog.at_level(logging.DEBUG, logger="eligicore"):
+        client.get("/api/v1/health")
+    lines = records_named(caplog, "method=GET")
+    assert lines and all(r.levelno == logging.INFO for r in lines), [r.levelname for r in lines]
+
+
+def test_the_five_hundred_request_record_is_also_at_info(
+    client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    break_a_dependency()
+    with caplog.at_level(logging.DEBUG, logger="eligicore"):
+        client.post("/api/v1/eligibility/check", json={"profile": PROFILE, "job_ids": ["job-1"]})
+    lines = records_named(caplog, "status=500")
+    assert lines and all(r.levelno == logging.INFO for r in lines), [r.levelname for r in lines]
+
+
+def test_a_validation_record_is_at_info_and_an_unhandled_one_at_error(
+    client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.DEBUG, logger="eligicore"):
+        client.post("/api/v1/candidates/validate", json={"nonsense": True})
+    validation = records_named(caplog, "validation_failed")
+    assert validation and all(r.levelno == logging.INFO for r in validation)
+
+    caplog.clear()
+    break_a_dependency()
+    with caplog.at_level(logging.DEBUG, logger="eligicore"):
+        client.post("/api/v1/eligibility/check", json={"profile": PROFILE, "job_ids": ["job-1"]})
+    unhandled = records_named(caplog, "unhandled_exception")
+    assert unhandled and all(r.levelno == logging.ERROR for r in unhandled)
+
+
+@pytest.mark.parametrize(
+    ("name", "call"),
+    [
+        ("success", lambda c: c.get("/api/v1/health")),
+        (
+            "validation failure",
+            lambda c: c.post("/api/v1/candidates/validate", json={"nonsense": True}),
+        ),
+        ("not found", lambda c: c.get("/api/v1/jobs/missing")),
+    ],
+)
+def test_duration_is_a_measured_elapsed_time(
+    client: TestClient, name: str, call: Any
+) -> None:
+    """Bounded on both sides. Zero means the timer was never read; an enormous value means
+    it was read against the wrong origin. Both are timings that describe nothing."""
+    with Capture() as log:
+        call(client)
+    duration = float(field(log.requests()[0], "duration_ms"))
+    assert 0 < duration < 60_000, (name, duration)
+
+
+def test_the_five_hundred_duration_is_measured_too(client: TestClient) -> None:
+    break_a_dependency()
+    with Capture() as log:
+        client.post("/api/v1/eligibility/check", json={"profile": PROFILE, "job_ids": ["job-1"]})
+    duration = float(field(log.requests()[0], "duration_ms"))
+    assert 0 < duration < 60_000, duration
+
+
+def test_a_slower_request_reports_a_longer_duration(client: TestClient) -> None:
+    """The number tracks the work, rather than being a constant that happens to be in range."""
+    with Capture() as trivial:
+        client.get("/api/v1/health")
+    with Capture() as heavier:
+        client.post("/api/v1/recommendations", json={"profile": PROFILE})
+
+    assert float(field(heavier.requests()[0], "duration_ms")) > float(
+        field(trivial.requests()[0], "duration_ms")
+    )
+
+
+# ---------------------------------------------------------------------------------------
+# Error envelopes stay exactly as specified
+# ---------------------------------------------------------------------------------------
+
+
+def test_a_not_found_body_carries_the_detail_and_nothing_more(client: TestClient) -> None:
+    response = client.get("/api/v1/jobs/missing-job")
+    body = response.json()
+    assert response.status_code == 404
+    assert body["error"] == "HTTP_ERROR"
+    assert body["message"] == "Job not found."
+    assert "404" not in body["message"], "the status must not be spliced into the message"
+    assert body["request_id"]
+
+
+def test_a_prepare_not_found_body_is_the_same_shape(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/applications/prepare",
+        json={"profile": PROFILE, "job_id": "no-such-job", "questions": []},
+    )
+    assert response.status_code == 404
+    body = response.json()
+    assert body["error"] == "HTTP_ERROR"
+    assert body["message"] == "Job not found."
+    for marker in MARKERS.values():
+        assert marker not in response.text
+
+
+def test_a_validation_body_keeps_its_details_and_echoes_no_value(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/api/v1/candidates/validate",
+        json={"candidate_id": M_ID, "name": M_NAME, "email": "not-an-email"},
+    )
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"] == "VALIDATION_ERROR"
+    assert body["details"], "a validation failure must say which fields failed"
+    for detail in body["details"]:
+        assert set(detail) == {"field", "code", "message"}
+        assert detail["field"] and detail["code"]
+    for marker in (M_NAME, M_ID, "not-an-email"):
+        assert marker not in response.text, marker
