@@ -336,3 +336,201 @@ def test_the_cache_stores_no_score_and_no_vector() -> None:
     for forbidden in ("score", "scores", "candidate", "candidate_vector", "matches", "result"):
         assert forbidden not in names, forbidden
     assert corpus.job_matrix.shape[0] == len(CATALOGUE), "one row per job, none for a candidate"
+
+
+# ---------------------------------------------------------------------------------------
+# 7. Artifact immutability
+# ---------------------------------------------------------------------------------------
+
+
+def artifact_digest(corpus: CorpusArtifacts) -> str:
+    parts = [
+        pickle.dumps(sorted(corpus.vectorizer.vocabulary_.items())),
+        np.ascontiguousarray(corpus.vectorizer.idf_).tobytes() if corpus.has_vocabulary else b"",
+        corpus.job_matrix.data.tobytes(),
+        corpus.job_matrix.indices.tobytes(),
+        corpus.job_matrix.indptr.tobytes(),
+        pickle.dumps(list(corpus.features)),
+        pickle.dumps(sorted(corpus.row_of.items())),
+    ]
+    return hashlib.sha256(b"".join(parts)).hexdigest()
+
+
+def test_scoring_does_not_mutate_the_cached_artifacts() -> None:
+    """Evidence for sharing rather than copying: nothing downstream writes to these."""
+    score_jobs(ALICE, CATALOGUE)
+    corpus = CORPUS_CACHE.get_or_fit(corpus_fingerprint(CATALOGUE), lambda: fit_corpus(CATALOGUE))
+    before = artifact_digest(corpus)
+
+    for n in range(40):
+        score_jobs(candidate(("Python", "React"), (f"varied history {n}",)), CATALOGUE)
+        score_jobs(ALICE, CATALOGUE, job_ids=["a"])
+
+    assert artifact_digest(corpus) == before
+
+
+def test_the_cached_entry_is_the_same_object_across_hits() -> None:
+    """Sharing, not copying — and therefore a mutation would have been visible above."""
+    score_jobs(ALICE, CATALOGUE)
+    key = corpus_fingerprint(CATALOGUE)
+    first = CORPUS_CACHE.get_or_fit(key, lambda: pytest.fail("must not refit"))
+    second = CORPUS_CACHE.get_or_fit(key, lambda: pytest.fail("must not refit"))
+    assert first is second
+
+
+def test_the_artifact_record_is_frozen() -> None:
+    corpus = fit_corpus(CATALOGUE)
+    with pytest.raises(Exception):
+        corpus.has_vocabulary = False  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------------------
+# 8. Bounded eviction
+# ---------------------------------------------------------------------------------------
+
+
+def catalogue_number(n: int) -> list[JobMatchInput]:
+    return [job(f"j{n}", ("Python",), f"Role {n}", f"description number {n}")]
+
+
+def test_the_cache_never_exceeds_its_capacity() -> None:
+    for n in range(CORPUS_CACHE_CAPACITY * 5):
+        score_jobs(ALICE, catalogue_number(n))
+        assert len(CORPUS_CACHE) <= CORPUS_CACHE_CAPACITY
+    assert len(CORPUS_CACHE) == CORPUS_CACHE_CAPACITY
+
+
+def test_capacity_is_small_and_fixed() -> None:
+    assert 1 <= CORPUS_CACHE_CAPACITY < 10
+    assert CORPUS_CACHE.capacity == CORPUS_CACHE_CAPACITY
+
+
+def test_the_least_recently_used_entry_is_the_one_evicted() -> None:
+    cache = CorpusCache(capacity=3)
+    keys = [corpus_fingerprint(catalogue_number(n)) for n in range(4)]
+    for n in range(3):
+        cache.get_or_fit(keys[n], lambda n=n: fit_corpus(catalogue_number(n)))
+    assert cache.fingerprints() == (keys[0], keys[1], keys[2])
+
+    # Touch the oldest, making the second-oldest the least recently used.
+    cache.get_or_fit(keys[0], lambda: pytest.fail("must not refit a held entry"))
+    assert cache.fingerprints() == (keys[1], keys[2], keys[0])
+
+    cache.get_or_fit(keys[3], lambda: fit_corpus(catalogue_number(3)))
+    assert cache.fingerprints() == (keys[2], keys[0], keys[3])
+    assert keys[1] not in cache.fingerprints(), "the least recently used must go"
+
+
+def test_an_evicted_catalogue_is_refitted_and_still_correct() -> None:
+    first = score_jobs(ALICE, catalogue_number(0))
+    for n in range(1, CORPUS_CACHE_CAPACITY + 1):
+        score_jobs(ALICE, catalogue_number(n))
+    assert corpus_fingerprint(catalogue_number(0)) not in CORPUS_CACHE.fingerprints()
+
+    assert full_shape(score_jobs(ALICE, catalogue_number(0))) == full_shape(first)
+
+
+def test_eviction_leaves_the_surviving_entries_correct() -> None:
+    kept = score_jobs(ALICE, catalogue_number(99))
+    for n in range(CORPUS_CACHE_CAPACITY - 1):
+        score_jobs(ALICE, catalogue_number(n))
+        # Keep entry 99 fresh so it survives.
+        score_jobs(ALICE, catalogue_number(99))
+
+    assert corpus_fingerprint(catalogue_number(99)) in CORPUS_CACHE.fingerprints()
+    assert full_shape(score_jobs(ALICE, catalogue_number(99))) == full_shape(kept)
+
+
+def test_a_cache_of_capacity_one_still_works() -> None:
+    cache = CorpusCache(capacity=1)
+    a, b = catalogue_number(1), catalogue_number(2)
+    cache.get_or_fit(corpus_fingerprint(a), lambda: fit_corpus(a))
+    cache.get_or_fit(corpus_fingerprint(b), lambda: fit_corpus(b))
+    assert cache.fingerprints() == (corpus_fingerprint(b),)
+
+
+def test_a_capacity_below_one_is_refused() -> None:
+    for bad in (0, -1):
+        with pytest.raises(ValueError):
+            CorpusCache(capacity=bad)
+
+
+# ---------------------------------------------------------------------------------------
+# 9. Concurrency
+# ---------------------------------------------------------------------------------------
+
+
+def test_concurrent_scoring_against_one_warm_corpus_is_uncontaminated() -> None:
+    candidates = [
+        candidate(("Python", "SQL") if n % 2 else ("React", "JavaScript"), (f"history {n}",))
+        for n in range(48)
+    ]
+    serial = [full_shape(score_jobs(c, CATALOGUE)) for c in candidates]
+
+    CORPUS_CACHE.clear()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+        parallel = list(pool.map(lambda c: full_shape(score_jobs(c, CATALOGUE)), candidates))
+
+    assert parallel == serial
+    assert len(CORPUS_CACHE) == 1
+
+
+def test_a_concurrent_cold_start_converges_on_one_entry() -> None:
+    """Several requests may race to fit the same catalogue; all must agree, and none corrupt."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+        results = list(pool.map(lambda _: full_shape(score_jobs(ALICE, CATALOGUE)), range(24)))
+
+    assert len(set(results)) == 1
+    assert len(CORPUS_CACHE) == 1
+
+
+def test_concurrent_distinct_catalogues_respect_the_bound() -> None:
+    def run(n: int) -> str:
+        return score_jobs(ALICE, catalogue_number(n)).corpus_fingerprint
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+        fingerprints = list(pool.map(run, range(40)))
+
+    assert len(set(fingerprints)) == 40
+    assert len(CORPUS_CACHE) <= CORPUS_CACHE_CAPACITY
+
+
+def test_concurrent_mixed_catalogues_never_cross_wires() -> None:
+    catalogues = {n: catalogue_number(n) for n in range(3)}
+    expected = {n: full_shape(score_jobs(ALICE, cat)) for n, cat in catalogues.items()}
+    CORPUS_CACHE.clear()
+
+    def run(n: int) -> tuple[int, Any]:
+        return n, full_shape(score_jobs(ALICE, catalogues[n % 3]))
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+        for n, shape in pool.map(run, range(60)):
+            assert shape == expected[n % 3]
+
+
+# ---------------------------------------------------------------------------------------
+# Boundaries the slice must not have crossed
+# ---------------------------------------------------------------------------------------
+
+
+def test_the_cache_is_in_memory_only() -> None:
+    source = inspect.getsource(CorpusCache) + inspect.getsource(fit_corpus)
+    for forbidden in ("open(", "Path(", "redis", "Redis", "memcache", "sqlite", "session", "pickle.dump"):
+        assert forbidden not in source, forbidden
+
+
+def test_matching_still_imports_no_framework_database_or_ai_module() -> None:
+    """INV-7 and the ADR-020 boundary: 8B added a cache, not a dependency."""
+    import app.services.matching_engine as engine
+
+    source = inspect.getsource(engine)
+    for forbidden in ("fastapi", "starlette", "sqlalchemy", "app.ai", "app.models", "httpx"):
+        assert forbidden not in source, forbidden
+
+
+def test_the_capacity_is_a_constant_not_a_setting() -> None:
+    """ADR-025 D4 rejected cache configuration keys; 8B introduces none."""
+    from app.config import Settings
+
+    for name in Settings.model_fields:
+        assert "cache" not in name.lower(), name
