@@ -162,7 +162,8 @@ the single commit on `main` where that phase's merge landed.
 | **5A** | Week 5 — Deterministic Matching Engine (PR 5A) · **intermediate** | `05534af` | PR #13 (`feature/week-5-matching-engine`), merged 2026-09-17 | ✅ `test` success on `05534af` | 736 passed | **Stable** |
 | **5** | Week 5 — Matching Engine (final: PR 5A + PR 5B) | `0aaaa1d` | PR #13 (`05534af`) + PR #15 (`feature/week-5-recommendations`), merged 2026-09-19 | ✅ `test` success on `0aaaa1d` | 850 passed | **Stable** |
 | **6A** | Week 6 — Excel Export (PR 6A) · **intermediate** | `0125703` | PR #17 (`feature/week-6-excel-export`), merged 2026-09-19 | ✅ `test` success on `0125703` | 1075 passed | **Stable** |
-| **6** | Week 6 — MVP (final: PR 6A + PR 6B) | `13eb832` | PR #17 (`0125703`) + PR #19 (`feature/week-6-polish`), merged 2026-09-20 | ✅ `test` success on `13eb832` | 1133 passed | **Stable — current** |
+| **6** | Week 6 — MVP (final: PR 6A + PR 6B) | `13eb832` | PR #17 (`0125703`) + PR #19 (`feature/week-6-polish`), merged 2026-09-20 | ✅ `test` success on `13eb832` | 1133 passed | **Stable** |
+| **7** | Week 7 — Application Preparation (final: Slice 7A + Slice 7B) | `6c269a0` | PR #24 (`365e7a4`, Slice 7A) + PR #28 (`feature/week-7-application-prep`), merged 2026-09-22 | ✅ `test` success on `6c269a0` | 1358 passed | **Stable — current** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
 **Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
@@ -173,6 +174,7 @@ the single commit on `main` where that phase's merge landed.
 **Checkpoint 5 full SHA:** `0aaaa1da6fe643b8164df645113322adc889075d`
 **Checkpoint 6A full SHA:** `0125703ad9464216b1622c14941664ec32ac9bac`
 **Checkpoint 6 full SHA:** `13eb8325149cab60a039534631265803250b767a`
+**Checkpoint 7 full SHA:** `6c269a05ec1a4fdbdc7820d0c6b0b40980ba8fb3`
 
 **Checkpoint 4A is intermediate, not Checkpoint 4.** Week 4 is delivered in two PRs. 4A marks the
 verified deterministic engine; **Checkpoint 4 is reserved for Week 4 as a whole** and is
@@ -199,6 +201,147 @@ Week 5 checkpoint.
 remains recorded as the intermediate Excel-export checkpoint. **This is the dossier's declared
 safe stopping point (§15): the Phase 1 product is complete and demoable.** It is still a
 checkpoint — no release, version or tag was created.
+
+**Week 7 has no intermediate checkpoint.** Week 6 and every week before it were recorded with an
+intermediate checkpoint plus a final one. Week 7 is not: Slice 7A (the deterministic truthfulness
+validator, PR #24) was merged and verified post-merge but deliberately recorded **no checkpoint**,
+because a validator with no caller is not a state worth rolling back to. There is therefore no
+Checkpoint 7A, and **Checkpoint 7 covers Week 7 as a whole** — both slices.
+
+**Checkpoint 7 established 2026-09-22** at `6c269a0`, after Slice 7B (PR #28) was merged and
+verified. It is a checkpoint, not a release, version or tag (C-28). **Checkpoint 6 (`13eb832`)
+remains the dossier's declared safe stopping point (§15)** and stays recorded as the final Week 6
+checkpoint; Week 7 is the first enhancement week on top of it.
+
+### Checkpoint 7 — verification record (final Week 7)
+
+**Checkpoint:** Checkpoint 7 — Week 7 Application Preparation (final: Slice 7A + Slice 7B)
+**Phase:** Week 7 — Application preparation and truthfulness validation (ADR-025)
+**Commit on `main`:** `6c269a0` — the PR #28 merge commit, parents `234dabf` (previous `main`, the
+PR #29 ADR-025 correction) and `37275e5` (PR #28 branch head). Real merge; the eight PR #28
+commits are preserved.
+**Merged by:** `Lakshya172` on GitHub at 2026-09-22T12:39:36Z, after an independent 21-section
+pre-merge audit that returned APPROVED TO MERGE. The post-merge gate confirmed the merged tree is
+identical to the reviewed head `37275e5` in all fifteen changed files; the one further difference,
+`artifacts/decisions/ADR-025-week-7-application-preparation.md`, is the PR #29 correction that
+`main` gained after PR #28 branched, and is expected.
+
+**Git history of Week 7:**
+
+| Step | Merge on `main` |
+|---|---|
+| Week 7 design gate — ADR-025 (PR #23) | `c20577093b97b89469f585ac3e6b020ab0ba03c7` |
+| ADR-025 evidence-boundary correction (PR #25) | `5e906361db9680718cdc7dccdfac993ab9e96bcf` |
+| Slice 7A implementation (PR #24) — **no checkpoint** | `365e7a46737b0a1bf59334703c2a5bdd9e8e0803` |
+| Slice 7A docstring correction (PR #26) | `f5b81f0de65d28b8418b7ba0283e20a9a295cf44` |
+| Current-state documentation refresh (PR #27) | `ee9207ffdc4ebb3cfe87f7301779dad637eb4abd` |
+| ADR-025 answer-outcome correction (PR #29) | `234dabff42e6540c3ee96934c41a5d1190b6d8df` |
+| Slice 7B implementation (PR #28) — **Checkpoint 7** | `6c269a05ec1a4fdbdc7820d0c6b0b40980ba8fb3` |
+
+**Week 7 capability at this checkpoint.**
+
+*7A — truthfulness validator* (`app/services/truthfulness_validator.py`, ADR-025 D3–D9):
+deterministic and AI-free, with no FastAPI, database, filesystem or network dependency.
+Remove-by-default — a sentence survives only if every claim in it traces to the structured profile
+the caller supplied — with a structured removal list naming what was removed and why. Evidence is
+the provider-visible structured profile only, **never `resume_raw_text`** (D11, D12). Unchanged by
+Slice 7B: the merged blob `4a8572ed4428f0e8e658ee663c266cf5cea0eaf6` is byte-identical before and
+after this merge, and its six enums and `RemovedClaim` kept every member and field.
+
+*7B — application preparation* (`POST /api/v1/applications/prepare`, ADR-025 D1, D2, D10–D14):
+
+- **Stateless orchestration.** `app/services/application_prep.py` reads one catalogue job by id,
+  projects the request profile into an evidence object, asks the AI provider for a draft, passes
+  every generated string through the 7A validator, and returns only sanitized text. Nothing is
+  written: no candidate, application, evaluation or package row, no file, no cache.
+- **Contract.** One `job_id`; at most five client-supplied questions with bounded ids and text;
+  optional cover letter; word limits bounded at both ends; unknown fields rejected at every level.
+  The response carries the sanitized cover letter, one `PreparedAnswer` per question, the full
+  `removed_claims` audit list, a package `status`, a per-item confidence and an explicit
+  no-submission notice. An unknown `job_id` is a 404 carrying no profile data.
+- **Evidence boundary (D10–D12).** `build_evidence` is written field by field — no `model_dump`,
+  no `**` unpacking, no attribute iteration — so a new profile field cannot reach a provider by
+  accident. The provider sees exactly `skills`, `experience`, `projects`, `certifications` and
+  `education`; `experience` carries only `title`, `duration` and `description`, `education` only
+  `degree`, `level`, `field_of_study` and `grad_year`, and a certification only its `name`.
+  Employer names, languages, contact details, location, institution, grades, backlog count,
+  `candidate_id` and `resume_raw_text` never leave the service. Verified structurally (syntax
+  tree) and at runtime (captured provider calls against fourteen marker values).
+- **Failure semantics (ADR-025 § Failure semantics, as corrected by PR #29).** A provider error, an
+  invalid reply shape, a duplicate or unknown answer id, or an empty draft degrades the package
+  rather than failing the request. `RemovalReason.ANSWER_REQUIRES_EXCLUDED_DATA` remains defined in
+  the enum and **unused by the service**; the `REQUIRES_EXCLUDED_DATA` answer outcome is derived
+  only from actual validator output — an `EXCLUDED_DATA` removal that leaves nothing behind —
+  never guessed from the question text.
+- **Generation (D13).** The mandatory mock provider is the only implementation: deterministic,
+  conservative, and injectable into fabricating, over-length and empty modes so the sanitization
+  path is exercised. `app/ai/prompts/application_content.txt` records the reviewed prompt, with an
+  explicit BEGIN/END convention marking every data block as data and not instruction. **Live Gemini
+  generation is deferred to Week 8/9**: the Gemini method is a stub that raises
+  `AIProviderUnavailableError` and holds no transport, prompt load or key.
+- **No submission (INV-10, ADR-008).** The package is a draft. Nothing is sent, scheduled,
+  autofilled or committed on the candidate's behalf, and the notice in every response says so.
+
+**Architecture at this checkpoint:** `router → application_prep service → AI provider boundary →
+truthfulness validator`. The router holds no business logic and the service imports no FastAPI
+(INV-7); the provider is reached only through `AIService` and the ADR-004 abstraction, never a
+vendor SDK (INV-5); the validator stays the final sanitization boundary, and no path returns raw
+generated text. No new algorithm, no eligibility, matching, recommendation, ingestion or export
+change, no new model, migration, table or dependency.
+
+| Check | Result |
+|---|---|
+| PR #28 merged on GitHub | `merged: true`, `merge_commit_sha` = `6c269a05ec1a4fdbdc7820d0c6b0b40980ba8fb3` |
+| Tree on `main` vs reviewed PR head `37275e5` | **Identical** in all fifteen changed files; ADR-025 differs only by the PR #29 correction `main` already carried |
+| Scope | 15 files, +2828/−34: application schemas, the provider boundary, the mock generator, the Gemini stub, `AIService` logging, the prep service, the prompt file, the router, the OpenAPI description, one new test file and five re-aimed merged tests. No `artifacts/`, `context/`, `CHANGELOG.md`, `alembic/` or `requirements.txt` change |
+| Working tree / `origin/main` | Clean; local `main` = `origin/main` = `6c269a0`, 0 ahead / 0 behind |
+| Full suite from `main` | **1358 total — 1358 passed, 0 failed, 0 skipped**, offline |
+| Regression | The 1259 tests of Slice 7A unchanged and passing; 98 new in `tests/test_application_prep.py`; Slice 7A's own 124 intact; full flow 9 passed |
+| CI on `6c269a0` | `test` completed, conclusion `success` (run `106748013483`) |
+| Mutation testing from `main` | Week 7B **54/54** · Week 7A **42/42**; sources restored byte-identical; neither scratch suite committed |
+| API surface | Exactly **10 routes**; `POST /api/v1/applications/prepare` present once and POST-only; `/api/v1/matching/score` and `/api/v1/jobs/ingest` still absent; `/api/v1/applications/export` remains the only binary response |
+| Evidence boundary (D10–D12) | Evidence fields exactly `{skills, experience, projects, certifications, education}`; `build_evidence` has zero attribute calls and zero `*`/`**` nodes in executable code; `resume_raw_text` appears only in docstrings |
+| Slice 7A integrity | `truthfulness_validator.py` blob `4a8572ed4428f0e8e658ee663c266cf5cea0eaf6` identical before and after the merge; all six enums and `RemovedClaim` unchanged |
+| Migration chain | Unchanged — three migrations, head `b3e8d2c61a47`; no Week 7 migration; models unchanged; fresh `upgrade head` + `alembic check` clean ("No new upgrade operations detected") |
+| Tables | Exactly `jobs`, `ingestion_state` (+ `alembic_version`); no candidate, application, evaluation or package table |
+| Persistence | No `session.add/commit/flush/delete` in the prep service; database file byte-identical across a live prepare request |
+| Caching | None — no `lru_cache`, no `open(`, no cache identifier or literal in executable code (the word occurs once, in a docstring stating that nothing is cached) |
+| Privacy | Two counts-only log lines and nothing else. Name, email, phone, location, institution, CGPA, backlog count, employer, language, résumé text, question text, generated prose, removed-claim text, project name and target company all absent from every log line; the 404 body carries no profile data |
+| Dependencies | `requirements.txt` untouched; no new package |
+| Performance (local, synthetic) | p95 for a five-question package with the mock provider, pinned by test — not a production capacity claim |
+
+**Gates:** QG-001 PASS · QG-003 PASS (AI change: provider boundary, mock generation, prompt file) ·
+QG-004 PASS (new endpoint and contract) · QG-005 PASS (privacy and personal data) · QG-002 N/A (no
+eligibility change) · QG-006 N/A (no model or migration) · QG-007 N/A (no deployment) · QG-008 N/A
+(no resume-processing change).
+
+**Reviewers:** ai, security, qa, api, architect, documentation PASS — the `application_prep`
+trigger plus the API and personal-data triggers. release was not triggered (nothing deployed or
+tagged); performance was not triggered by the map (benchmark recorded above).
+
+**Known limitations:**
+- **The OpenAPI "Current status" text still reads "Weeks 1–6 of a 10-week build are complete."**
+  and two merged tests pin that sentence and reject Week 7-era wording. Correcting it touches
+  `app/main.py` and both tests, so it is deliberately kept out of this documentation-only record
+  and tracked as the next small approved change — the same handling C-32 received at Checkpoint 6.
+  The endpoint-level OpenAPI documentation for `/applications/prepare` is accurate and complete.
+- **Generation runs on the mock provider only.** The package contract, the sanitization path and
+  the failure semantics are fully exercised, but no draft has ever been produced by a live model.
+  Live Gemini generation is Week 8/9 work, and the quality of real generated prose is unverified.
+- The validator's remove-by-default rule is deliberately blunt: a true claim phrased in a way the
+  validator cannot trace to the structured profile is removed rather than reworded, so a
+  well-formed package can still come back thin. The removal list discloses every such case.
+- Carried forward: Gemini's live calls and model identifier are unverified, and the migration
+  chain has never run against PostgreSQL (both Week 9).
+
+**Deferred, explicitly:** live Gemini application generation · caching · AI cost/token logging ·
+a second AI call · AI claim extraction · résumé tailoring · PDF/DOCX rendering ·
+`/api/v1/matching/score` · `/api/v1/jobs/ingest` · application tracking/status endpoints ·
+submission, autofill and browser automation · authentication · frontend · deployment. No stub
+routes exist.
+
+**Week 8 has not started.** No branch, no caching or cost-logging code, no new provider behaviour,
+no new endpoint, and no Checkpoint 8.
 
 ### Checkpoint 6 — verification record (final Week 6 MVP)
 
