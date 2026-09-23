@@ -908,16 +908,17 @@ Notes that remove the ambiguities this registry exists to close:
 
 | Priority | Checkpoint | Commit | Role |
 |---|---|---|---|
-| **1st** | Checkpoint 6 — Week 6 MVP (final) | `13eb832` | **Current stable point.** If Week 7 introduces a regression, this is the immediate rollback reference. |
-| **2nd** | Checkpoint 6A — Week 6 Excel Export (intermediate) | `0125703` | The export without the demo path. Reached by reverting the PR #19 merge; no database step. |
-| **3rd** | Checkpoint 5 — Week 5 Matching Engine (final) | `0aaaa1d` | Last state before any Week 6 code. Reached by also reverting the PR #17 merge; no database step (`openpyxl` and `et-xmlfile` leave `requirements.txt` with it). |
-| **4th** | Checkpoint 5A — Week 5 deterministic matching engine | `05534af` | Matching engine without the recommendations endpoint. Reached by also reverting the PR #15 merge; no database step. |
-| **5th** | Checkpoint 4 — Week 4 Eligibility Intelligence | `f56d7df` | Last state before any matching code. Reached by also reverting the PR #13 merge; no database step (scikit-learn leaves `requirements.txt` with it). |
-| **6th** | Checkpoint 4A — Week 4 deterministic engine | `4a5cb84` | Deterministic eligibility without the AI stage. Reached by also reverting the PR #11 merge; no database step. |
-| **7th** | Checkpoint 3 — Week 3 | `2cfd4f0` | Last state before any eligibility code. |
-| **8th** | Checkpoint 2 — Week 2 | `91dd31d` | Known-good state before the job catalogue. |
-| **9th** | Checkpoint 1 — Week 1 | `2e79454` | Remains available indefinitely as a historical recovery point. |
-| **10th** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
+| **1st** | Checkpoint 7 — Week 7 Application Preparation (final) | `6c269a0` | **Current stable point.** If a future phase introduces a regression, this is the immediate rollback reference. |
+| **2nd** | Checkpoint 6 — Week 6 MVP (final) | `13eb832` | **Historical fallback — the dossier's declared safe stopping point (§15).** The complete demoable MVP without application preparation. Reached by reverting the PR #28 merge; no database step. |
+| **3rd** | Checkpoint 6A — Week 6 Excel Export (intermediate) | `0125703` | The export without the demo path. Reached by also reverting the PR #19 merge; no database step. |
+| **4th** | Checkpoint 5 — Week 5 Matching Engine (final) | `0aaaa1d` | Last state before any Week 6 code. Reached by also reverting the PR #17 merge; no database step (`openpyxl` and `et-xmlfile` leave `requirements.txt` with it). |
+| **5th** | Checkpoint 5A — Week 5 deterministic matching engine | `05534af` | Matching engine without the recommendations endpoint. Reached by also reverting the PR #15 merge; no database step. |
+| **6th** | Checkpoint 4 — Week 4 Eligibility Intelligence | `f56d7df` | Last state before any matching code. Reached by also reverting the PR #13 merge; no database step (scikit-learn leaves `requirements.txt` with it). |
+| **7th** | Checkpoint 4A — Week 4 deterministic engine | `4a5cb84` | Deterministic eligibility without the AI stage. Reached by also reverting the PR #11 merge; no database step. |
+| **8th** | Checkpoint 3 — Week 3 | `2cfd4f0` | Last state before any eligibility code. |
+| **9th** | Checkpoint 2 — Week 2 | `91dd31d` | Known-good state before the job catalogue. |
+| **10th** | Checkpoint 1 — Week 1 | `2e79454` | Remains available indefinitely as a historical recovery point. |
+| **11th** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
 
 **Recovering from Checkpoint 4A to Checkpoint 3 requires `alembic downgrade 7c2f1a9b4d30`**,
 which drops only `jobs.min_degree_level` (verified with existing rows preserved and the existing
