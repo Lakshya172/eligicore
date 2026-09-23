@@ -7,8 +7,15 @@ make a job eligible or ineligible. Eligibility is :mod:`app.services.eligibility
 two are combined only by a caller that consumes both (dossier §12.2, ADR-006).
 
 Pure business logic (INV-7). No FastAPI, no database, no AI, no I/O and no logging: every value
-here is derived from candidate data, and a pure function has nothing to log. Nothing is cached
-or persisted — the vectorizer, vocabulary, IDF values, vectors and scores exist for one call.
+here is derived from candidate data, and a pure function has nothing to log.
+
+**One thing is cached, and only one** (ADR-026 D7, partially superseding ADR-020 §5). The fitted
+corpus — vectorizer, job matrix, feature names and row mapping — is derived from the catalogue
+alone and is held in a small bounded in-memory cache keyed by :func:`corpus_fingerprint`. The
+candidate is **transformed, never fitted**, and that transform runs per call and is never stored:
+the fit is cached, the candidate's vector is not. No candidate value reaches the cache key or the
+cached value, nothing is written to disk or a database, and results are identical whether an entry
+was hit, missed or evicted.
 
 The algorithm is fixed by ADR-020 (match scoring) and ADR-021 (skill comparison):
 
@@ -31,7 +38,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Iterable, Sequence
+import threading
+from collections import OrderedDict
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from enum import Enum
 
@@ -428,6 +437,136 @@ def corpus_fingerprint(catalogue: Sequence[JobMatchInput]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+
+#: How many fitted corpora to keep. Deliberately small: in practice one catalogue is scored
+#: over and over, and a handful of entries covers a catalogue edit or a test suite moving
+#: between fixtures. A module constant rather than configuration — ADR-025 D4 rejected cache
+#: configuration keys, and a setting here would be a lever for widening a bounded cache into
+#: an unbounded one.
+CORPUS_CACHE_CAPACITY = 4
+
+
+@dataclass(frozen=True)
+class CorpusArtifacts:
+    """The fitted corpus: everything derived from the catalogue, and nothing else.
+
+    Every field is a function of the catalogue alone, which is what makes this cacheable at
+    all. There is no candidate field here and no parameter through which one could arrive —
+    the candidate's vector is built by the caller, per call, and never stored (ADR-026 D7).
+
+    Treated as **immutable**. Downstream scoring only reads: it slices a row from
+    ``job_matrix``, multiplies two vectors into a new one, sums, and indexes ``features``.
+    Verified against scikit-learn 1.7.2 — a fitted vectorizer's ``transform`` leaves
+    ``vocabulary_``, ``idf_`` and the matrix byte-identical, including under concurrent
+    calls — so entries are shared rather than copied. Copying without that evidence would be
+    cargo cult; mutating one would be a defect, and a test pins that nothing does.
+    """
+
+    vectorizer: TfidfVectorizer
+    job_matrix: csr_matrix
+    features: Sequence[str]
+    row_of: dict[str, int]
+    has_vocabulary: bool
+
+
+class CorpusCache:
+    """A bounded LRU of fitted corpora, keyed by corpus fingerprint.
+
+    Process-local and in-memory. No disk, no database, no external cache service and no new
+    dependency — an `OrderedDict` and a lock (ADR-026 D7).
+
+    **Invalidation is the key.** A catalogue whose membership, order or matching terms change
+    produces a different fingerprint and therefore a different entry; a stale fit cannot be
+    served because it cannot be addressed. There is no TTL, no timestamp and no manual
+    invalidation call, because each of those would be a second mechanism that could disagree
+    with the first.
+
+    The lock guards the mapping, not the fit. Two requests that miss the same key
+    concurrently may both fit; that wastes work once and is otherwise harmless, because the
+    fit is deterministic and the two results are identical. Holding the lock across a fit
+    would make one catalogue's first request block every other catalogue's.
+    """
+
+    def __init__(self, capacity: int = CORPUS_CACHE_CAPACITY) -> None:
+        if capacity < 1:
+            raise ValueError("corpus cache capacity must be at least 1")
+        self._capacity = capacity
+        self._entries: OrderedDict[str, CorpusArtifacts] = OrderedDict()
+        self._lock = threading.Lock()
+
+    @property
+    def capacity(self) -> int:
+        return self._capacity
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._entries)
+
+    def fingerprints(self) -> tuple[str, ...]:
+        """Cached keys, least recently used first. For tests and diagnostics."""
+        with self._lock:
+            return tuple(self._entries)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._entries.clear()
+
+    def get_or_fit(
+        self, fingerprint: str, fit: Callable[[], CorpusArtifacts]
+    ) -> CorpusArtifacts:
+        """Return the fitted corpus for ``fingerprint``, fitting it if it is not held."""
+        with self._lock:
+            found = self._entries.get(fingerprint)
+            if found is not None:
+                self._entries.move_to_end(fingerprint)
+                return found
+
+        built = fit()
+
+        with self._lock:
+            self._entries[fingerprint] = built
+            self._entries.move_to_end(fingerprint)
+            while len(self._entries) > self._capacity:
+                self._entries.popitem(last=False)
+        return built
+
+
+#: The process-wide cache. One catalogue is scored repeatedly, so the hit rate is the point.
+CORPUS_CACHE = CorpusCache()
+
+
+def fit_corpus(catalogue: Sequence[JobMatchInput]) -> CorpusArtifacts:
+    """Fit TF-IDF over the whole catalogue.
+
+    Exactly the work ``score_jobs`` did inline before Slice 8B, moved out so it can be cached
+    and so a test can compare a cached corpus against a freshly fitted one. The candidate is
+    not a parameter here, which is the boundary: nothing candidate-derived can enter a
+    cached value because nothing candidate-derived is in scope (ADR-020 §5, ADR-026 D7).
+    """
+    job_documents = [job_terms(job) for job in catalogue]
+    row_of = {job.job_id: row for row, job in enumerate(catalogue)}
+    has_vocabulary = any(job_documents)
+
+    if not has_vocabulary:
+        return CorpusArtifacts(
+            vectorizer=build_vectorizer(),
+            job_matrix=csr_matrix((len(catalogue), 0)),
+            features=(),
+            row_of=row_of,
+            has_vocabulary=False,
+        )
+
+    vectorizer = build_vectorizer()
+    job_matrix = vectorizer.fit_transform(job_documents).tocsr()
+    return CorpusArtifacts(
+        vectorizer=vectorizer,
+        job_matrix=job_matrix,
+        features=vectorizer.get_feature_names_out(),
+        row_of=row_of,
+        has_vocabulary=True,
+    )
+
+
 def score_jobs(
     candidate: CandidateMatchInput,
     catalogue: Sequence[JobMatchInput],
@@ -454,15 +593,22 @@ def score_jobs(
     if any(job_id not in jobs_by_id for job_id in selected):
         raise ValueError("a selected job id is not in the catalogue")
 
-    job_documents = [job_terms(job) for job in catalogue]
-    row_of = {job.job_id: row for row, job in enumerate(catalogue)}
-    has_vocabulary = any(job_documents)
+    # Computed once and used twice: as the cache key, and as the result's fingerprint. The
+    # same value must do both, or a cached corpus could be reported under a different
+    # identity than the one it was stored under.
+    fingerprint = corpus_fingerprint(catalogue)
+    corpus = CORPUS_CACHE.get_or_fit(fingerprint, lambda: fit_corpus(catalogue))
+
+    row_of = corpus.row_of
+    has_vocabulary = corpus.has_vocabulary
 
     if has_vocabulary:
-        vectorizer = build_vectorizer()
-        job_matrix = vectorizer.fit_transform(job_documents).tocsr()
-        features = vectorizer.get_feature_names_out()
-        candidate_vector = vectorizer.transform([candidate_terms(candidate)]).tocsr()
+        job_matrix = corpus.job_matrix
+        features = corpus.features
+        # **Per call, never cached.** The candidate is transformed against the catalogue's
+        # vocabulary and the result is local to this request: two candidates scored against
+        # one warm corpus share the fit and share nothing else (ADR-020 §5, ADR-026 D7).
+        candidate_vector = corpus.vectorizer.transform([candidate_terms(candidate)]).tocsr()
 
     matches: list[JobMatch] = []
     for job_id in selected:
@@ -504,7 +650,7 @@ def score_jobs(
     return MatchingResult(
         matching_version=MATCHING_VERSION,
         corpus_size=len(catalogue),
-        corpus_fingerprint=corpus_fingerprint(catalogue),
+        corpus_fingerprint=fingerprint,
         matches=tuple(matches),
     )
 
