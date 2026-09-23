@@ -402,7 +402,7 @@ async def test_gemini_without_a_key_is_a_lazy_configuration_error() -> None:
 @pytest.mark.anyio
 async def test_service_rejects_an_unvalidated_provider_result() -> None:
     class Sloppy(MockAIProvider):
-        async def assess_field_relatedness(self, field_of_study, allowed_fields):  # type: ignore[override]
+        async def assess_field_relatedness(self, field_of_study, allowed_fields, **kw):  # type: ignore[override]
             return {"result": "RELATED", "confidence": "HIGH", "reason": "trust me"}
 
     with pytest.raises(AIResponseInvalidError):

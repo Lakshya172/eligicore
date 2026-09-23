@@ -66,7 +66,11 @@ YEAR = 2027
 
 
 class SpyProvider(AIProvider):
-    """Records the exact arguments of every relatedness call, and every constructor call."""
+    """Records the exact arguments of every relatedness call, and every constructor call.
+
+    Also records the identity of the usage sink each call was handed, so a test can prove
+    AIService creates one per call rather than reusing one (ADR-026 D3).
+    """
 
     name = "spy"
     constructed = 0
@@ -74,6 +78,9 @@ class SpyProvider(AIProvider):
     def __init__(self, answer: FieldRelatednessAssessment | None = None, *, fail: bool = False) -> None:
         SpyProvider.constructed += 1
         self.calls: list[tuple[str, list[str]]] = []
+        #: ``id()`` of the usage sink handed to each call. Identities only — a sink holds
+        #: counts, and this records not even those.
+        self.sink_ids: list[int] = []
         self.answer = answer or FieldRelatednessAssessment(
             result="RELATED", confidence="MEDIUM", reason="Closely related disciplines."
         )
@@ -83,16 +90,19 @@ class SpyProvider(AIProvider):
     def model(self) -> str:
         return "spy-1"
 
-    async def extract_resume(self, resume_text: str) -> Any:
+    async def extract_resume(self, resume_text: str, *, usage: Any = None) -> Any:
         raise AssertionError("eligibility must never call resume extraction")
 
     async def generate_application_content(self, *args: Any, **kwargs: Any) -> Any:
         raise AssertionError("eligibility must never call application generation")
 
     async def assess_field_relatedness(
-        self, field_of_study: str, allowed_fields: list[str]
+        self, field_of_study: str, allowed_fields: list[str], *, usage: Any = None
     ) -> FieldRelatednessAssessment:
         self.calls.append((field_of_study, list(allowed_fields)))
+        self.sink_ids.append(id(usage))
+        if usage is not None:
+            usage.record(prompt_tokens=7, completion_tokens=3, total_tokens=10)
         if self.fail:
             raise AIProviderUnavailableError("spy failure")
         return self.answer
