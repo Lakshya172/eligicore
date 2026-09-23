@@ -13,6 +13,12 @@ tests have something stable to assert against. It deliberately does not try to b
 a mock that guesses well would hide extraction bugs behind plausible output.
 
 Failure modes are injectable so error paths are testable without a live provider.
+
+**Its token counts are arithmetic, not measurements.** The mock reports usage so the cost
+path is exercised offline, but the numbers come from :func:`_synthetic_tokens` — a fixed
+formula over the input length — and describe nothing that any model actually did. They are
+never a basis for a real cost claim, and the mock ships with no configured rate, so a cost
+figure only ever appears for it if an operator deliberately prices ``mock`` (ADR-026 D5).
 """
 
 from __future__ import annotations
@@ -25,6 +31,7 @@ from app.ai.errors import (
     AIResponseInvalidError,
 )
 from app.ai.providers.base import AIProvider
+from app.ai.usage import UsageSink
 from app.schemas.application import (
     ApplicationDraft,
     ApplicationEvidence,
@@ -56,6 +63,35 @@ _KNOWN_SKILLS = (
     "Django", "Flask", "SQL", "PostgreSQL", "MySQL", "MongoDB", "Docker",
     "Kubernetes", "AWS", "Git", "Linux", "C++", "C#", "Go", "Rust", "HTML", "CSS",
 )
+
+#: Characters per synthetic token. A round number chosen to be obviously arbitrary: the
+#: mock's counts must not resemble a real tokenizer's output closely enough to be mistaken
+#: for one (ADR-026 D3).
+_SYNTHETIC_CHARS_PER_TOKEN = 4
+#: Flat synthetic completion size. Constant, so a test can assert an exact figure.
+_SYNTHETIC_COMPLETION_TOKENS = 12
+
+
+def _synthetic_tokens(input_length: int) -> tuple[int, int]:
+    """Deterministic (prompt, completion) token counts for an input of ``input_length``.
+
+    Pure arithmetic over a length. It reports nothing about content and cannot vary between
+    runs, which is the whole point: a test asserting on cost needs a figure it can predict.
+    """
+    return input_length // _SYNTHETIC_CHARS_PER_TOKEN, _SYNTHETIC_COMPLETION_TOKENS
+
+
+def _report(sink: UsageSink | None, input_length: int) -> None:
+    """Write synthetic usage for one call into ``sink``, if there is one."""
+    if sink is None:
+        return
+    prompt, completion = _synthetic_tokens(input_length)
+    sink.record(
+        prompt_tokens=prompt,
+        completion_tokens=completion,
+        total_tokens=prompt + completion,
+    )
+
 
 _SCALE_BY_MAXIMUM = {
     4: GradeScale.SCALE_4,
@@ -92,6 +128,10 @@ class MockAIProvider(AIProvider):
         over_length: Compose items that exceed the requested word limits, to exercise the
             server-side limit enforcement that D9 requires regardless of what a provider does.
         empty: Compose whitespace-only content, to exercise the empty-output path.
+        report_usage: Whether to report synthetic token counts. ``False`` makes the mock
+            stand in for a provider that cannot report usage at all — a local model, a
+            future provider whose API omits it — so the ``unknown`` path is exercised by a
+            real provider rather than only by a hand-built sink (ADR-026 D5).
     """
 
     name = "mock"
@@ -107,6 +147,7 @@ class MockAIProvider(AIProvider):
         fabricate: str | None = None,
         over_length: bool = False,
         empty: bool = False,
+        report_usage: bool = True,
     ) -> None:
         self._fail_with = fail_with
         self._return_extraction = return_extraction
@@ -116,6 +157,7 @@ class MockAIProvider(AIProvider):
         self._fabricate = fabricate
         self._over_length = over_length
         self._empty = empty
+        self._report_usage = report_usage
         self.call_count = 0
         #: Lengths of the texts this provider was asked to process. Lengths only — never
         #: the text, so an assertion about calls can never itself leak resume content.
@@ -137,10 +179,14 @@ class MockAIProvider(AIProvider):
     def model(self) -> str:
         return "mock-deterministic-v1"
 
-    async def extract_resume(self, resume_text: str) -> ResumeExtraction:
+    async def extract_resume(
+        self, resume_text: str, *, usage: UsageSink | None = None
+    ) -> ResumeExtraction:
         """Extract a structured profile using deterministic pattern matching."""
         self.call_count += 1
         self.received_text_lengths.append(len(resume_text))
+        if self._report_usage:
+            _report(usage, len(resume_text))
 
         if self._fail_with is not None:
             raise self._fail_with
@@ -156,11 +202,19 @@ class MockAIProvider(AIProvider):
         return self._extract(resume_text)
 
     async def assess_field_relatedness(
-        self, field_of_study: str, allowed_fields: list[str]
+        self,
+        field_of_study: str,
+        allowed_fields: list[str],
+        *,
+        usage: UsageSink | None = None,
     ) -> FieldRelatednessAssessment:
         """Return the pinned assessment, or the conservative ``UNCERTAIN`` default."""
         self.relatedness_call_count += 1
         self.received_allowed_field_counts.append(len(allowed_fields))
+        if self._report_usage:
+            # Reported before the injected failure below, mirroring a real provider: a reply
+            # that arrived and then failed validation still consumed tokens (ADR-026 D4).
+            _report(usage, len(field_of_study) + sum(len(f) for f in allowed_fields))
 
         if self._fail_with is not None:
             raise self._fail_with

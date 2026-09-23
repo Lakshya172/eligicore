@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from app.ai.usage import UsageSink
 from app.schemas.application import (
     ApplicationDraft,
     ApplicationEvidence,
@@ -46,7 +47,9 @@ class AIProvider(ABC):
         """
 
     @abstractmethod
-    async def extract_resume(self, resume_text: str) -> ResumeExtraction:
+    async def extract_resume(
+        self, resume_text: str, *, usage: UsageSink | None = None
+    ) -> ResumeExtraction:
         """Extract a structured candidate profile from raw resume text.
 
         The returned object is already validated against
@@ -59,6 +62,9 @@ class AIProvider(ABC):
 
         Args:
             resume_text: Extracted plain text. **Sensitive** — must never be logged.
+            usage: Optional per-call sink for token counts. **Output only** — it carries
+                nothing into the provider, and an implementation that cannot report usage
+                leaves it untouched (ADR-026 D3).
 
         Returns:
             A validated extraction.
@@ -72,7 +78,11 @@ class AIProvider(ABC):
 
     @abstractmethod
     async def assess_field_relatedness(
-        self, field_of_study: str, allowed_fields: list[str]
+        self,
+        field_of_study: str,
+        allowed_fields: list[str],
+        *,
+        usage: UsageSink | None = None,
     ) -> FieldRelatednessAssessment:
         """Judge whether a field of study falls within a job's permitted fields.
 
@@ -87,6 +97,9 @@ class AIProvider(ABC):
         Args:
             field_of_study: The candidate's stated field. Never logged.
             allowed_fields: The job's permitted fields, as the catalogue states them.
+            usage: Optional per-call sink for token counts. **Output only**, as for
+                :meth:`extract_resume`; it widens no input channel, so the two arguments
+                above remain the whole of what a provider is told.
 
         Returns:
             A validated assessment. ``UNCERTAIN`` is always an acceptable answer.
@@ -121,6 +134,13 @@ class AIProvider(ABC):
 
         Implementations must not exceed ``limits``; the service enforces them again afterwards,
         because a limit a provider was merely asked to respect is not a limit (D9).
+
+        **This method takes no usage sink, and that is deliberate.** ADR-025 bars logging any
+        length that could characterize one candidate's content, and a token count is such a
+        length. ADR-026 D8 therefore excludes generation from cost accounting *structurally*
+        rather than behind a flag: there is no parameter for a sink to arrive through, so the
+        exclusion cannot be undone by configuration. Adding one requires its own privacy
+        decision.
 
         Args:
             evidence: The allow-listed candidate projection. Sensitive; never logged.

@@ -37,6 +37,7 @@ from app.ai.errors import (
 )
 from app.ai.prompts import load_prompt
 from app.ai.providers.base import AIProvider
+from app.ai.usage import UsageSink
 from app.schemas.application import (
     ApplicationDraft,
     ApplicationEvidence,
@@ -118,6 +119,57 @@ _RELATEDNESS_SCHEMA: dict[str, Any] = {
 }
 
 
+def _record_usage(
+    sink: UsageSink | None, raw: dict[str, Any], *, tokens_certain: bool
+) -> None:
+    """Record one reply's token counts into ``sink``, if there are any to read.
+
+    Gemini reports usage in ``usageMetadata``. Provider output is untrusted, so the block is
+    read defensively and the sink itself rejects anything that is not a non-negative integer.
+
+    ``tokens_certain`` distinguishes the two kinds of missing metadata, and the distinction
+    is load-bearing:
+
+    * **True** — a successful generation. Tokens were certainly spent, so a missing count is
+      recorded as **unreadable**: the count being absent is not the same fact as the count
+      being nothing (ADR-026 D5).
+    * **False** — an error reply. The request may never have been processed, so a missing
+      count records **nothing at all**. Marking it unreadable would be worse than the gap it
+      closes: one usage-less 429 would turn a later successful attempt's real total into
+      ``unknown``.
+
+    Reads counts only. No part of the reply's content is touched, and nothing is logged here
+    — ``AIService`` is the single logging point (dossier §9.2).
+    """
+    if sink is None:
+        return
+
+    metadata = raw.get("usageMetadata")
+    if not isinstance(metadata, dict):
+        if tokens_certain:
+            sink.record_unreadable()
+        return
+
+    sink.record(
+        prompt_tokens=metadata.get("promptTokenCount"),
+        completion_tokens=metadata.get("candidatesTokenCount"),
+        total_tokens=metadata.get("totalTokenCount"),
+    )
+
+
+def _error_body(response: httpx.Response) -> dict[str, Any]:
+    """The JSON object of an error reply, or an empty one.
+
+    An error body is frequently not JSON at all — a proxy's HTML, an empty 503. Nothing here
+    may raise: this runs on the way to raising the real error, and must not replace it.
+    """
+    try:
+        body = response.json()
+    except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
+        return {}
+    return body if isinstance(body, dict) else {}
+
+
 class GeminiFlashProvider(AIProvider):
     """Structured resume extraction and field-relatedness assessment via the Gemini API."""
 
@@ -151,18 +203,24 @@ class GeminiFlashProvider(AIProvider):
     def model(self) -> str:
         return self._model
 
-    async def extract_resume(self, resume_text: str) -> ResumeExtraction:
+    async def extract_resume(
+        self, resume_text: str, *, usage: UsageSink | None = None
+    ) -> ResumeExtraction:
         """Extract a structured profile from resume text."""
         payload = self._build_payload(resume_text)
-        raw = await self._post_with_retries(payload)
+        raw = await self._post_with_retries(payload, usage)
         return self._parse_response(raw)
 
     async def assess_field_relatedness(
-        self, field_of_study: str, allowed_fields: list[str]
+        self,
+        field_of_study: str,
+        allowed_fields: list[str],
+        *,
+        usage: UsageSink | None = None,
     ) -> FieldRelatednessAssessment:
         """Judge whether a field of study falls within a job's permitted fields."""
         payload = self._build_relatedness_payload(field_of_study, allowed_fields)
-        raw = await self._post_with_retries(payload)
+        raw = await self._post_with_retries(payload, usage)
         data = self._response_object(raw)
         try:
             return FieldRelatednessAssessment.model_validate(data)
@@ -248,8 +306,24 @@ class GeminiFlashProvider(AIProvider):
             },
         }
 
-    async def _post_with_retries(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """POST to the API, retrying only failures that a retry could plausibly fix."""
+    async def _post_with_retries(
+        self, payload: dict[str, Any], usage: UsageSink | None = None
+    ) -> dict[str, Any]:
+        """POST to the API, retrying only failures that a retry could plausibly fix.
+
+        Retry eligibility, the attempt cap and the error translation below are unchanged by
+        usage accounting (ADR-026 D4): the sink is written to, never consulted.
+
+        Usage is accumulated from **every attempt that reported any**, whether that attempt
+        succeeded or was throttled, rejected or failed with a server error — a retried call
+        may be billed for each try, and counting only the last would under-report it. It is
+        recorded before validation, so tokens spent on a reply that later fails schema
+        validation or arrives truncated are still accounted for.
+
+        An attempt that reported no usage contributes nothing: a timeout and a transport
+        failure return no body at all, and an error body need not carry a count. Nothing is
+        invented for them, because a guessed figure is worse than an honest ``unknown``.
+        """
         url = f"{self._api_base}/models/{self._model}:generateContent"
         # The key travels as a header, never in the URL — a query string lands in access
         # logs and proxy logs (standards/security_privacy.md, privacy rules).
@@ -261,7 +335,7 @@ class GeminiFlashProvider(AIProvider):
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
             try:
-                return await self._post_once(url, headers, payload)
+                raw = await self._post_once(url, headers, payload, usage)
             except AIProviderUnavailableError as exc:
                 # Retryable: transport failure, timeout, or 5xx.
                 last_error = exc
@@ -274,6 +348,9 @@ class GeminiFlashProvider(AIProvider):
             except AIProviderRejectedError:
                 # Not retryable: the same request produces the same rejection.
                 raise
+            else:
+                _record_usage(usage, raw, tokens_certain=True)
+                return raw
 
         raise AIProviderUnavailableError(
             f"Gemini request failed after {self._max_retries + 1} attempt(s)."
@@ -284,6 +361,7 @@ class GeminiFlashProvider(AIProvider):
         url: str,
         headers: dict[str, str],
         payload: dict[str, Any],
+        usage: UsageSink | None = None,
     ) -> dict[str, Any]:
         """Perform one request and translate transport errors into application errors."""
         try:
@@ -303,11 +381,23 @@ class GeminiFlashProvider(AIProvider):
                 f"Gemini transport failure ({type(exc).__name__})."
             ) from exc
 
-        return self._handle_status(response)
+        return self._handle_status(response, usage)
 
-    def _handle_status(self, response: httpx.Response) -> dict[str, Any]:
-        """Translate an HTTP status into either a payload or an application error."""
+    def _handle_status(
+        self, response: httpx.Response, usage: UsageSink | None = None
+    ) -> dict[str, Any]:
+        """Translate an HTTP status into either a payload or an application error.
+
+        An error reply is read for its usage block **before** the status is translated,
+        because raising discards the body and a rejected or throttled attempt may still
+        report what it consumed (ADR-026 D4). Nothing about the translation changes: the
+        same statuses raise the same errors under the same conditions, and an error that
+        reports no usage contributes nothing rather than a guess.
+        """
         status = response.status_code
+
+        if status >= 400:
+            _record_usage(usage, _error_body(response), tokens_certain=False)
 
         if status >= 500:
             raise AIProviderUnavailableError(f"Gemini returned server error {status}.")
@@ -320,9 +410,10 @@ class GeminiFlashProvider(AIProvider):
             raise AIProviderRejectedError(f"Gemini rejected the request ({status}).")
 
         try:
-            return response.json()
+            body = response.json()
         except (json.JSONDecodeError, ValueError) as exc:
             raise AIResponseInvalidError("Gemini response was not valid JSON.") from exc
+        return body
 
     # -- response -----------------------------------------------------------------------
 

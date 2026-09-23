@@ -13,7 +13,7 @@ from __future__ import annotations
 from enum import Enum
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,6 +35,24 @@ class AIProviderName(str, Enum):
 
     MOCK = "mock"
     GEMINI = "gemini"
+
+
+class ModelCostRate(BaseModel):
+    """What one provider's model costs, per 1000 tokens, in micro-units of currency.
+
+    **No rate is shipped in source.** Published provider pricing is a third-party fact that
+    changes, and a stale constant in a repository is a wrong number presented as a
+    measurement. Rates are supplied by whoever operates the deployment, and a model with no
+    configured rate is reported as ``cost_micros=unknown`` rather than as free (ADR-026 D5).
+
+    Integer micro-units, because a cost is an accounting figure and float drift in one is a
+    defect (``app.ai.usage.cost_micros``).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    prompt_micros_per_1k: int = Field(ge=0)
+    completion_micros_per_1k: int = Field(ge=0)
 
 
 class Settings(BaseSettings):
@@ -93,6 +111,19 @@ class Settings(BaseSettings):
     ai_timeout_seconds: float = Field(default=30.0, gt=0)
     # An unbounded retry loop against a paid API is a financial bug (standards/ai.md §7).
     ai_max_retries: int = Field(default=2, ge=0, le=5)
+
+    # --- AI cost accounting (ADR-026, dossier §9.2, §10.2) ------------------------------
+    # Maps "<provider>:<model>" to its rate, e.g.
+    #   ELIGICORE_AI_COST_RATES={"gemini:gemini-2.0-flash":
+    #                            {"prompt_micros_per_1k": 75, "completion_micros_per_1k": 300}}
+    # Empty by default and deliberately so: an unpriced model logs cost=unknown, which is
+    # honest, where a shipped default would be a guess about somebody else's price list.
+    # Operational accounting only — never a per-candidate ledger (ADR-026 D9).
+    ai_cost_rates: dict[str, ModelCostRate] = Field(default_factory=dict)
+
+    def cost_rate_for(self, provider: str, model: str) -> ModelCostRate | None:
+        """The configured rate for one provider and model, or ``None`` when unpriced."""
+        return self.ai_cost_rates.get(f"{provider}:{model}")
 
     @property
     def is_production(self) -> bool:
