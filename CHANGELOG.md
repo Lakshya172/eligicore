@@ -15,26 +15,142 @@ tag is created for it.
 
 ## [Unreleased]
 
-No work is pending. **Week 7 is in progress and has produced no checkpoint:** its design gate is
-ruled (ADR-025) and Slice 7A — the deterministic truthfulness validator — is merged (PR #24);
-Slice 7B, the application-preparation endpoint, has not started. The entry below is already
-merged on `main`; it is a follow-up to Week 6, not a new phase, and it creates no new
-checkpoint.
+No work is pending. **Week 8 has not started and is not authorized** — caching, AI cost logging
+and live Gemini application generation all await their own design gate. Week 7 is complete and
+closed at **Checkpoint 7** (`6c269a0`).
 
-### Changed — after Checkpoint 6
+### Known, tracked — after Checkpoint 7
 
-- **Final Week 6 OpenAPI status (C-32 closed).** PR #21 (`932d719`, merged 2026-09-20) replaced
-  *"Weeks 1–5 of a 10-week build are complete and Week 6 is underway"* with **"Weeks 1–6 of a
-  10-week build are complete."**, and updated the two tests that pin that sentence so they reject
-  both the stale wording and Week 7-era claims. Three files — one description string and two tests.
-  No route, schema, model, migration, dependency or behaviour change; 1133 tests passing, CI green.
-  Week 6 stays closed at **Checkpoint 6** (`13eb832`).
+- **The OpenAPI "Current status" string still reads "Weeks 1–6 of a 10-week build are complete."**
+  while Week 7 is complete. Two merged tests pin that sentence and reject Week 7-era wording, so
+  correcting it touches `app/main.py` and both tests and was deliberately kept out of the
+  documentation-only Checkpoint 7 record — the same handling C-32 received at Checkpoint 6. It is
+  tracked as the next small approved change. The endpoint-level documentation for
+  `/api/v1/applications/prepare` is accurate.
+
+---
+
+## Checkpoint 7 — Week 7: Application Preparation (final)
+
+**Date:** 2026-09-22 · **Commit on `main`:** `6c269a0` · **Status:** Stable — current
+**Produced by:** PR #24 (`365e7a4`, truthfulness validator — Slice 7A, no checkpoint of its own)
++ PR #28 (`6c269a0`, application preparation — Slice 7B)
+**Full SHA:** `6c269a05ec1a4fdbdc7820d0c6b0b40980ba8fb3` · **CI:** `test` success ·
+**Tests:** 1358 passing from `main` (0 failed, 0 skipped) · **Mutations:** 7B 54/54 · 7A 42/42 ·
+6B 23/23 · 6A 30/30 · 5B 40/40 · 5A 36/36 · Week 4 27/27
+
+Week 7 as a whole: a candidate can now ask EligiCore to prepare application material for one
+catalogue job, and gets back a draft in which **every claim that could not be traced to the
+profile they supplied has been removed rather than reworded**, with an audit list of what went and
+why. Ruled by **ADR-025** and delivered in two slices — the deterministic validator first, the
+endpoint that uses it second. **Week 6 remains the dossier's declared safe stopping point;**
+Week 7 is the first enhancement week on top of it.
+
+**This is a checkpoint, not a release. No tag and no version bump.**
+
+**Week 7 has no intermediate checkpoint.** Slice 7A deliberately recorded none — a validator with
+no caller is not a state worth rolling back to — so there is no Checkpoint 7A.
+
+### Slice 7B — application preparation (PR #28)
+
+#### Added
+
+- **`POST /api/v1/applications/prepare`** — takes one catalogue `job_id`, the candidate profile in
+  the request body and at most five client-supplied questions, and returns a sanitized cover letter
+  and per-question answers, the full `removed_claims` audit list, a package status, per-item
+  confidence and an explicit notice that **EligiCore never submits on the candidate's behalf**.
+  Stateless: nothing is written, cached or retained. An unknown `job_id` is a 404 carrying no
+  profile data.
+- **`app/services/application_prep.py`** — the orchestration: one catalogue read, one provider
+  generation call, then the Slice 7A validator on every generated string. Raw generated text never
+  reaches the response; the only paths that touch it are an emptiness check, a word count and the
+  validator call.
+- **Provider boundary `generate_application_content`** on `AIProvider` and `AIService` (ADR-004),
+  with a counts-only logging wrapper and a reply-shape guard.
+- **Deterministic conservative mock generation** — the mandatory mock provider can be injected into
+  fabricating, over-length and empty modes so the sanitization and degradation paths are exercised
+  by tests rather than asserted.
+- **`app/ai/prompts/application_content.txt`** — the reviewed prompt, kept as a file and not an
+  inline string, with a BEGIN/END convention marking every data block as data and never
+  instruction.
+- **Application preparation request/response contracts** in `app/schemas/application.py` — bounded
+  question count, id pattern and text length, bounded word limits at both ends, `extra="forbid"`
+  throughout.
+- **98 tests** in `tests/test_application_prep.py`, plus a preparation leg in the offline
+  full-flow test. 54/54 mutants caught.
+
+#### Changed
+
+- Five merged assertions were re-aimed after the provider interface grew a method — the AI
+  interface-surface test, the eligibility spy provider, the export router-dependency test, the
+  deferred-endpoints test and the full-flow status assertion. **Each was strengthened, none
+  weakened**: the deferred-endpoints test now asserts `/applications/prepare` is present rather
+  than absent, and the router-dependency test became signature-based.
+- The OpenAPI description gained the preparation endpoints and a new **"Application packages are
+  drafts"** section. The top-level "Current status" sentence was deliberately left unchanged.
+
+#### Privacy and boundaries
+
+- **The provider sees five evidence fields** — `skills`, `experience`, `projects`,
+  `certifications`, `education` — and nothing else. `experience` carries only title, duration and
+  description; `education` only degree, level, field of study and graduation year; a certification
+  only its name. **Employer names, languages, contact details, location, institution, grades,
+  backlog count, `candidate_id` and `resume_raw_text` never leave the service** (ADR-025 D10–D12).
+  The projection is written field by field — no `model_dump`, no `**` unpacking, no attribute
+  iteration — so a new profile field cannot reach a provider by accident.
+- **Two counts-only log lines.** No candidate data, question text, generated prose or removed-claim
+  text is logged anywhere.
+- **No persistence.** No candidate, application, evaluation or package table; the database file is
+  byte-identical across a prepare request.
+
+#### Not included
+
+- **No live Gemini generation** — the Gemini method is a stub that raises
+  `AIProviderUnavailableError` and holds no transport, prompt or key. Deferred to Week 8/9
+  (ADR-025 D13).
+- No caching, no AI cost or token logging, no second AI call, no AI claim extraction.
+- No eligibility, matching, recommendation, ingestion or export change. No résumé tailoring, no
+  PDF/DOCX rendering, no application tracking or status endpoint.
+- **No submission, autofill, browser automation, or CAPTCHA/OTP handling** (ADR-008, INV-10).
+- No new model, migration, table or dependency. No `/matching/score`, no `/jobs/ingest`.
+- **This PR did not itself record the checkpoint**; Checkpoint 7 was recorded separately.
+
+### Slice 7A — truthfulness validator (PR #24)
+
+Merged and verified ahead of 7B and deliberately recorded **no checkpoint**. Covered here as part
+of Week 7 as a whole.
+
+#### Added
+
+- **`app/services/truthfulness_validator.py`** — deterministic, AI-free claim validation with no
+  FastAPI, database, filesystem or network dependency. Remove-by-default: a sentence survives only
+  if every claim in it traces to the structured profile the caller supplied, and what does not
+  survive is reported as a structured removal with a reason.
+- The Slice 7A half of `app/schemas/application.py` — the removal vocabulary and `RemovedClaim`.
+- **124 tests**; 42/42 mutants caught.
+
+#### Unchanged by Slice 7B
+
+The validator blob `4a8572ed4428f0e8e658ee663c266cf5cea0eaf6` is byte-identical before and after
+the Slice 7B merge, and every enum member and `RemovedClaim` field survives. The validator remains
+the **final sanitization boundary**: it is the last thing any generated string passes through.
+
+### ADR-025 corrections merged during Week 7
+
+- **PR #25** (`5e90636`) stated the evidence boundary exactly.
+- **PR #26** (`f5b81f0`) corrected a stale `_Evidence` docstring — no executable change.
+- **PR #29** (`234dabf`) corrected the failure-semantics wording so it matches the owner's ruling:
+  `RemovalReason.ANSWER_REQUIRES_EXCLUDED_DATA` stays defined in the enum and **unused by the
+  service**, and the `REQUIRES_EXCLUDED_DATA` answer outcome is derived only from actual validator
+  output — an `EXCLUDED_DATA` removal that leaves nothing behind — never guessed from the question
+  text. The divergence was reported rather than silently resolved: the owner's decision was
+  implemented, and the ADR was corrected only once that correction was separately authorized.
 
 ---
 
 ## Checkpoint 6 — Week 6: MVP (final)
 
-**Date:** 2026-09-20 · **Commit on `main`:** `13eb832` · **Status:** Stable — current
+**Date:** 2026-09-20 · **Commit on `main`:** `13eb832` · **Status:** Stable
 **Produced by:** PR #17 (`0125703`, Excel tracker export — see Checkpoint 6A) + PR #19
 (`13eb832`, demo path and full-flow test)
 **Full SHA:** `13eb8325149cab60a039534631265803250b767a` · **CI:** `test` success ·
