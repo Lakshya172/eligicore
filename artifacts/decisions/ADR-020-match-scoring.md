@@ -85,6 +85,30 @@ job_terms(job)]` for each catalogue job in the order given. Job-side matching da
 candidate field — deterministic, and never persisted. Changed matching content, membership or
 order changes it; formatting that leaves the terms unchanged does not. No score changes.
 
+**Partially superseded 2026-09-23 (ADR-026, ruling W8-A) — Week 8 Slice 8B.** The third bullet
+above says *"Fitted once per call and discarded. No vocabulary, IDF values, vectorizer, vectors or
+scores are persisted or cached, and nothing is shared between calls."* **Only its caching and
+sharing clause is superseded**, and only for the Week 8 exception ADR-026 defines. The original
+wording is kept above as the historical record of the Week 5 decision.
+
+**What may now be cached:** the candidate-free fitted corpus artifacts — the fitted vectorizer, the
+job matrix, the feature names and the catalogue row mapping — each derived from the catalogue
+alone. They may be held in a **process-local, bounded, in-memory** cache keyed by
+`corpus_fingerprint`, which stays the cache identity. Nothing is written to the database, to disk,
+or to any external cache service.
+
+**What is unchanged.** The candidate is still **transformed, never fitted**, and the candidate
+vector and its transform remain **request-local and uncached** — the fit is cached, the candidate's
+transform never is. The vectorizer is still fitted on **every catalogue job** supplied to the call,
+so a job's score is still independent of which subset a request selects. **No candidate-derived
+value may enter the cache**, in the key or the value. Matching outputs and ordering must be
+identical cold, warm and after invalidation; a catalogue change yields a different fingerprint and
+therefore a different entry, which is what preserves the "discarded" guarantee this bullet existed
+to give.
+
+**Every other ADR-020 decision stands unchanged**, including the 2026-09-19 amendment above.
+ADR-026 is the authoritative record of the Week 8 exception and its limits.
+
 ### 6. Cosine and the score
 
 Both vectors are unit length, so `cosine = candidate_vector · job_vector`, in [0, 1] because TF-IDF
