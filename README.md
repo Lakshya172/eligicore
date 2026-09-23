@@ -48,13 +48,16 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 
 ## Project status
 
-**Pre-release development. Weeks 1–6 of a 10-week solo build complete.**
+**Pre-release development. Weeks 1–7 of a 10-week solo build complete.**
 
-Current stable checkpoint: **Checkpoint 6** (`13eb832`) — Week 6 MVP (final): the complete,
-demoable Phase 1 product. A résumé becomes a profile, the profile becomes explained eligibility
-verdicts and ranked recommendations over a 40-job synthetic catalogue, and those become an Excel
-tracker — all locally, with a mock AI provider and no candidate data stored anywhere on the
-server. **This is the dossier's declared safe stopping point; Weeks 7–10 are enhancement.**
+Current stable checkpoint: **Checkpoint 7** (`6c269a0`) — Week 7 application preparation. A
+résumé becomes a profile, the profile becomes explained eligibility verdicts and ranked
+recommendations over a 40-job synthetic catalogue, those become an Excel tracker, and a chosen
+job becomes a draft application in which every untraceable claim has been removed — all locally,
+with a mock AI provider and no candidate data stored anywhere on the server.
+
+**Checkpoint 6** (`13eb832`) — the complete, demoable Phase 1 MVP — remains the dossier's
+declared safe stopping point; Weeks 7–10 are enhancement.
 
 > **Not production-ready.** The Gemini Flash provider has not been exercised against the live
 > API — no key is configured and the test suite runs without one. The provider contract is
@@ -82,8 +85,10 @@ runs, and is tested. The authoritative, always-current state lives in
 - **Matching engine** — deterministic TF-IDF cosine similarity between a candidate's skills and experience and the job catalogue, with skill coverage, the shared terms behind each score and a template explanation. It reads no eligibility data and stores nothing.
 - **`POST /api/v1/recommendations`** — eligibility verdicts and relevance scores side by side: eligible jobs ranked by match score, borderline jobs flagged separately, ineligible and closed jobs listed with their reasons but never ranked. The two are never combined into one number. Nothing is stored.
 - **`POST /api/v1/applications/export`** — turns the tracking rows a client sends into an Excel tracker, built entirely in memory. Nothing that could run as a formula survives, and nothing is stored.
-- **1133 tests**, running offline with no credentials and no network — including a full-flow
-  integration test that walks résumé → profile → eligibility → recommendations → Excel export
+- **`POST /api/v1/applications/prepare`** — drafts a cover letter and answers to the questions a client supplies, for one catalogue job. Every claim that cannot be traced back to the supplied profile is **removed rather than reworded**, and the response lists what was removed and why. The AI provider is shown a narrow projection of the profile — skills, experience, projects, certifications, education — and never the candidate's name, contacts, employers, languages, grades or résumé text. The result is a draft for the candidate to review and send themselves: **EligiCore never submits an application.** Generation currently runs on the mock provider only. Nothing is stored.
+- **1358 tests**, running offline with no credentials and no network — including a full-flow
+  integration test that walks résumé → profile → eligibility → recommendations → application
+  preparation → Excel export
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
 - Repository workflow: branching, conventional commits, PR standard, CI, checkpoint discipline
 
@@ -102,8 +107,8 @@ asserts none exists. Uploaded resumes exist only for the duration of processing.
 | 4 | Eligibility engine — deterministic rules plus AI for ambiguity | **Complete** — deterministic engine (PR #9) + AI field relatedness (PR #11), Checkpoint 4 |
 | 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | **Complete** — matching engine (PR #13) + recommendations endpoint (PR #15), Checkpoint 5 |
 | 6 | **Polish, Excel export, testing — complete demoable MVP** | **Complete** — Excel export (PR #17, Checkpoint 6A) + demo path and full-flow test (PR #19), Checkpoint 6 |
-| 7 | Application preparation with truthfulness validation | Not started |
-| 8 | Caching and AI cost logging | Not started |
+| 7 | Application preparation with truthfulness validation | **Complete** — truthfulness validator (PR #24) + preparation endpoint (PR #28), Checkpoint 7; live provider generation deferred |
+| 8 | Caching and AI cost logging | Not started — with live Gemini application generation |
 | 9 | Documentation and deployment | Not started |
 | 10 | Buffer | Not started |
 

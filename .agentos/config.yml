@@ -21,14 +21,14 @@ project:
   api_namespace: /api/v1
   env_prefix: ELIGICORE_
   database_name: eligicore
-  phase: "Week 6 — MVP (COMPLETE, Checkpoint 6) — the declared safe stopping point"
-  next_approved_phase: "Week 7 — application preparation and truthfulness validator (not started, not authorized; begins with a design gate). /matching/score, /jobs/ingest and /applications/prepare deferred (ADR-023, ADR-024)"
+  phase: "Week 7 — Application Preparation (COMPLETE, Checkpoint 7). Week 6 (Checkpoint 6) remains the declared safe stopping point"
+  next_approved_phase: "Week 8 — caching, AI cost logging and live Gemini application generation (not started, not authorized; begins with a design gate). /matching/score and /jobs/ingest remain deferred (ADR-023, ADR-024)"
   source_of_truth: EligiCore_Dossier_update.md
   ai_provider_phase_1: gemini-flash   # ADR-013. Concrete implementation, not a dependency.
   vcs:
     remote: https://github.com/Lakshya172/eligicore
     default_branch: main
-    last_stable_checkpoint: "Checkpoint 6 — 13eb8325149cab60a039534631265803250b767a"
+    last_stable_checkpoint: "Checkpoint 7 — 6c269a05ec1a4fdbdc7820d0c6b0b40980ba8fb3"
 
 # Read at the start of every session, without exception.
 context:
