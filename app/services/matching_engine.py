@@ -593,15 +593,22 @@ def score_jobs(
     if any(job_id not in jobs_by_id for job_id in selected):
         raise ValueError("a selected job id is not in the catalogue")
 
-    job_documents = [job_terms(job) for job in catalogue]
-    row_of = {job.job_id: row for row, job in enumerate(catalogue)}
-    has_vocabulary = any(job_documents)
+    # Computed once and used twice: as the cache key, and as the result's fingerprint. The
+    # same value must do both, or a cached corpus could be reported under a different
+    # identity than the one it was stored under.
+    fingerprint = corpus_fingerprint(catalogue)
+    corpus = CORPUS_CACHE.get_or_fit(fingerprint, lambda: fit_corpus(catalogue))
+
+    row_of = corpus.row_of
+    has_vocabulary = corpus.has_vocabulary
 
     if has_vocabulary:
-        vectorizer = build_vectorizer()
-        job_matrix = vectorizer.fit_transform(job_documents).tocsr()
-        features = vectorizer.get_feature_names_out()
-        candidate_vector = vectorizer.transform([candidate_terms(candidate)]).tocsr()
+        job_matrix = corpus.job_matrix
+        features = corpus.features
+        # **Per call, never cached.** The candidate is transformed against the catalogue's
+        # vocabulary and the result is local to this request: two candidates scored against
+        # one warm corpus share the fit and share nothing else (ADR-020 §5, ADR-026 D7).
+        candidate_vector = corpus.vectorizer.transform([candidate_terms(candidate)]).tocsr()
 
     matches: list[JobMatch] = []
     for job_id in selected:
@@ -643,7 +650,7 @@ def score_jobs(
     return MatchingResult(
         matching_version=MATCHING_VERSION,
         corpus_size=len(catalogue),
-        corpus_fingerprint=corpus_fingerprint(catalogue),
+        corpus_fingerprint=fingerprint,
         matches=tuple(matches),
     )
 
