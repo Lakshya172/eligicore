@@ -462,3 +462,168 @@ async def test_mock_usage_is_deterministic() -> None:
 def test_the_mock_is_unpriced_by_default() -> None:
     """So a synthetic token count can never surface as a cost figure by accident."""
     assert Settings().cost_rate_for("mock", "mock-deterministic-v1") is None
+
+
+# ---------------------------------------------------------------------------------------
+# Exact values through the service — closing the gap that let a field swap survive
+# ---------------------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_every_logged_field_carries_its_own_value(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Each field must hold *its* number. Asserting only the total lets a swap through."""
+    with caplog.at_level(logging.INFO, logger="eligicore.ai"):
+        await AIService(MockAIProvider(), settings=priced()).extract_resume("x" * 400)
+
+    # 400 chars -> 100 prompt tokens; completion is the mock's flat 12.
+    assert field_of(caplog, "prompt_tokens") == "100"
+    assert field_of(caplog, "completion_tokens") == "12"
+    assert field_of(caplog, "total_tokens") == "112"
+    # 100 * 100 // 1000 + 12 * 400 // 1000 = 10 + 4
+    assert field_of(caplog, "cost_micros") == "14"
+
+
+@pytest.mark.anyio
+async def test_a_priced_model_logs_a_real_cost_not_unknown(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Without this, a lookup that always missed would be indistinguishable from working."""
+    with caplog.at_level(logging.INFO, logger="eligicore.ai"):
+        await AIService(MockAIProvider(), settings=priced()).extract_resume("x" * 4000)
+
+    cost = field_of(caplog, "cost_micros")
+    assert cost != "unknown"
+    assert int(cost) == 1000 * 100 // 1000 + 12 * 400 // 1000
+
+
+@pytest.mark.anyio
+async def test_cost_tracks_the_configured_rate(caplog: pytest.LogCaptureFixture) -> None:
+    """Doubling the prompt rate doubles the prompt half of the bill."""
+    costs: list[int] = []
+    for prompt_rate in (100, 200):
+        caplog.clear()
+        with caplog.at_level(logging.INFO, logger="eligicore.ai"):
+            await AIService(
+                MockAIProvider(), settings=priced(prompt=prompt_rate, completion=0)
+            ).extract_resume("x" * 4000)
+        costs.append(int(field_of(caplog, "cost_micros")))
+    assert costs[1] == 2 * costs[0] != 0
+
+
+@pytest.mark.anyio
+async def test_relatedness_logs_the_exact_synthetic_counts(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Pins that the mock measures the whole relatedness input, not just part of it."""
+    field, allowed = "A" * 40, ["B" * 40]
+    with caplog.at_level(logging.INFO, logger="eligicore.ai"):
+        await AIService(MockAIProvider(), settings=priced()).assess_field_relatedness(
+            field, allowed
+        )
+    assert field_of(caplog, "prompt_tokens") == str((40 + 40) // 4)
+    assert field_of(caplog, "completion_tokens") == "12"
+
+
+# ---------------------------------------------------------------------------------------
+# Rate lookup — closing the gap that let a key swap survive
+# ---------------------------------------------------------------------------------------
+
+
+def test_the_rate_key_is_provider_then_model_in_that_order() -> None:
+    rate = ModelCostRate(prompt_micros_per_1k=1, completion_micros_per_1k=2)
+    settings = Settings(ai_cost_rates={"alpha:beta": rate})
+    assert settings.cost_rate_for("alpha", "beta") == rate
+    assert settings.cost_rate_for("beta", "alpha") is None
+    assert settings.cost_rate_for("alpha", "") is None
+    assert settings.cost_rate_for("alpha", "beta2") is None
+
+
+def test_a_rate_for_one_model_does_not_price_another() -> None:
+    settings = priced()
+    assert settings.cost_rate_for("mock", "mock-deterministic-v1") is not None
+    assert settings.cost_rate_for("mock", "mock-deterministic-v2") is None
+    assert settings.cost_rate_for("gemini", "mock-deterministic-v1") is None
+
+
+@pytest.mark.parametrize("bad", [-1, -1000])
+def test_a_negative_rate_is_refused_by_configuration(bad: int) -> None:
+    """Rejected at the boundary, not merely survived by the arithmetic downstream."""
+    with pytest.raises(ValueError):
+        ModelCostRate(prompt_micros_per_1k=bad, completion_micros_per_1k=1)
+    with pytest.raises(ValueError):
+        ModelCostRate(prompt_micros_per_1k=1, completion_micros_per_1k=bad)
+
+
+def test_a_rate_rejects_unknown_keys_and_is_frozen() -> None:
+    with pytest.raises(ValueError):
+        ModelCostRate(prompt_micros_per_1k=1, completion_micros_per_1k=1, currency="USD")
+    rate = ModelCostRate(prompt_micros_per_1k=1, completion_micros_per_1k=1)
+    with pytest.raises(ValueError):
+        rate.prompt_micros_per_1k = 5  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------------------
+# is_unknown is about *all* fields
+# ---------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "usage",
+    [
+        AIUsage(prompt_tokens=1),
+        AIUsage(completion_tokens=1),
+        AIUsage(total_tokens=1),
+        AIUsage(prompt_tokens=0),
+    ],
+)
+def test_partial_usage_is_not_unknown(usage: AIUsage) -> None:
+    """One known field means something was learned; "unknown" would overstate the loss."""
+    assert not usage.is_unknown
+
+
+def test_only_a_wholly_empty_usage_is_unknown() -> None:
+    assert AIUsage().is_unknown
+    assert not AIUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0).is_unknown
+
+
+# ---------------------------------------------------------------------------------------
+# Gemini's reader, directly
+# ---------------------------------------------------------------------------------------
+
+
+def test_record_usage_marks_a_missing_metadata_block_unreadable() -> None:
+    """Not merely "records nothing": a prior attempt's total must be invalidated too."""
+    from app.ai.providers.gemini import _record_usage
+
+    sink = UsageSink()
+    sink.record(prompt_tokens=10, completion_tokens=2, total_tokens=12)
+    _record_usage(sink, {"candidates": []})
+    assert sink.usage == AIUsage()
+
+
+@pytest.mark.parametrize("metadata", [None, "none", 7, [], {"promptTokenCount": None}])
+def test_record_usage_survives_any_shape_of_metadata(metadata: Any) -> None:
+    from app.ai.providers.gemini import _record_usage
+
+    sink = UsageSink()
+    _record_usage(sink, {"usageMetadata": metadata} if metadata is not None else {})
+    assert sink.usage == AIUsage()
+
+
+def test_record_usage_without_a_sink_does_nothing() -> None:
+    from app.ai.providers.gemini import _record_usage
+
+    _record_usage(None, {"usageMetadata": USAGE})
+
+
+@pytest.mark.anyio
+async def test_gemini_resume_extraction_reports_usage_too() -> None:
+    """Both instrumented operations must be wired, not just the one with more tests."""
+    payload = {"name": "Test Candidate", "skills": ["Python"], "field_confidence": {}}
+    sink = UsageSink()
+    await _gemini(lambda r: _reply(payload, USAGE), max_retries=0).extract_resume(
+        RESUME, usage=sink
+    )
+    assert sink.usage == AIUsage(prompt_tokens=120, completion_tokens=30, total_tokens=150)
