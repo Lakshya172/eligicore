@@ -192,12 +192,38 @@ async def request_context_middleware(
     Logged: request id, method, path, status, duration. Deliberately not logged: request
     body, query values, headers, or anything else that could carry candidate data (INV-4,
     ``standards/security_privacy.md`` §2).
+
+    **Every request is recorded, including one that ends in an unhandled exception.**
+    Starlette's ``ServerErrorMiddleware`` — which turns that exception into the 500 — sits
+    *outside* this middleware, so the exception travels back through ``call_next`` and the
+    ordinary log call below is never reached. Without the ``except`` branch, the request
+    record would be systematically blind to exactly the requests an operator most needs to
+    see (dossier §10.2, ADR-026 D10).
+
+    The branch logs and re-raises. It handles nothing, changes no response, and leaves the
+    500 to :func:`unhandled_exception_handler` exactly as before; the two lines carry the
+    same ``request_id`` and are the two different records §10.2 names — a request count and
+    an error record — for one request, as already happens for a 422.
     """
     request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
     request.state.request_id = request_id
 
     started = time.perf_counter()
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception:
+        # The status this request will return. Nothing about the exception is logged here:
+        # its type is the error record's business, and its message may carry candidate data.
+        logger.info(
+            "request_id=%s method=%s path=%s status=%s duration_ms=%.1f",
+            request_id,
+            request.method,
+            request.url.path,
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            (time.perf_counter() - started) * 1000,
+        )
+        raise
+
     elapsed_ms = (time.perf_counter() - started) * 1000
 
     logger.info(
