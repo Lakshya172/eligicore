@@ -15,24 +15,169 @@ tag is created for it.
 
 ## [Unreleased]
 
-No work is pending. **Week 8 has not started and is not authorized** — caching, AI cost logging
-and live Gemini application generation all await their own design gate. Week 7 is complete and
-closed at **Checkpoint 7** (`6c269a0`).
+No work is pending. **Week 9 has not started and is not authorized** — documentation and
+deployment await their own design gate. Week 8 is complete and closed at **Checkpoint 8**
+(`9aba1f2`).
 
-### Known, tracked — after Checkpoint 7
+### Known, tracked — after Checkpoint 8
 
+- **AI cost coverage excludes the application-generation path, by design.** Week 8 instruments
+  `extract_resume` and `assess_field_relatedness` only. `generate_application_content` is excluded
+  **structurally** — no usage sink is threaded through it and there is no setting that could
+  enable one (ADR-026 D8) — because ADR-025's merged generation-logging rule stands verbatim and a
+  token count is a length that could characterize one candidate's content. **Week 8 is not
+  complete cost coverage.** That path becomes material only when live application generation is
+  separately approved, and it will need its own explicit privacy decision then.
+- **Live Gemini application generation remains deferred.** Nothing was added in Week 8; the Gemini
+  generation method is still a stub, and no claim of live generation is made anywhere.
+- **No benchmarked speed-up is claimed for the corpus cache.** Slice 8B is verified
+  output-identical cold, warm and after invalidation; it was not benchmarked, and no latency
+  figure is recorded.
 - **The OpenAPI "Current status" string still reads "Weeks 1–6 of a 10-week build are complete."**
-  while Week 7 is complete. Two merged tests pin that sentence and reject Week 7-era wording, so
-  correcting it touches `app/main.py` and both tests and was deliberately kept out of the
-  documentation-only Checkpoint 7 record — the same handling C-32 received at Checkpoint 6. It is
-  tracked as the next small approved change. The endpoint-level documentation for
-  `/api/v1/applications/prepare` is accurate.
+  while Weeks 7 and 8 are complete. Two merged tests pin that sentence, so correcting it touches
+  `app/main.py` and both tests and was deliberately kept out of the documentation-only Checkpoint 8
+  record — the same handling C-32 received at Checkpoint 6 and Checkpoint 7. It is tracked as the
+  next small approved change. The endpoint-level documentation is accurate.
+
+---
+
+## Checkpoint 8 — Week 8: Refinement, Caching and Cost Logging (final)
+
+**Date:** 2026-09-24 · **Commit on `main`:** `9aba1f2` · **Status:** Stable — current
+**Produced by:** PR #34 (`e5d6d36`, cost/usage accounting — Slice 8A, no checkpoint of its own)
++ PR #35 (`f3fbf35`, corpus vectorizer cache — Slice 8B, no checkpoint of its own)
++ PR #36 (`9aba1f2`, operational-log completeness — Slice 8C)
+**Full SHA:** `9aba1f2b1007b0931ec9adc39afb88b15eaa2c14` · **CI:** `test` success on all three
+merges · **Tests:** 1549 passing from `main` (0 failed, 0 skipped) ·
+**Mutations:** 230/230 — 8C 32/32 · 8B 34/34 · 8A 68/68 · 7B 54/54 · 7A 42/42
+
+Week 8 as a whole: EligiCore now knows what its AI calls cost, stops re-fitting the same job
+catalogue on every request, and records every inbound request — including the ones that end in an
+unhandled exception, which it had been silently missing. Ruled by **ADR-026** and delivered in
+three slices, **every one of them behaviour-preserving**: no endpoint, route, schema, contract,
+verdict, score or response body changed, and every existing response stays byte-identical.
+
+**This is a checkpoint, not a release. No tag and no version bump.**
+
+**Week 8 has no intermediate checkpoint.** None of the three slices recorded one — each is
+behaviour-preserving on its own, so the intermediate states are not distinct rollback destinations
+— and there is no Checkpoint 8A, 8B or 8C.
+
+### Slice 8A — cost and usage accounting (PR #34)
+
+#### Added
+
+- **`app/ai/usage.py`** — `AIUsage`, a per-call `UsageSink`, and cost arithmetic in integer
+  micro-units. **One sink per call, never provider state**: `eligibility_ai` fans assessments out
+  through `asyncio.gather`, and shared mutable provider state would race and mis-attribute cost on
+  exactly the path this slice covers (ADR-026 D3).
+- **Token and cost logging on `extract_resume` and `assess_field_relatedness`**, on both the
+  success and the error path — provider, model, operation, outcome, prompt/completion/total tokens,
+  cost and duration.
+- **Usage accumulation across retries** (D4). A Gemini call that fails twice and succeeds on the
+  third consumed tokens three times. The usage on a retryable error body is read *before* the error
+  is translated. Discovered by a post-merge audit and fixed in `0d2689c`: the first implementation
+  raised on 429/5xx before reading the body, so three attempts reported one attempt's tokens.
+- **`ModelCostRate` configuration** keyed `provider:model`, with an **empty default table** — no
+  external provider price is hard-coded anywhere (D5). Published pricing is a third-party fact that
+  changes, and a stale constant in source would be a fabricated figure presented as a measurement.
+- **Deterministic synthetic usage from the mock provider**, switchable off, so the unknown path is
+  exercised rather than asserted.
+
+#### Behaviour
+
+- **Unknown means unknown.** An unknown provider or model, a missing rate, or absent, partial or
+  malformed usage yields `unknown` — and prompt, completion and total tokens each degrade
+  **independently**.
+- **Accounting can never change an AI outcome** (D6). Every accounting path is wrapped; a defect in
+  it logs `unknown` and is otherwise inert.
+- **Operational log records only** (D9). No cost table, no ledger, no migration, and **no
+  `candidate_id` in any cost record** — a per-candidate cost ledger would be candidate persistence
+  wearing an accounting hat.
+
+#### Not included
+
+- **No cost or usage accounting on `generate_application_content`** — see the limitation above and
+  ADR-026 D8. The exclusion is structural: the call has no usage parameter at all.
+
+### Slice 8B — candidate-free corpus vectorizer cache (PR #35)
+
+#### Added
+
+- **A process-local, bounded, in-memory LRU of capacity 4** in `app/services/matching_engine.py`,
+  holding the fitted vectorizer, the job matrix, the feature names and the catalogue row mapping —
+  every one of them derived from the catalogue alone.
+- **Keyed by the existing `corpus_fingerprint`**, which is an exact determinant of the fit rather
+  than a heuristic: it hashes each catalogue job's id and terms in order, precisely the inputs that
+  decide the fit and the row mapping.
+
+#### Behaviour
+
+- **The candidate is never cached.** `vectorizer.transform(candidate_terms(...))` stays
+  per-request, every time. The fit is cached; the candidate's transform is not — that single
+  boundary is the whole privacy argument for this slice, and ADR-020's rule that the candidate is
+  transformed and never fitted is preserved exactly.
+- **Output-identical**: cold, warm and after invalidation. A catalogue change produces a different
+  fingerprint and a miss.
+- No Redis, no disk, no external cache service, **no new dependency and no cache configuration
+  key** — the bound is a module constant, so there is no setting whose default could later be
+  widened into a policy change.
+
+#### Recorded
+
+- **ADR-020 §5 is superseded in part** by ADR-026, recorded explicitly in PR #33 (`dc0a759`) as an
+  owner-ruled supersession that preserves the original historical wording rather than rewriting it.
+
+### Slice 8C — operational-log completeness (PR #36)
+
+#### Fixed
+
+- **A request that ends in an unhandled exception now emits its request record.** Starlette's
+  `ServerErrorMiddleware` — which turns an unhandled exception into the 500 — sits *outside* the
+  request middleware, so the exception travelled back through `call_next` and the log call after it
+  never ran. The request count was systematically blind to exactly the requests an operator most
+  needs to see. Eight lines, in `app/main.py`; it handles nothing, changes no response, and leaves
+  the 500 to the existing handler.
+- **Nothing about the exception is logged there.** Its type is the error record's business, and its
+  message can carry candidate data.
+
+#### Verified, not changed
+
+- Request counts on success, 404, 405 and 422; error records for validation failures and unhandled
+  exceptions; the Slice 8A cost records through a real endpoint. A 4xx `HTTPException` deliberately
+  gets no second, dedicated error line — its request record carries the status.
+- **AI provider retries are outbound and never reach the middleware**: three retry attempts produce
+  zero inbound request records.
+
+### Privacy and boundaries (all three slices)
+
+- **No `candidate_id` in any cost, usage or error record.** No PII in any log line — fourteen
+  markers asserted absent across seven paths.
+- **No candidate-derived cache, no generated-prose cache, no résumé-content retention.**
+- **No persistence added.** No cost, usage, ledger, candidate, application, evaluation or package
+  table; tables remain exactly `jobs` and `ingestion_state` (plus `alembic_version`).
+- **The generation path emits no token, length or cost field** — verified structurally on the
+  syntax tree, and at runtime through a live prepare request.
+- **No submission, autofill, browser automation or CAPTCHA/OTP handling** (ADR-008, INV-10).
+- Deterministic eligibility authority is unchanged (ADR-017, ADR-019); so are matching,
+  recommendations, export and preparation.
+
+### Not included
+
+- No live Gemini application generation, and no new AI provider.
+- No endpoint, route, schema or contract change — **10 routes, OpenAPI byte-identical**.
+- No new model, migration, table or dependency — `requirements.txt` untouched across all three
+  slices.
+- No spaCy fallback, no résumé extraction-accuracy measurement, no matching or recommendation
+  tuning, no metrics or admin endpoint, no frontend, no deployment, no authentication, no rate
+  limiting.
+- **These PRs did not record the checkpoint**; Checkpoint 8 was recorded separately.
 
 ---
 
 ## Checkpoint 7 — Week 7: Application Preparation (final)
 
-**Date:** 2026-09-22 · **Commit on `main`:** `6c269a0` · **Status:** Stable — current
+**Date:** 2026-09-22 · **Commit on `main`:** `6c269a0` · **Status:** Stable
 **Produced by:** PR #24 (`365e7a4`, truthfulness validator — Slice 7A, no checkpoint of its own)
 + PR #28 (`6c269a0`, application preparation — Slice 7B)
 **Full SHA:** `6c269a05ec1a4fdbdc7820d0c6b0b40980ba8fb3` · **CI:** `test` success ·
