@@ -11,15 +11,15 @@
 
 | Field | Value |
 |---|---|
-| **Date** | 2026-09-23 |
-| **Phase** | **Week 7 — Application preparation · COMPLETE.** Slice 7A (deterministic truthfulness validator) and Slice 7B (`POST /api/v1/applications/prepare`) are both **complete and merged**, recorded as **Checkpoint 7**. Week 6 remains the dossier's declared safe stopping point (§15); Week 7 is the first enhancement week on top of it. **Week 8 is NOT started and NOT authorized.** |
-| **Roadmap position** | **Weeks 1–7 complete and merged.** Week 6 delivered as PR 6A (Checkpoint 6A) + PR 6B (Checkpoint 6). Week 7 delivered as Slice 7A (PR #24, no checkpoint) + Slice 7B (PR #28, **Checkpoint 7**), on the design gate ruled in **ADR-025** (PR #23, amended by PR #25 and PR #29). **Weeks 8–10 NOT started.** `/matching/score` and HTTP `/jobs/ingest` remain explicitly deferred (C-25, ADR-023 §11, ADR-024); live Gemini application generation, caching and AI cost logging remain deferred to Weeks 8/9 (ADR-025 D13). |
-| **Health** | 🟢 GREEN — 1358 tests passing on `main`; mutations 54/54 (7B), 42/42 (7A), 23/23 (6B), 30/30 (6A), 40/40 (5B), 36/36 (5A), 27/27 (Week 4); CI green on `6c269a0`; live privacy sweep clean; no open blockers |
+| **Date** | 2026-09-24 |
+| **Phase** | **Week 8 — Refinement, caching and cost logging · COMPLETE.** Slice 8A (cost/usage accounting), Slice 8B (candidate-free corpus vectorizer cache) and Slice 8C (operational-log completeness) are all **complete and merged**, recorded as **Checkpoint 8**. Week 6 remains the dossier's declared safe stopping point (§15); Weeks 7 and 8 are enhancement on top of it. **Week 9 is NOT started and NOT authorized.** |
+| **Roadmap position** | **Weeks 1–8 complete and merged.** Week 7 delivered as Slice 7A (PR #24, no checkpoint) + Slice 7B (PR #28, **Checkpoint 7**) on **ADR-025**. Week 8 delivered as Slice 8A (PR #34), Slice 8B (PR #35) and Slice 8C (PR #36, **Checkpoint 8**) on the design gate ruled in **ADR-026** (PR #32, with ADR-020 §5's partial supersession recorded in PR #33) — **none of the three slices recorded a checkpoint of its own**. **Weeks 9–10 NOT started.** `/matching/score` and HTTP `/jobs/ingest` remain explicitly deferred (C-25, ADR-023 §11, ADR-024); **live Gemini application generation remains deferred** and was not implemented in Week 8. |
+| **Health** | 🟢 GREEN — 1549 tests passing on `main`; mutations **230/230** re-verified from a clean tree — 32/32 (8C), 34/34 (8B), 68/68 (8A), 54/54 (7B), 42/42 (7A) — plus 23/23 (6B), 30/30 (6A), 40/40 (5B), 36/36 (5A), 27/27 (Week 4); CI green on `e5d6d36`, `f3fbf35` and `9aba1f2`; live privacy sweep clean; no open blockers |
 | **Stable branch** | `main` |
-| **Current checkpoint** | **Checkpoint 7** — Week 7 Application Preparation (final) — `6c269a05ec1a4fdbdc7820d0c6b0b40980ba8fb3`, which is also the current head of `main`. Checkpoint 6 (`13eb832`) remains recorded as the final Week 6 checkpoint and the declared safe stopping point. **Week 7 has no intermediate checkpoint: there is no Checkpoint 7A**, because Slice 7A deliberately recorded none. **There is no Checkpoint 8.** |
-| **Produced by** | PR #24 (`365e7a4`, Slice 7A truthfulness validator) + PR #28 (`6c269a0`, Slice 7B application preparation), both **MERGED**. Checkpoint 6 (`13eb832`) remains the final Week 6 checkpoint and Checkpoint 6A (`0125703`) the intermediate one. |
-| **Rollback target** | Checkpoint 7 first; Checkpoint 6 by reverting PR #28 (no database step); Checkpoint 6A by also reverting PR #19 (no database step); Checkpoint 5 by also reverting PR #17 (no database step); Checkpoint 5A by also reverting PR #15 (no database step); Checkpoint 4 by also reverting PR #13; Checkpoint 4A by also reverting PR #11; Checkpoint 3 also needs `alembic downgrade 7c2f1a9b4d30`; below Checkpoint 3 also needs `alembic downgrade base`. |
-| **Next milestone** | **Week 8 — caching and AI cost logging. NOT started and NOT authorized**; it begins only on explicit instruction, after its own design gate. Live Gemini application generation is deferred to the same window (ADR-025 D13). Everything after Week 6 is enhancement (dossier §15). |
+| **Current checkpoint** | **Checkpoint 8** — Week 8 Refinement, Caching and Cost Logging (final) — `9aba1f2b1007b0931ec9adc39afb88b15eaa2c14`, which is also the current head of `main`. Checkpoint 7 (`6c269a0`) is now historical; Checkpoint 6 (`13eb832`) remains recorded as the final Week 6 checkpoint and the declared safe stopping point. **Week 8 has no intermediate checkpoint: there is no Checkpoint 8A, 8B or 8C**, because none of the three slices recorded one. **There is no Checkpoint 9.** |
+| **Produced by** | PR #34 (`e5d6d36`, Slice 8A cost/usage accounting) + PR #35 (`f3fbf35`, Slice 8B corpus cache) + PR #36 (`9aba1f2`, Slice 8C operational-log completeness), all three **MERGED**. Checkpoint 7 (`6c269a0`) remains the final Week 7 checkpoint and Checkpoint 6 (`13eb832`) the final Week 6 one. |
+| **Rollback target** | Checkpoint 8 first; Checkpoint 7 by reverting the Week 8 merges as appropriate — PR #36, then PR #35, then PR #34 (no database step: Week 8 added no migration and no dependency); Checkpoint 6 by also reverting PR #28 (no database step); Checkpoint 6A by also reverting PR #19 (no database step); Checkpoint 5 by also reverting PR #17 (no database step); Checkpoint 5A by also reverting PR #15 (no database step); Checkpoint 4 by also reverting PR #13; Checkpoint 4A by also reverting PR #11; Checkpoint 3 also needs `alembic downgrade 7c2f1a9b4d30`; below Checkpoint 3 also needs `alembic downgrade base`. |
+| **Next milestone** | **Week 9 — documentation and deployment. NOT started and NOT authorized**; it begins only on explicit instruction, after its own design gate. Live Gemini application generation remains deferred and is not scheduled by any merged decision. Everything after Week 6 is enhancement (dossier §15). |
 | **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
@@ -86,6 +86,13 @@
 | **Week 7 Slice 7A — truthfulness validator** *(merged, PR #24)* | `app/services/truthfulness_validator.py` and `app/schemas/application.py` — deterministic, AI-free, framework-free claim validation; remove-by-default with a structured removal list; evidence is the provider-visible structured profile only, never `resume_raw_text` (ADR-025 D11, D12). No route, schema-for-request, model, migration, dependency or AI change, and **no checkpoint**. |
 | **Week 7 Slice 7A — tests** *(merged, PR #24)* | 124 new (1259 total); 1135 existing unchanged. 42/42 mutations caught. Docs-only PR #26 (`f5b81f0`) then corrected a stale `_Evidence` docstring with no executable change (AST identical ignoring docstrings). |
 | **Week 7 Slice 7B — application preparation** *(merged, PR #28)* | `POST /api/v1/applications/prepare` — `app/services/application_prep.py` orchestrates one catalogue read, one provider generation call and the Slice 7A validator, returning only sanitized text with a full removal audit and an explicit no-submission notice. Provider boundary `generate_application_content` added to `AIProvider`/`AIService`; deterministic conservative mock generation with injectable fabricating, over-length and empty modes; reviewed prompt file. Gemini generation is a stub (deferred to Week 8/9, D13). No persistence, cache, migration, table or dependency. Recorded as **Checkpoint 7**. |
+| **Week 8 design gate** | Approved 2026-09-23; W8-A..W8-H ruled and recorded as **ADR-026** (PR #32), with ADR-020 §5's partial supersession recorded separately in PR #33 so the historical wording is preserved rather than rewritten. Week 8 is exactly three behaviour-preserving slices: 8A, 8B, 8C. |
+| **Week 8 Slice 8A — cost and usage accounting** *(merged, PR #34)* | `app/ai/usage.py` (new) — `AIUsage`, a per-call `UsageSink` and integer micro-unit cost arithmetic; `extract_resume` and `assess_field_relatedness` log tokens and cost on both success and error paths; Gemini reports usage across retries, reading a retryable error body before translating it; the mock reports deterministic synthetic usage; `ModelCostRate` configuration with an **empty default** so no external price is hard-coded. **`generate_application_content` gained no usage parameter — the exclusion is structural** (ADR-026 D8). No endpoint, schema, contract, model, migration or dependency change. |
+| **Week 8 Slice 8A — tests** *(merged, PR #34)* | 87 new across `tests/test_ai_cost_accounting.py` and `tests/test_ai_cost_privacy.py` (1445); a retry-accounting audit then found and fixed a real gap — usage on a 429/5xx body was discarded before it could be read (`0d2689c`) — and added 17 more (1462 total). Two merged test files were re-aimed and strengthened when the provider signature grew a keyword-only `usage` parameter; none was weakened. 68/68 mutations caught. |
+| **Week 8 Slice 8B — corpus vectorizer cache** *(merged, PR #35)* | `CorpusArtifacts`, `CorpusCache` and `fit_corpus` in `app/services/matching_engine.py` — a process-local, bounded, in-memory LRU of **capacity 4**, keyed by the existing `corpus_fingerprint`, holding only catalogue-derived fitted artifacts. **The candidate transform stays per-request and is never cached.** No configuration key, no disk, no external cache service, no new dependency. An output-identical optimization: cold, warm and post-invalidation results are identical. |
+| **Week 8 Slice 8B — tests** *(merged, PR #35)* | 43 new in `tests/test_corpus_cache.py` (1505 total) — cold/warm equivalence, fingerprint invalidation, candidate isolation, bounded eviction and artifact immutability. 34/34 mutations caught. |
+| **Week 8 Slice 8C — operational-log completeness** *(merged, PR #36)* | One production gap, closed in eight lines of `app/main.py`: a request that ends in an unhandled exception now emits its request record before the exception propagates. Starlette's `ServerErrorMiddleware` sits outside the request middleware, so the request count had been systematically blind to exactly those requests. Nothing about the exception is logged there. Recorded as **Checkpoint 8**. |
+| **Week 8 Slice 8C — tests** *(merged, PR #36)* | 44 new in `tests/test_operational_logs.py` (1549 total) — request-count completeness across seven paths, error-record content, the Slice 8A regression, the generation boundary verified on the syntax tree, and a fourteen-marker privacy sweep. 32/32 mutations caught. |
 | **Week 7 Slice 7B — tests** *(merged, PR #28)* | 98 new (1358 total); five merged assertions re-aimed and strengthened after the provider interface grew, none weakened. 54/54 mutations caught; Slice 7A's 42/42 preserved. ADR-025's failure-semantics wording was corrected by docs-only PR #29 (`234dabf`) before the merge, not during implementation. |
 
 ## Partial
@@ -115,7 +122,7 @@
 | Deterministic **eligibility** test suite (boundary/missing/invalid per constraint) | 4 | **COMPLETE** — PR #9 |
 | Truthfulness validator (deterministic service, no endpoint) | 7 | **COMPLETE** — PR #24, Slice 7A (ADR-025); no checkpoint of its own — covered by Checkpoint 7 |
 | Application preparation endpoint (`POST /api/v1/applications/prepare`) | 7 | **COMPLETE** — PR #28, Slice 7B, Checkpoint 7 (ADR-025); mock generation only, live Gemini deferred |
-| Caching, AI cost logging | 8 | NOT STARTED — with live Gemini application generation (ADR-025 D13) |
+| Caching, AI cost logging | 8 | **COMPLETE** — PR #34 (8A cost/usage accounting) + PR #35 (8B corpus cache) + PR #36 (8C operational logs), Checkpoint 8 (ADR-026). **Cost coverage excludes the generation path, by design (D8); live Gemini application generation was NOT implemented and remains deferred.** |
 | Deployment (Render/Railway), README, docs | 9 | NOT STARTED |
 
 **Week 6 is the declared safe stopping point** — at that line the system is complete and
@@ -125,10 +132,45 @@ demoable. Weeks 7–10 are enhancement.
 
 ## Next approved phase
 
-**None. Week 8 — caching and AI cost logging — is NOT started and NOT authorized.** Week 6 is the
-dossier's declared safe stopping point (§15): everything after it is enhancement. Week 7 is
-complete and recorded as Checkpoint 7; Week 8 begins only on explicit instruction, after its own
-design gate.
+**None. Week 9 — documentation and deployment — is NOT started and NOT authorized.** Week 6 is the
+dossier's declared safe stopping point (§15): everything after it is enhancement. Week 8 is
+complete and recorded as Checkpoint 8; Week 9 begins only on explicit instruction, after its own
+design gate. **There is no Week 9 branch, no deployment work and no Checkpoint 9.**
+
+### Week 8 — Refinement, caching and cost logging · COMPLETE (Checkpoint 8)
+
+Design gate approved 2026-09-23 and recorded as **ADR-026** (PR #32, `ca338f2`); ADR-020 §5's
+partial supersession was recorded separately in PR #33 (`dc0a759`) so the historical wording is
+preserved rather than rewritten. Three **behaviour-preserving** slices (D1) — no endpoint, route,
+schema, contract, verdict, score or response body changed:
+
+- **Slice 8A — cost and usage accounting.** **Merged** as PR #34 (`e5d6d36`). `extract_resume` and
+  `assess_field_relatedness` log token usage and a derived cost. Usage travels on a **per-call
+  sink** rather than provider state, so `eligibility_ai`'s `asyncio.gather` fan-out cannot
+  mis-attribute cost (D3). Retried calls accumulate (D4). Pricing is configuration with an empty
+  default, so **no external provider price is hard-coded** (D5), and cost is integer micro-units.
+  Accounting can never change an AI outcome (D6). Operational logs only — **no table, no migration,
+  no `candidate_id` in any cost record** (D9).
+- **Slice 8B — candidate-free corpus vectorizer cache.** **Merged** as PR #35 (`f3fbf35`). A
+  process-local, bounded, in-memory LRU of capacity 4, keyed by `corpus_fingerprint`, holding only
+  the catalogue-derived fitted artifacts. **The candidate's transform is never cached** — that
+  single boundary is the whole privacy argument, and ADR-020's rule that the candidate is
+  transformed and never fitted is preserved exactly (D7).
+- **Slice 8C — operational-log completeness.** **Merged** as PR #36 (`9aba1f2`) and recorded as
+  **Checkpoint 8**. "Refinement" was ruled to mean closing the three operational logging categories
+  the dossier §10.2 names — request counts, AI usage/cost, error records (D10). The audit found one
+  gap: an unhandled exception escaped the request middleware, so the request count missed exactly
+  the requests an operator most needs. Eight lines closed it.
+
+**Cost coverage is deliberately partial.** `generate_application_content` is **excluded
+structurally** — no usage sink is threaded through it and no setting could enable one — because
+ADR-025's merged generation-logging rule stands verbatim and a token count is a length that could
+characterize one candidate's content (D8). **Week 8 is not complete AI cost coverage**, and the
+generation path becomes material only when live application generation is separately approved and
+receives its own explicit privacy decision.
+
+**Week 8 has no intermediate checkpoint.** None of the three slices recorded one, so there is no
+Checkpoint 8A, 8B or 8C, and Checkpoint 8 covers Week 8 as a whole.
 
 ### Week 7 — Application preparation · COMPLETE (Checkpoint 7)
 
@@ -301,6 +343,7 @@ Full index in `context/decisions.md`.
 
 | ADR | Title | Date |
 |---|---|---|
+| ADR-026 | Week 8 refinement, caching and cost logging (W8-A..W8-H; partially supersedes ADR-020 §5) | 2026-09-23 |
 | ADR-025 | Week 7 application preparation and truthfulness validation (C-3, C-35..C-40, A-53..A-70) | 2026-09-20 |
 | ADR-024 | Week 6 MVP scope: local setup, curated catalogue, full-flow test (C-30..C-34) | 2026-09-20 |
 | ADR-023 | Tracker export contract (C-23..C-29) | 2026-09-19 |
@@ -333,7 +376,8 @@ governs; this is a summary.
 | **5** | Week 5 — Matching Engine (final) | `0aaaa1d` | PR #13 + PR #15, merged 2026-09-19 | **Stable** |
 | **6A** | Week 6 — Excel Export (**intermediate**) | `0125703` | PR #17, merged 2026-09-19 | **Stable** |
 | **6** | Week 6 — MVP (final) | `13eb832` | PR #17 + PR #19, merged 2026-09-20 | **Stable** |
-| **7** | Week 7 — Application Preparation (final) | `6c269a0` | PR #24 + PR #28, merged 2026-09-22 | **Stable — current** |
+| **7** | Week 7 — Application Preparation (final) | `6c269a0` | PR #24 + PR #28, merged 2026-09-22 | **Stable** |
+| **8** | Week 8 — Refinement, Caching and Cost Logging (final) | `9aba1f2` | PR #34 + PR #35 + PR #36, merged 2026-09-24 | **Stable — current** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
 **Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
@@ -345,6 +389,7 @@ governs; this is a summary.
 **Checkpoint 6A full SHA:** `0125703ad9464216b1622c14941664ec32ac9bac`
 **Checkpoint 6 full SHA:** `13eb8325149cab60a039534631265803250b767a`
 **Checkpoint 7 full SHA:** `6c269a05ec1a4fdbdc7820d0c6b0b40980ba8fb3`
+**Checkpoint 8 full SHA:** `9aba1f2b1007b0931ec9adc39afb88b15eaa2c14`
 
 ```
 main
@@ -382,8 +427,15 @@ main
   |
   ├── 365e7a4  PR #24 — Week 7 Slice 7A truthfulness validator (NOT a checkpoint: no caller yet)
   |
-  └── 6c269a0  Checkpoint 7 — Week 7 Application Preparation (final)  <- current
-                    ↑  PR #28 (feature/week-7-application-prep, 8 commits)
+  ├── 6c269a0  Checkpoint 7 — Week 7 Application Preparation (final)
+  |                 ↑  PR #28 (feature/week-7-application-prep, 8 commits)
+  |
+  ├── e5d6d36  PR #34 — Week 8 Slice 8A cost/usage accounting (NOT a checkpoint)
+  |
+  ├── f3fbf35  PR #35 — Week 8 Slice 8B corpus vectorizer cache (NOT a checkpoint)
+  |
+  └── 9aba1f2  Checkpoint 8 — Week 8 Refinement, Caching and Cost Logging (final)  <- current
+                    ↑  PR #36 (feature/week-8-operational-logs, 3 commits)
 ```
 
 Checkpoint 0 is the single commit `e8c68b7` — the state of `main` at the end of Phase 0 — not the
@@ -391,9 +443,10 @@ two-commit range that built it. Each checkpoint is declared stable only after th
 state is verified: merge confirmed on GitHub, tree clean, full suite run from `main`, and CI
 green on the merged commit.
 
-**Checkpoint 7 is the current rollback target; Checkpoint 6 is next.** Earlier checkpoints remain
+**Checkpoint 8 is the current rollback target; Checkpoint 7 is next.** Earlier checkpoints remain
 recoverable indefinitely and are not superseded — a regression whose cause predates the newest
-checkpoint needs an older target.
+checkpoint needs an older target. Recovering from Checkpoint 8 to Checkpoint 7 is code-only: Week 8
+introduced no migration, no model and no dependency.
 
 Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: never rewrite
 `main` history, never `git reset --hard` as recovery, never roll back without human approval.
@@ -402,37 +455,48 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Await explicit instruction before starting Week 8.** Week 7 is complete — Slice 7A (PR #24)
-   and Slice 7B (PR #28) are merged and verified, and Checkpoint 7 (`6c269a0`) is the current
-   checkpoint. Week 8 — caching, AI cost logging and live Gemini application generation — is
-   **not started and not authorized**, and needs its own design gate. No phase rolls into the
-   next automatically.
+1. **Await explicit instruction before starting Week 9.** Week 8 is complete — Slice 8A (PR #34),
+   Slice 8B (PR #35) and Slice 8C (PR #36) are merged and verified, and Checkpoint 8 (`9aba1f2`) is
+   the current checkpoint. Week 9 — documentation and deployment — is **not started and not
+   authorized**, and needs its own design gate. No phase rolls into the next automatically.
 2. **Next small approved change: the OpenAPI "Current status" sentence.** It still reads
    "Weeks 1–6 of a 10-week build are complete." Correcting it touches `app/main.py` and the two
    merged tests that pin the wording (`tests/test_full_flow.py`, `tests/test_tracker_export_endpoint.py`),
    so it was kept out of the documentation-only Checkpoint 7 record — exactly as the equivalent
    correction was handled at Checkpoint 6 (C-32, later closed by PR #21).
 3. Before relying on live AI: exercise Gemini's `assess_field_relatedness` (and
-   `extract_resume`) against the real service once, and confirm the model identifier.
-   `generate_application_content` is a deliberate stub until Week 8/9 (ADR-025 D13).
+   `extract_resume`) against the real service once, and confirm the model identifier. Both now
+   carry cost and usage accounting, so a live call would also be the first real measurement of it.
+   `generate_application_content` remains a deliberate stub; **live application generation was not
+   implemented in Week 8 and is not scheduled by any merged decision.**
 4. Before deployment (Week 9 / QG-007): verify the migration chain against PostgreSQL.
    `batch_alter_table` has only ever run on SQLite.
+5. **If live application generation is ever approved, it needs its own explicit privacy decision on
+   cost logging.** Week 8 excluded `generate_application_content` from usage accounting
+   structurally — no sink is threaded through it and no setting could enable one (ADR-026 D8) — and
+   that exclusion is not something a later slice may quietly reverse.
 
 **Outstanding integration step:** the Gemini provider — resume extraction and field relatedness —
 has never run against the live service. Confirm the model identifier and exercise one real call before
 relying on live extraction.
 
-**Weeks 1–7 are complete; Weeks 8–10 have not started.** Checkpoint 7 (`6c269a0`) is the final
-Week 7 record and **Stable — current**; Checkpoint 6 (`13eb832`) remains the final Week 6 record
-and the dossier's declared safe stopping point, with Checkpoint 6A the intermediate Week 6 one.
-**Week 7 has no intermediate checkpoint — there is no Checkpoint 7A — and there is no
-Checkpoint 8.** The published OpenAPI status still reads "Weeks 1–6 of a 10-week build are
-complete."; correcting it is application work, tracked under Next actions.
+**Weeks 1–8 are complete; Weeks 9–10 have not started.** Checkpoint 8 (`9aba1f2`) is the final
+Week 8 record and **Stable — current**; Checkpoint 7 (`6c269a0`) is the final Week 7 record and now
+historical; Checkpoint 6 (`13eb832`) remains the final Week 6 record and the dossier's declared
+safe stopping point, with Checkpoint 6A the intermediate Week 6 one. **Week 8 has no intermediate
+checkpoint — there is no Checkpoint 8A, 8B or 8C — and there is no Checkpoint 9.** The published
+OpenAPI status still reads "Weeks 1–6 of a 10-week build are complete."; correcting it is
+application work, tracked under Next actions.
 No `/matching/score` route and no `/jobs/ingest` route exists. `POST /api/v1/applications/prepare`
-exists and is POST-only, one of exactly ten routes. Application generation runs on the **mock
-provider only** — the Gemini generation method is a stub that raises `AIProviderUnavailableError`.
-**No caching, cost-logging, persistence, tracking, submission or automation code exists anywhere
-in the repository.**
+exists and is POST-only, one of exactly ten routes — the same ten as at Checkpoint 7. Application
+generation runs on the **mock provider only** — the Gemini generation method is a stub that raises
+`AIProviderUnavailableError`.
+**Caching and cost logging now exist, and both are bounded exactly as ADR-026 rules them:** one
+process-local, in-memory corpus cache of capacity 4 holding catalogue-derived artifacts only, and
+operational cost/usage log records for two AI operations. **No candidate-derived cache, no
+generated-prose cache, no résumé-content retention, no cost table or ledger, no `candidate_id` in
+any cost record, and no persistence, tracking, submission or automation code exists anywhere in
+the repository.**
 
 **Doc drift corrected:** the OpenAPI "Current status" string in `app/main.py` said the AI
 field-relatedness stage was not yet implemented. The docs-only Checkpoint 4 record PR corrected the

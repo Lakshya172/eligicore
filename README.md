@@ -48,20 +48,23 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 
 ## Project status
 
-**Pre-release development. Weeks 1–7 of a 10-week solo build complete.**
+**Pre-release development. Weeks 1–8 of a 10-week solo build complete.**
 
-Current stable checkpoint: **Checkpoint 7** (`6c269a0`) — Week 7 application preparation. A
-résumé becomes a profile, the profile becomes explained eligibility verdicts and ranked
+Current stable checkpoint: **Checkpoint 8** (`9aba1f2`) — Week 8 refinement, caching and cost
+logging. A résumé becomes a profile, the profile becomes explained eligibility verdicts and ranked
 recommendations over a 40-job synthetic catalogue, those become an Excel tracker, and a chosen
 job becomes a draft application in which every untraceable claim has been removed — all locally,
-with a mock AI provider and no candidate data stored anywhere on the server.
+with a mock AI provider and no candidate data stored anywhere on the server. Week 8 added no
+capability to that flow: it made the system cost-aware and quieter about repeated work, without
+changing a single response.
 
 **Checkpoint 6** (`13eb832`) — the complete, demoable Phase 1 MVP — remains the dossier's
 declared safe stopping point; Weeks 7–10 are enhancement.
 
 > **Not production-ready.** The Gemini Flash provider has not been exercised against the live
 > API — no key is configured and the test suite runs without one. The provider contract is
-> covered through a mocked transport; a live smoke test remains pending.
+> covered through a mocked transport; a live smoke test remains pending, and it would also be the
+> first real measurement of the Week 8 cost accounting.
 
 This section is kept honest deliberately. Nothing is listed as implemented until it exists,
 runs, and is tested. The authoritative, always-current state lives in
@@ -86,7 +89,20 @@ runs, and is tested. The authoritative, always-current state lives in
 - **`POST /api/v1/recommendations`** — eligibility verdicts and relevance scores side by side: eligible jobs ranked by match score, borderline jobs flagged separately, ineligible and closed jobs listed with their reasons but never ranked. The two are never combined into one number. Nothing is stored.
 - **`POST /api/v1/applications/export`** — turns the tracking rows a client sends into an Excel tracker, built entirely in memory. Nothing that could run as a formula survives, and nothing is stored.
 - **`POST /api/v1/applications/prepare`** — drafts a cover letter and answers to the questions a client supplies, for one catalogue job. Every claim that cannot be traced back to the supplied profile is **removed rather than reworded**, and the response lists what was removed and why. The AI provider is shown a narrow projection of the profile — skills, experience, projects, certifications, education — and never the candidate's name, contacts, employers, languages, grades or résumé text. The result is a draft for the candidate to review and send themselves: **EligiCore never submits an application.** Generation currently runs on the mock provider only. Nothing is stored.
-- **1358 tests**, running offline with no credentials and no network — including a full-flow
+- **AI cost and usage accounting** — résumé extraction and field-relatedness calls log their
+  token usage and a derived cost, accumulated across retries. Pricing is configuration with an
+  empty default, so no provider price is hard-coded and an unconfigured rate logs `unknown` rather
+  than a guess. Operational log records only: no cost table, no ledger, and no cost figure keyed to
+  a candidate. **Application generation is deliberately excluded** — a token count is a length that
+  could characterize one candidate's content.
+- **Corpus vectorizer cache** — the matching engine stops re-fitting the same job catalogue on
+  every request, reusing the fitted artifacts for up to four catalogues per process, keyed by a
+  fingerprint of the catalogue itself. **The candidate is never cached**: their transform is
+  recomputed every request. Results are identical cold and warm.
+- **Complete operational request logging** — every inbound request produces exactly one record,
+  including the ones that end in an unhandled exception, which were previously missed. No candidate
+  data in any log line.
+- **1549 tests**, running offline with no credentials and no network — including a full-flow
   integration test that walks résumé → profile → eligibility → recommendations → application
   preparation → Excel export
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
@@ -108,7 +124,7 @@ asserts none exists. Uploaded resumes exist only for the duration of processing.
 | 5 | Matching engine — skill normalization, TF-IDF, cosine similarity | **Complete** — matching engine (PR #13) + recommendations endpoint (PR #15), Checkpoint 5 |
 | 6 | **Polish, Excel export, testing — complete demoable MVP** | **Complete** — Excel export (PR #17, Checkpoint 6A) + demo path and full-flow test (PR #19), Checkpoint 6 |
 | 7 | Application preparation with truthfulness validation | **Complete** — truthfulness validator (PR #24) + preparation endpoint (PR #28), Checkpoint 7; live provider generation deferred |
-| 8 | Caching and AI cost logging | Not started — with live Gemini application generation |
+| 8 | Caching and AI cost logging | **Complete** — cost/usage accounting (PR #34) + corpus cache (PR #35) + operational logs (PR #36), Checkpoint 8; cost coverage excludes the generation path, and live Gemini application generation remains deferred |
 | 9 | Documentation and deployment | Not started |
 | 10 | Buffer | Not started |
 
