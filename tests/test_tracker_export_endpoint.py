@@ -306,13 +306,80 @@ def test_deferred_endpoints_do_not_exist(server: Server) -> None:
     )
 
 
+def test_openapi_structure_is_unchanged_by_the_status_text() -> None:
+    """Week 9A-1 corrected prose only, so the contract surface is pinned exactly here.
+
+    Paths, methods, response status codes and component schema names are the whole of what a
+    client depends on. Pinning them means a future edit to the description — the one part of
+    the document Week 9 is allowed to touch — cannot quietly move the contract with it
+    (ADR-027 D10).
+    """
+    spec = TestClient(app).get("/openapi.json").json()
+
+    paths = (
+        "/api/v1/applications/export", "/api/v1/applications/prepare",
+        "/api/v1/candidates/normalize", "/api/v1/candidates/validate",
+        "/api/v1/eligibility/check", "/api/v1/health", "/api/v1/jobs", "/api/v1/jobs/{job_id}",
+        "/api/v1/recommendations", "/api/v1/resumes/parse",
+    )
+    assert set(spec["paths"]) == set(paths)
+    assert len(spec["paths"]) == 10
+
+    operations = {
+        (path, method): sorted(operation["responses"])
+        for path, methods in spec["paths"].items()
+        for method, operation in methods.items()
+    }
+    assert operations == {
+        ("/api/v1/applications/export", "post"): ["200", "422"],
+        ("/api/v1/applications/prepare", "post"): ["200", "404", "422"],
+        ("/api/v1/candidates/normalize", "post"): ["200", "422"],
+        ("/api/v1/candidates/validate", "post"): ["200", "422"],
+        ("/api/v1/eligibility/check", "post"): ["200", "422"],
+        ("/api/v1/health", "get"): ["200"],
+        ("/api/v1/jobs", "get"): ["200", "422"],
+        ("/api/v1/jobs/{job_id}", "get"): ["200", "404", "422"],
+        ("/api/v1/recommendations", "post"): ["200", "422"],
+        ("/api/v1/resumes/parse", "post"): ["200", "413", "415", "422", "502"],
+    }
+
+    schemas = (
+        "AnswerOutcome", "ApplicationPrepareRequest", "ApplicationPrepareResponse",
+        "ApplicationQuestion", "ApplicationStatus",
+        "Body_parse_resume_api_v1_resumes_parse_post", "CandidateNormalizationResponse",
+        "CandidatePreferences", "CandidateProfile-Input", "CandidateProfile-Output",
+        "CandidateValidationResponse", "CertificationEntry", "ClaimCategory", "Confidence",
+        "DegreeLevel", "EducationEntry", "EligibilityCheckRequest", "EligibilityCheckResponse",
+        "EligibilityState", "EvaluationMethod", "ExperienceEntry", "ExtractionMetadata",
+        "GenerationOutcome", "GradeScale", "HTTPValidationError", "HealthResponse",
+        "IssueSeverity", "JobEligibility", "JobListResponse", "JobRead", "JobStatusSchema",
+        "JobType", "MatchScoreBasis", "MatchTermKind", "NormalizedGrade", "PackageStatus",
+        "PreparedAnswer", "ProjectEntry", "ReasonCode", "RecommendationItem",
+        "RecommendationMatch", "RecommendationRequest", "RecommendationResponse",
+        "RemovalReason", "RemovalScope", "RemovedClaim", "RequirementResult",
+        "RequirementStatus", "RequirementType", "ResumeParseResponse", "ResumeParseStatus",
+        "SharedTerm", "SourceFormat", "TrackerExportRequest", "TrackerRecord",
+        "ValidationError", "ValidationIssue", "WorkMode",
+    )
+    assert set(spec["components"]["schemas"]) == set(schemas)
+    assert len(spec["components"]["schemas"]) == 58
+
+
 def test_openapi_status_text_is_current() -> None:
     description = TestClient(app).get("/openapi.json").json()["info"]["description"]
-    assert "Week 5 of a 10-week build is in progress" not in description
-    assert "export are not yet implemented" not in description
-    assert "Weeks 1–6 of a 10-week build are complete." in description
-    assert "Week 6 is underway" not in description
+    assert "Weeks 1–8 of a 10-week build are complete." in description
     assert "tracker export" in description
+    for stale in (
+        "Week 5 of a 10-week build is in progress",
+        "export are not yet implemented",
+        "Weeks 1–5",
+        "Weeks 1–6",
+        "Weeks 1–7",
+        "Week 6 is underway",
+    ):
+        assert stale not in description, stale
+    for premature in ("Weeks 1–9", "Week 9", "Week 10", "10-week build is complete"):
+        assert premature not in description, premature
 
 
 # ---------------------------------------------------------------------------------------

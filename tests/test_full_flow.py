@@ -556,9 +556,9 @@ def test_this_file_still_guards_the_network_and_the_golden_results() -> None:
 
 
 def test_openapi_status_matches_the_repository_state(flow: Flow) -> None:
-    """The published status must not run ahead of the checkpoints (C-32)."""
+    """The published status must not run ahead of the checkpoints (C-32, ADR-027 D10)."""
     description = flow.client.get("/openapi.json").json()["info"]["description"]
-    assert "Weeks 1–6 of a 10-week build are complete." in description
+    assert "Weeks 1–8 of a 10-week build are complete." in description
     assert "python -m app.cli seed-catalogue" in description
     assert "Single-pair match scoring and HTTP-triggered job ingestion are not implemented" in description
     # Preparation exists now (ADR-025 Slice 7B), and the status must say what it actually is:
@@ -567,9 +567,25 @@ def test_openapi_status_matches_the_repository_state(flow: Flow) -> None:
     assert "**Generation currently runs on the mock provider only**" in description
     assert "removes every claim it cannot trace" in description
     assert "`review_required` is always true" in description
-    for stale in ("Weeks 1–5", "Week 6 is underway"):
+    # Week 8 is closed at Checkpoint 8, and the status says what it actually did: nothing
+    # that a caller can observe. Each clause below is a claim Week 8 must keep true.
+    assert "Week 8 added no endpoint and changed no response." in description
+    assert "no candidate identifier" in description
+    assert "application generation is deliberately excluded" in description
+    assert "never cached" in description
+    for stale in ("Weeks 1–5", "Weeks 1–6", "Weeks 1–7", "Week 6 is underway"):
         assert stale not in description, stale
-    for premature in ("Week 7", "Weeks 1–7", "Week 8", "10-week build is complete"):
+    # Week 9 has not started, and 9B deployment is optional and unperformed (ADR-027): the
+    # published status must not claim either before it is true.
+    for premature in (
+        "Weeks 1–9",
+        "Weeks 1–10",
+        "Week 9",
+        "Week 10",
+        "10-week build is complete",
+        "deployed",
+        "publicly accessible",
+    ):
         assert premature not in description, premature
 
 
