@@ -48,7 +48,7 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 
 ## Project status
 
-**Pre-release development. Weeks 1–8 of a 10-week solo build complete.**
+**Pre-release development. Weeks 1–8 of a 10-week solo build complete; Week 9A (local production readiness) complete.**
 
 Current stable checkpoint: **Checkpoint 8** (`9aba1f2`) — Week 8 refinement, caching and cost
 logging. A résumé becomes a profile, the profile becomes explained eligibility verdicts and ranked
@@ -60,6 +60,30 @@ changing a single response.
 
 **Checkpoint 6** (`13eb832`) — the complete, demoable Phase 1 MVP — remains the dossier's
 declared safe stopping point; Weeks 7–10 are enhancement.
+
+### How EligiCore is meant to be run
+
+**Normal mode is local.** You run it from a terminal, on `localhost`, with local environment
+variables, a local database and a local AI-provider setting. **No hosting is required, and no part
+of ordinary personal use depends on a deployed instance.** The [Quickstart](#quickstart) below is
+the whole of it.
+
+**Deployment is optional and deliberate.** It happens only if and when the owner wants to share
+EligiCore with someone else — it is not a prerequisite, not a pending chore, and not something the
+project is waiting on. This is recorded as
+[ADR-027](artifacts/decisions/ADR-027-week-9-local-first-deployment-model.md), which also records
+that it is a deliberate deviation from the original plan's Week 9 deliverable rather than a
+reinterpretation of it.
+
+Week 9 is therefore two stages:
+
+| Stage | What it is | State |
+|---|---|---|
+| **9A — local production readiness** | OpenAPI accuracy, PostgreSQL compatibility, production configuration, secret handling, privacy and logging, a local end-to-end run, and this documentation | **Complete** |
+| **9B — deployment and sharing** | Hosting, hosted PostgreSQL, host configuration, an access decision, deployment verification | **Optional, not started** |
+
+**EligiCore is not deployed anywhere.** There is no public URL, and nothing in this README should
+be read as saying otherwise.
 
 > **Not production-ready.** The Gemini Flash provider has not been exercised against the live
 > API — no key is configured and the test suite runs without one. The provider contract is
@@ -102,7 +126,7 @@ runs, and is tested. The authoritative, always-current state lives in
 - **Complete operational request logging** — every inbound request produces exactly one record,
   including the ones that end in an unhandled exception, which were previously missed. No candidate
   data in any log line.
-- **1549 tests**, running offline with no credentials and no network — including a full-flow
+- **1567 tests**, running offline with no credentials and no network — including a full-flow
   integration test that walks résumé → profile → eligibility → recommendations → application
   preparation → Excel export
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
@@ -125,7 +149,7 @@ asserts none exists. Uploaded resumes exist only for the duration of processing.
 | 6 | **Polish, Excel export, testing — complete demoable MVP** | **Complete** — Excel export (PR #17, Checkpoint 6A) + demo path and full-flow test (PR #19), Checkpoint 6 |
 | 7 | Application preparation with truthfulness validation | **Complete** — truthfulness validator (PR #24) + preparation endpoint (PR #28), Checkpoint 7; live provider generation deferred |
 | 8 | Caching and AI cost logging | **Complete** — cost/usage accounting (PR #34) + corpus cache (PR #35) + operational logs (PR #36), Checkpoint 8; cost coverage excludes the generation path, and live Gemini application generation remains deferred |
-| 9 | Documentation and deployment | Not started |
+| 9 | Documentation and deployment | **9A complete** — OpenAPI corrected, PostgreSQL compatibility validated, production configuration, secret handling, privacy and logging re-verified, local end-to-end run, documentation. **9B (deployment) is optional and not started** ([ADR-027](artifacts/decisions/ADR-027-week-9-local-first-deployment-model.md)) |
 | 10 | Buffer | Not started |
 
 **Week 6 is the declared safe stopping point.** Everything after it is enhancement.
@@ -230,7 +254,7 @@ answer is treated as a failure, not a result.
 | Server | Uvicorn | Standard ASGI pairing |
 | Validation | Pydantic | Every request and response shape defined and enforced at the boundary |
 | ORM | SQLAlchemy | Same model code targets SQLite in dev and PostgreSQL in production |
-| Database | SQLite → PostgreSQL | Operational data only. Zero-setup locally; parity validated before deployment, not assumed |
+| Database | SQLite → PostgreSQL | Operational data only. SQLite needs zero setup and is the ordinary local database. **PostgreSQL parity has been validated by execution**, not assumed: the migration chain was run up, down and up again against PostgreSQL 18.6 with data present (Week 9A) |
 | Migrations | Alembic | Schema changes as explicit reviewable scripts |
 | Resume parsing | pdfplumber, python-docx | Layout-heavy documents need reliable layout handling |
 | NLP fallback | spaCy | Deterministic extraction of predictable fields with no AI call |
@@ -249,8 +273,12 @@ unexplainable score is self-defeating.
 ## Quickstart
 
 Runs entirely on your machine: SQLite, a synthetic job catalogue, and a deterministic mock AI
-provider. **No API key, no network and no configuration are required** — deployment and the
-public documentation are Week 9.
+provider. **No API key, no network, no hosting and no configuration are required.** This is the
+normal way to run EligiCore, not a development shortcut.
+
+*Measured from a fresh clone of `main` on a Windows laptop: **3 minutes 7 seconds** to a running
+API answering requests, and 4 minutes 38 seconds including the full test suite — with pip's cache
+disabled, so a warm machine is faster.*
 
 **Requires Python 3.11 or newer** (built and tested on 3.12).
 
@@ -307,8 +335,15 @@ uvicorn app.main:app --reload
 
 **6. Open the interactive documentation**
 
-`http://127.0.0.1:8000/docs` — generated from the code itself, so it is always accurate. Every
-endpoint can be tried from that page.
+| URL | What it is |
+|---|---|
+| `http://127.0.0.1:8000/docs` | Swagger UI — every endpoint can be tried from the page |
+| `http://127.0.0.1:8000/redoc` | The same contract, as reference documentation |
+| `http://127.0.0.1:8000/openapi.json` | The raw OpenAPI document |
+
+All three are generated from the code itself, so they cannot drift from what the API actually
+does. The current surface is **ten endpoints**, listed under
+[Implemented](#implemented) above.
 
 ### Try the flow
 
