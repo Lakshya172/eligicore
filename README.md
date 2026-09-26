@@ -48,7 +48,7 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 
 ## Project status
 
-**Pre-release development. Weeks 1–8 of a 10-week solo build complete.**
+**Pre-release development. Weeks 1–8 of a 10-week solo build complete; Week 9A (local production readiness) complete.**
 
 Current stable checkpoint: **Checkpoint 8** (`9aba1f2`) — Week 8 refinement, caching and cost
 logging. A résumé becomes a profile, the profile becomes explained eligibility verdicts and ranked
@@ -60,6 +60,30 @@ changing a single response.
 
 **Checkpoint 6** (`13eb832`) — the complete, demoable Phase 1 MVP — remains the dossier's
 declared safe stopping point; Weeks 7–10 are enhancement.
+
+### How EligiCore is meant to be run
+
+**Normal mode is local.** You run it from a terminal, on `localhost`, with local environment
+variables, a local database and a local AI-provider setting. **No hosting is required, and no part
+of ordinary personal use depends on a deployed instance.** The [Quickstart](#quickstart) below is
+the whole of it.
+
+**Deployment is optional and deliberate.** It happens only if and when the owner wants to share
+EligiCore with someone else — it is not a prerequisite, not a pending chore, and not something the
+project is waiting on. This is recorded as
+[ADR-027](artifacts/decisions/ADR-027-week-9-local-first-deployment-model.md), which also records
+that it is a deliberate deviation from the original plan's Week 9 deliverable rather than a
+reinterpretation of it.
+
+Week 9 is therefore two stages:
+
+| Stage | What it is | State |
+|---|---|---|
+| **9A — local production readiness** | OpenAPI accuracy, PostgreSQL compatibility, production configuration, secret handling, privacy and logging, a local end-to-end run, and this documentation | **Complete** |
+| **9B — deployment and sharing** | Hosting, hosted PostgreSQL, host configuration, an access decision, deployment verification | **Optional, not started** |
+
+**EligiCore is not deployed anywhere.** There is no public URL, and nothing in this README should
+be read as saying otherwise.
 
 > **Not production-ready.** The Gemini Flash provider has not been exercised against the live
 > API — no key is configured and the test suite runs without one. The provider contract is
@@ -82,7 +106,7 @@ runs, and is tested. The authoritative, always-current state lives in
   produces a scale-independent view of each grade
 - **`POST /api/v1/resumes/parse`** — parses a PDF or DOCX resume into a structured profile with per-field confidence. The uploaded file is deleted after processing, on both the success and failure paths.
 - **AI provider abstraction** — one interface, a mandatory deterministic mock, and a Google Gemini Flash implementation for Phase 1. Swapping providers is a configuration change.
-- **`GET /api/v1/jobs`, `GET /api/v1/jobs/{id}`** — the job catalogue: 40 synthetic postings ingested from a pluggable source adapter with canonical deduplication, loaded locally with `python -m app.cli seed-catalogue`. Closed postings are kept and stay retrievable with their reason, never deleted.
+- **`GET /api/v1/jobs`, `GET /api/v1/jobs/{job_id}`** — the job catalogue: 40 synthetic postings ingested from a pluggable source adapter with canonical deduplication, loaded locally with `python -m app.cli seed-catalogue`. Closed postings are kept and stay retrievable with their reason, never deleted.
 - **`POST /api/v1/eligibility/check`** — evaluates a supplied profile against up to 50 catalogue jobs' stated requirements (minimum CGPA, graduation year window, backlog limit, minimum qualification level, permitted fields) and returns a verdict with a per-requirement breakdown. A field of study that is not an exact match is judged by an AI provider — sent only the field and the permitted fields — and the result is labelled `ai_reasoning`, capped at MEDIUM confidence, and can never make a candidate `NOT_ELIGIBLE`. Nothing is stored.
 - **`GET /api/v1/health`** — liveness
 - **Matching engine** — deterministic TF-IDF cosine similarity between a candidate's skills and experience and the job catalogue, with skill coverage, the shared terms behind each score and a template explanation. It reads no eligibility data and stores nothing.
@@ -102,7 +126,7 @@ runs, and is tested. The authoritative, always-current state lives in
 - **Complete operational request logging** — every inbound request produces exactly one record,
   including the ones that end in an unhandled exception, which were previously missed. No candidate
   data in any log line.
-- **1549 tests**, running offline with no credentials and no network — including a full-flow
+- **1567 tests**, running offline with no credentials and no network — including a full-flow
   integration test that walks résumé → profile → eligibility → recommendations → application
   preparation → Excel export
 - Engineering environment: architectural context, ADRs, standards, review lenses, quality gates
@@ -125,7 +149,7 @@ asserts none exists. Uploaded resumes exist only for the duration of processing.
 | 6 | **Polish, Excel export, testing — complete demoable MVP** | **Complete** — Excel export (PR #17, Checkpoint 6A) + demo path and full-flow test (PR #19), Checkpoint 6 |
 | 7 | Application preparation with truthfulness validation | **Complete** — truthfulness validator (PR #24) + preparation endpoint (PR #28), Checkpoint 7; live provider generation deferred |
 | 8 | Caching and AI cost logging | **Complete** — cost/usage accounting (PR #34) + corpus cache (PR #35) + operational logs (PR #36), Checkpoint 8; cost coverage excludes the generation path, and live Gemini application generation remains deferred |
-| 9 | Documentation and deployment | Not started |
+| 9 | Documentation and deployment | **9A complete** — OpenAPI corrected, PostgreSQL compatibility validated, production configuration, secret handling, privacy and logging re-verified, local end-to-end run, documentation. **9B (deployment) is optional and not started** ([ADR-027](artifacts/decisions/ADR-027-week-9-local-first-deployment-model.md)) |
 | 10 | Buffer | Not started |
 
 **Week 6 is the declared safe stopping point.** Everything after it is enhancement.
@@ -230,7 +254,7 @@ answer is treated as a failure, not a result.
 | Server | Uvicorn | Standard ASGI pairing |
 | Validation | Pydantic | Every request and response shape defined and enforced at the boundary |
 | ORM | SQLAlchemy | Same model code targets SQLite in dev and PostgreSQL in production |
-| Database | SQLite → PostgreSQL | Operational data only. Zero-setup locally; parity validated before deployment, not assumed |
+| Database | SQLite → PostgreSQL | Operational data only. SQLite needs zero setup and is the ordinary local database. **PostgreSQL parity has been validated by execution**, not assumed: the migration chain was run up, down and up again against PostgreSQL 18.6 with data present (Week 9A) |
 | Migrations | Alembic | Schema changes as explicit reviewable scripts |
 | Resume parsing | pdfplumber, python-docx | Layout-heavy documents need reliable layout handling |
 | NLP fallback | spaCy | Deterministic extraction of predictable fields with no AI call |
@@ -249,8 +273,12 @@ unexplainable score is self-defeating.
 ## Quickstart
 
 Runs entirely on your machine: SQLite, a synthetic job catalogue, and a deterministic mock AI
-provider. **No API key, no network and no configuration are required** — deployment and the
-public documentation are Week 9.
+provider. **No API key, no network, no hosting and no configuration are required.** This is the
+normal way to run EligiCore, not a development shortcut.
+
+*Measured from a fresh clone of `main` on a Windows laptop: **3 minutes 7 seconds** to a running
+API answering requests, and 4 minutes 38 seconds including the full test suite — with pip's cache
+disabled, so a warm machine is faster.*
 
 **Requires Python 3.11 or newer** (built and tested on 3.12).
 
@@ -307,8 +335,15 @@ uvicorn app.main:app --reload
 
 **6. Open the interactive documentation**
 
-`http://127.0.0.1:8000/docs` — generated from the code itself, so it is always accurate. Every
-endpoint can be tried from that page.
+| URL | What it is |
+|---|---|
+| `http://127.0.0.1:8000/docs` | Swagger UI — every endpoint can be tried from the page |
+| `http://127.0.0.1:8000/redoc` | The same contract, as reference documentation |
+| `http://127.0.0.1:8000/openapi.json` | The raw OpenAPI document |
+
+All three are generated from the code itself, so they cannot drift from what the API actually
+does. The current surface is **ten endpoints**, listed under
+[Implemented](#implemented) above.
 
 ### Try the flow
 
@@ -357,6 +392,96 @@ pytest -q
 ```
 
 The suite runs with **no network and no API key**. All AI calls go through a mock provider.
+
+### Running it in production mode, still locally
+
+Nothing about this requires hosting. It is the same application with different configuration, and
+it is what Week 9A verified end to end.
+
+```bash
+export ELIGICORE_ENVIRONMENT=production
+export ELIGICORE_DATABASE_URL=postgresql://USER@HOST:5432/DBNAME   # or keep SQLite
+alembic upgrade head
+python -m app.cli seed-catalogue
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+`--reload` is deliberately absent: it is a development convenience.
+
+What `production` changes, and what it does not:
+
+- `environment` reads `production` and `debug` stays `false`
+- **it does not change any response, verdict, score or log field.** Selecting it is not what makes
+  the API safe — server error responses are generic and tracebacks are suppressed in *every*
+  environment, so the guarantee cannot be lost by misconfiguring this variable
+- it does not enable hosting, authentication, rate limiting or anything else
+
+PostgreSQL is optional locally. SQLite remains the ordinary choice; PostgreSQL exists because it
+is what a deployed instance would use, and its migration compatibility has been validated by
+running the chain up, down and up again with data present.
+
+### Configuration
+
+Every setting is an environment variable with the `ELIGICORE_` prefix. `.env.example` lists them
+all with placeholder values and **no secrets**; copy it to `.env` only if you want to change a
+default. `.env` is git-ignored and must never be committed.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `ELIGICORE_ENVIRONMENT` | `development` | `development`, `test` or `production` |
+| `ELIGICORE_DEBUG` | `false` | |
+| `ELIGICORE_DATABASE_URL` | `sqlite:///./eligicore.db` | A PostgreSQL URL for a server database |
+| `ELIGICORE_LOG_LEVEL` | `INFO` | Operational metadata only — never payloads |
+| `ELIGICORE_AI_PROVIDER` | `mock` | `mock` or `gemini`. **The default is deliberate**: an unconfigured checkout cannot make a paid call by accident |
+| `ELIGICORE_GEMINI_API_KEY` | *(unset)* | Required only when the provider is `gemini`. Sent as a header, never in a URL, never logged |
+| `ELIGICORE_AI_COST_RATES` | *(empty)* | Per-model prices for cost logging. **No provider price is shipped in source** — a stale constant would be a wrong number presented as a measurement, so an unpriced model logs `cost=unknown` |
+
+**On selecting `gemini`:** the provider is implemented and covered by tests through a mocked
+transport, but **it has never been exercised against the live service from this project** — no key
+has been configured, and the model identifier is a configured default rather than a verified one.
+Résumé extraction and field-of-study assessment would call the live API; **application generation
+would not** — that method is still a stub and degrades honestly rather than inventing content.
+
+### Optional: deploying it so someone else can use it
+
+**You do not need this.** It exists for the day you want to show EligiCore to another person. The
+steps below are written to be reproducible; **none of them has been executed**, and nothing here
+has been verified against a real host.
+
+The application is the same in both places. Deployment changes environment variables, the database
+connection, the network layer and secrets — and nothing else. There is no separate "hosted
+version", and a code path that only existed when hosted would be a defect.
+
+1. **Provision a PostgreSQL database** and a place to run one web process.
+2. **Set the environment** on the host: `ELIGICORE_ENVIRONMENT=production`, the PostgreSQL
+   `ELIGICORE_DATABASE_URL`, `ELIGICORE_AI_PROVIDER`, and a key only if the provider needs one.
+   Secrets go in the host's own environment — never in the repository, never in an image.
+3. **Run the migrations** — `alembic upgrade head`. The head is `b3e8d2c61a47`; there are three
+   migrations and Week 9 added none.
+4. **Seed the catalogue** — `python -m app.cli seed-catalogue`, as a one-off release step. There is
+   deliberately no HTTP route that writes the catalogue.
+5. **Start the process** — `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+6. **Verify** — `/api/v1/health` returns `environment: production`; `/docs` renders; a real request
+   round-trips; the host's own logs carry no personal data.
+7. **Rollback** — redeploy the previous revision. Week 9 introduced no migration, so returning to
+   the previous release is code-only; a migration downgrade would only matter for a release that
+   added one.
+
+**Things that are genuinely undecided, and are the owner's to decide** — this README does not
+choose them, and inventing a value here would be worse than leaving it open:
+
+| Decision | Why it is open |
+|---|---|
+| Render or Railway | Both are named in the plan; neither has been chosen |
+| Hosted PostgreSQL, or something else | Free tiers differ, and free-tier filesystems are ephemeral, so SQLite on a host would lose the catalogue on every redeploy |
+| Rate limiting: mechanism and values | The deployment gate requires it on AI-cost-exposed endpoints; no limit, window or backend has been chosen, and none is guessed here |
+| Which AI provider a shared instance runs | `mock` costs nothing and demonstrates a mock; `gemini` is real but spends the owner's budget on someone else's requests |
+| How a hosted catalogue gets seeded | A one-off command is simplest; startup seeding would be a behaviour change |
+| Whether `/docs` stays public on a shared instance | Currently public by framework default, which is not the same as a decision |
+| Access control for a shared instance | Authentication is a later phase, and **an unauthenticated public API is not assumed acceptable** just because deployment is optional |
+
+**Not verified, and not claimed:** no hosted deployment, no platform logs, no public URL, no live
+Gemini call, no rate limiting and no authentication. Every one of those belongs to 9B or later.
 
 ---
 
