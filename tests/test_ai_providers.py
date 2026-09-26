@@ -9,6 +9,7 @@ status handling and response validation are all covered without touching the liv
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 import httpx
@@ -17,6 +18,7 @@ import pytest
 from app.ai.ai_service import AIService, build_provider
 from app.ai.errors import (
     AIConfigurationError,
+    AIError,
     AIProviderRejectedError,
     AIProviderUnavailableError,
     AIResponseInvalidError,
@@ -261,6 +263,52 @@ async def test_gemini_sends_key_as_header_never_in_url() -> None:
     assert captured["header"] == "test-key-not-real"
     assert "test-key-not-real" not in captured["url"]
     assert "key=" not in captured["url"]
+
+
+@pytest.mark.anyio
+async def test_gemini_key_never_reaches_a_log_line(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A provider key in a log is an incident, and logs outlive the process.
+
+    The header-vs-URL rule above is already pinned; the logging path was not. Nothing today
+    logs the key - verified structurally, no logging call in the provider references it - but
+    nothing would have caught a future ``logger.debug("headers=%s", headers)`` either.
+    """
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _gemini_reply({"skills": []})
+
+    with caplog.at_level(logging.DEBUG):
+        await _gemini(handler=handler).extract_resume(RESUME)
+
+    logged = caplog.text + "\n".join(str(record.args) for record in caplog.records)
+    assert "test-key-not-real" not in logged
+    assert "x-goog-api-key" not in logged
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("status", [400, 401, 403, 429, 500, 503])
+async def test_gemini_key_never_reaches_an_error_or_a_log_on_a_failure(
+    status: int, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The failure paths are where a key most easily escapes.
+
+    An error that echoed the request - headers included - or a handler that logged what it
+    sent would leak the credential precisely when someone is reading the logs. The provider
+    raises fixed strings carrying only a status code; this pins that.
+    """
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status, json={"error": {"message": "upstream said no"}})
+
+    with caplog.at_level(logging.DEBUG):
+        with pytest.raises(AIError) as raised:
+            await _gemini(handler=handler).extract_resume(RESUME)
+
+    logged = caplog.text + "\n".join(str(record.args) for record in caplog.records)
+    assert "test-key-not-real" not in str(raised.value)
+    assert "x-goog-api-key" not in str(raised.value)
+    assert "test-key-not-real" not in logged
+    assert "x-goog-api-key" not in logged
 
 
 @pytest.mark.anyio
