@@ -11,15 +11,15 @@
 
 | Field | Value |
 |---|---|
-| **Date** | 2026-09-24 |
-| **Phase** | **Week 8 — Refinement, caching and cost logging · COMPLETE.** Slice 8A (cost/usage accounting), Slice 8B (candidate-free corpus vectorizer cache) and Slice 8C (operational-log completeness) are all **complete and merged**, recorded as **Checkpoint 8**. Week 6 remains the dossier's declared safe stopping point (§15); Weeks 7 and 8 are enhancement on top of it. **Week 9 is NOT started and NOT authorized.** |
-| **Roadmap position** | **Weeks 1–8 complete and merged.** Week 7 delivered as Slice 7A (PR #24, no checkpoint) + Slice 7B (PR #28, **Checkpoint 7**) on **ADR-025**. Week 8 delivered as Slice 8A (PR #34), Slice 8B (PR #35) and Slice 8C (PR #36, **Checkpoint 8**) on the design gate ruled in **ADR-026** (PR #32, with ADR-020 §5's partial supersession recorded in PR #33) — **none of the three slices recorded a checkpoint of its own**. **Weeks 9–10 NOT started.** `/matching/score` and HTTP `/jobs/ingest` remain explicitly deferred (C-25, ADR-023 §11, ADR-024); **live Gemini application generation remains deferred** and was not implemented in Week 8. |
-| **Health** | 🟢 GREEN — 1549 tests passing on `main`; mutations **230/230** re-verified from a clean tree — 32/32 (8C), 34/34 (8B), 68/68 (8A), 54/54 (7B), 42/42 (7A) — plus 23/23 (6B), 30/30 (6A), 40/40 (5B), 36/36 (5A), 27/27 (Week 4); CI green on `e5d6d36`, `f3fbf35` and `9aba1f2`; live privacy sweep clean; no open blockers |
+| **Date** | 2026-09-26 |
+| **Phase** | **Week 9A — Local production readiness · COMPLETE.** All seven slices (9A-1 OpenAPI · 9A-2 PostgreSQL · 9A-3 production configuration · 9A-4 secret handling · 9A-5 privacy and logging · 9A-6 local end-to-end · 9A-7 documentation) are merged or verified and recorded as **Checkpoint 9A**. **Local execution is the normal operating mode; nothing is deployed.** **Week 9B — Deployment and Sharing — is OPTIONAL, owner-triggered and NOT started** (ADR-027). Previously: **Week 8 · COMPLETE.** Slice 8A (cost/usage accounting), Slice 8B (candidate-free corpus vectorizer cache) and Slice 8C (operational-log completeness) are all **complete and merged**, recorded as **Checkpoint 8**. Week 6 remains the dossier's declared safe stopping point (§15); Weeks 7 and 8 are enhancement on top of it. **Week 9 is NOT started and NOT authorized.** |
+| **Roadmap position** | **Weeks 1–8 complete and merged; Week 9A complete.** Week 9 is two stages under **ADR-027** — 9A local production readiness (done, Checkpoint 9A) and 9B deployment and sharing (optional, not started). **Weeks 9B and 10 NOT started.** Earlier:  Week 7 delivered as Slice 7A (PR #24, no checkpoint) + Slice 7B (PR #28, **Checkpoint 7**) on **ADR-025**. Week 8 delivered as Slice 8A (PR #34), Slice 8B (PR #35) and Slice 8C (PR #36, **Checkpoint 8**) on the design gate ruled in **ADR-026** (PR #32, with ADR-020 §5's partial supersession recorded in PR #33) — **none of the three slices recorded a checkpoint of its own**. **Weeks 9–10 NOT started.** `/matching/score` and HTTP `/jobs/ingest` remain explicitly deferred (C-25, ADR-023 §11, ADR-024); **live Gemini application generation remains deferred** and was not implemented in Week 8. |
+| **Health** | 🟢 GREEN — 1567 tests passing on `main`; PostgreSQL 18.6 migration compatibility verified by execution; production configuration, secret handling, privacy and logging re-verified; local end-to-end run and two fresh-clone quickstarts passed; mutations **230/230** re-verified from a clean tree — 32/32 (8C), 34/34 (8B), 68/68 (8A), 54/54 (7B), 42/42 (7A) — plus 23/23 (6B), 30/30 (6A), 40/40 (5B), 36/36 (5A), 27/27 (Week 4); CI green on `e5d6d36`, `f3fbf35` and `9aba1f2`; live privacy sweep clean; no open blockers |
 | **Stable branch** | `main` |
-| **Current checkpoint** | **Checkpoint 8** — Week 8 Refinement, Caching and Cost Logging (final) — `9aba1f2b1007b0931ec9adc39afb88b15eaa2c14`, which is also the current head of `main`. Checkpoint 7 (`6c269a0`) is now historical; Checkpoint 6 (`13eb832`) remains recorded as the final Week 6 checkpoint and the declared safe stopping point. **Week 8 has no intermediate checkpoint: there is no Checkpoint 8A, 8B or 8C**, because none of the three slices recorded one. **There is no Checkpoint 9.** |
-| **Produced by** | PR #34 (`e5d6d36`, Slice 8A cost/usage accounting) + PR #35 (`f3fbf35`, Slice 8B corpus cache) + PR #36 (`9aba1f2`, Slice 8C operational-log completeness), all three **MERGED**. Checkpoint 7 (`6c269a0`) remains the final Week 7 checkpoint and Checkpoint 6 (`13eb832`) the final Week 6 one. |
-| **Rollback target** | Checkpoint 8 first; Checkpoint 7 by reverting the Week 8 merges as appropriate — PR #36, then PR #35, then PR #34 (no database step: Week 8 added no migration and no dependency); Checkpoint 6 by also reverting PR #28 (no database step); Checkpoint 6A by also reverting PR #19 (no database step); Checkpoint 5 by also reverting PR #17 (no database step); Checkpoint 5A by also reverting PR #15 (no database step); Checkpoint 4 by also reverting PR #13; Checkpoint 4A by also reverting PR #11; Checkpoint 3 also needs `alembic downgrade 7c2f1a9b4d30`; below Checkpoint 3 also needs `alembic downgrade base`. |
-| **Next milestone** | **Week 9 — documentation and deployment. NOT started and NOT authorized**; it begins only on explicit instruction, after its own design gate. Live Gemini application generation remains deferred and is not scheduled by any merged decision. Everything after Week 6 is enhancement (dossier §15). |
+| **Current checkpoint** | **Checkpoint 9A** — Week 9A Local Production Readiness — `95a1187715851ee7a67fa8cdbc7c6e87f3fa7ec3`, which is also the current head of `main`. **It records a verified local product, not a deployment: there is no hosted instance and no public URL.** Checkpoint 9 is reserved for the final Week 9 state and exists only if the owner deploys. Checkpoint 8 (`9aba1f2`) is now historical. Checkpoint 7 (`6c269a0`) is now historical; Checkpoint 6 (`13eb832`) remains recorded as the final Week 6 checkpoint and the declared safe stopping point. **Week 8 has no intermediate checkpoint: there is no Checkpoint 8A, 8B or 8C**, because none of the three slices recorded one. **There is no Checkpoint 9.** |
+| **Produced by** | PR #39 (`65b15bb`, 9A-1) + PR #40 (`89b616a`, 9A-2 prerequisite) + PR #41 (`229acc1`, 9A-3) + PR #42 (`88c884b`, 9A-4) + PR #43 (`8cd6ad8`, 9A-5) + PR #44 (`95a1187`, 9A-7), all **MERGED**, on ADR-027 (PR #38, `1afd4e5`). 9A-2's migration validation and 9A-6's end-to-end run were **verification-only and produced no commit**. Checkpoint 7 (`6c269a0`) remains the final Week 7 checkpoint and Checkpoint 6 (`13eb832`) the final Week 6 one. |
+| **Rollback target** | Checkpoint 9A first; Checkpoint 8 by reverting the Week 9A merges (PR #44, #43, #42, #41, #40, #39 and the ADR-027 record PR #38) — no database step, though reverting PR #40 removes the PostgreSQL driver; then Checkpoint 7 by also reverting the Week 8 merges as appropriate — PR #36, then PR #35, then PR #34 (no database step: Week 8 added no migration and no dependency); Checkpoint 6 by also reverting PR #28 (no database step); Checkpoint 6A by also reverting PR #19 (no database step); Checkpoint 5 by also reverting PR #17 (no database step); Checkpoint 5A by also reverting PR #15 (no database step); Checkpoint 4 by also reverting PR #13; Checkpoint 4A by also reverting PR #11; Checkpoint 3 also needs `alembic downgrade 7c2f1a9b4d30`; below Checkpoint 3 also needs `alembic downgrade base`. |
+| **Next milestone** | **Week 9B — Deployment and Sharing. OPTIONAL, owner-triggered and NOT started.** It is not required for ordinary use and may never be performed; it begins only when the owner decides to share EligiCore, and seven owner decisions are open before it can (ADR-027). Live Gemini application generation remains deferred and is not scheduled by any merged decision. Week 10 remains buffer. |
 | **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
@@ -92,6 +92,14 @@
 | **Week 8 Slice 8B — corpus vectorizer cache** *(merged, PR #35)* | `CorpusArtifacts`, `CorpusCache` and `fit_corpus` in `app/services/matching_engine.py` — a process-local, bounded, in-memory LRU of **capacity 4**, keyed by the existing `corpus_fingerprint`, holding only catalogue-derived fitted artifacts. **The candidate transform stays per-request and is never cached.** No configuration key, no disk, no external cache service, no new dependency. An output-identical optimization: cold, warm and post-invalidation results are identical. |
 | **Week 8 Slice 8B — tests** *(merged, PR #35)* | 43 new in `tests/test_corpus_cache.py` (1505 total) — cold/warm equivalence, fingerprint invalidation, candidate isolation, bounded eviction and artifact immutability. 34/34 mutations caught. |
 | **Week 8 Slice 8C — operational-log completeness** *(merged, PR #36)* | One production gap, closed in eight lines of `app/main.py`: a request that ends in an unhandled exception now emits its request record before the exception propagates. Starlette's `ServerErrorMiddleware` sits outside the request middleware, so the request count had been systematically blind to exactly those requests. Nothing about the exception is logged there. Recorded as **Checkpoint 8**. |
+| **Week 9 design ruling** | **ADR-027** (PR #38, `1afd4e5`) — EligiCore is primarily a locally run personal application; Week 9 splits into 9A local production readiness and 9B optional deployment. Records the deliberate deviation from dossier §15 row 9 and §17, which required a live public API. |
+| **Week 9A-1 — OpenAPI currency** *(merged, PR #39)* | The published status corrected from Weeks 1–6 to Weeks 1–8. **The document is byte-identical once `info.description` is removed** — 10 paths, 58 schemas, all status codes unchanged. Two merged pinning tests re-aimed and strengthened; one new test pins the whole contract surface. |
+| **Week 9A-2 — PostgreSQL compatibility** *(merged, PR #40 + verification)* | `psycopg2-binary==2.9.10` added, closing a real gap: ADR-009 names PostgreSQL for production but no driver was declared. The existing chain was then run against **local PostgreSQL 18.6** — upgrade, representative data, constraint probes, stepwise downgrade, re-upgrade and `alembic check` — all passing. **`batch_alter_table`, never before run outside SQLite, fell through to plain `ALTER TABLE` as documented.** No migration modified; head unchanged. |
+| **Week 9A-3 — production configuration** *(merged, PR #41)* | Seven tests pin production mode, which nothing had covered. Finding: **traceback suppression is unconditional**, not caused by the environment setting — a stronger guarantee, pinned in that form. Two coherence gaps reported, not patched: `ELIGICORE_DEBUG` is read nowhere, and `Settings.is_production` has no consumer. |
+| **Week 9A-4 — secret handling** *(merged, PR #42)* | Tree and full-history scans (412 blobs, 190 commits) found **no real secret**; all eight hits manually classified as false positives. **`.env` has zero historical revisions.** Two tests close the one unpinned gap: the provider key never reaches a log or an error message. |
+| **Week 9A-5 — privacy and logging** *(merged, PR #43)* | Three tests re-verify the Week 8C guarantees **under production**, which no merged test had done. Sixteen markers, every candidate-carrying endpoint, a controlled 500, cost records and a full database dump — all clean. |
+| **Week 9A-6 — local end-to-end** *(verification only, no commit)* | A real `uvicorn` process against local PostgreSQL under production: 40 jobs seeded, **all ten routes exercised from the live OpenAPI inventory, every one 200**, `/docs` `/redoc` `/openapi.json` served, a genuine 500 from stopping the database, and the **downgrade and re-upgrade executed** with 41 rows preserved through both data-preserving steps and the application restarted against the restored schema. |
+| **Week 9A-7 — documentation** *(merged, PR #44)* | README made current against the live application in both directions; local-first documented as normal; optional deployment path documented and **not executed**, with the seven 9B decisions left open. **Two fresh clones from GitHub reached a running API in 3 min 7 s and 2 min 46 s**, no undocumented step. |
 | **Week 8 Slice 8C — tests** *(merged, PR #36)* | 44 new in `tests/test_operational_logs.py` (1549 total) — request-count completeness across seven paths, error-record content, the Slice 8A regression, the generation boundary verified on the syntax tree, and a fourteen-marker privacy sweep. 32/32 mutations caught. |
 | **Week 7 Slice 7B — tests** *(merged, PR #28)* | 98 new (1358 total); five merged assertions re-aimed and strengthened after the provider interface grew, none weakened. 54/54 mutations caught; Slice 7A's 42/42 preserved. ADR-025's failure-semantics wording was corrected by docs-only PR #29 (`234dabf`) before the merge, not during implementation. |
 
@@ -123,7 +131,8 @@
 | Truthfulness validator (deterministic service, no endpoint) | 7 | **COMPLETE** — PR #24, Slice 7A (ADR-025); no checkpoint of its own — covered by Checkpoint 7 |
 | Application preparation endpoint (`POST /api/v1/applications/prepare`) | 7 | **COMPLETE** — PR #28, Slice 7B, Checkpoint 7 (ADR-025); mock generation only, live Gemini deferred |
 | Caching, AI cost logging | 8 | **COMPLETE** — PR #34 (8A cost/usage accounting) + PR #35 (8B corpus cache) + PR #36 (8C operational logs), Checkpoint 8 (ADR-026). **Cost coverage excludes the generation path, by design (D8); live Gemini application generation was NOT implemented and remains deferred.** |
-| Deployment (Render/Railway), README, docs | 9 | NOT STARTED |
+| Documentation and local production readiness | 9A | **COMPLETE** — Checkpoint 9A (`95a1187`); seven slices merged or verified (ADR-027) |
+| Deployment and sharing (Render/Railway, hosted PostgreSQL, access control) | 9B | **OPTIONAL — NOT STARTED.** Not required for ordinary use; seven owner decisions open (ADR-027) |
 
 **Week 6 is the declared safe stopping point** — at that line the system is complete and
 demoable. Weeks 7–10 are enhancement.
@@ -132,10 +141,44 @@ demoable. Weeks 7–10 are enhancement.
 
 ## Next approved phase
 
-**None. Week 9 — documentation and deployment — is NOT started and NOT authorized.** Week 6 is the
-dossier's declared safe stopping point (§15): everything after it is enhancement. Week 8 is
-complete and recorded as Checkpoint 8; Week 9 begins only on explicit instruction, after its own
-design gate. **There is no Week 9 branch, no deployment work and no Checkpoint 9.**
+**None. Week 9B — Deployment and Sharing — is OPTIONAL, owner-triggered and NOT started.** It is
+not required for ordinary use of EligiCore and may never be performed. Week 6 remains the dossier's
+declared safe stopping point (§15). **Nothing is deployed: there is no hosted instance, no public
+URL and no Checkpoint 9.**
+
+### Week 9A — Local production readiness · COMPLETE (Checkpoint 9A)
+
+Ruled by **ADR-027** (PR #38, `1afd4e5`), which records that EligiCore is primarily a locally run
+personal application and splits Week 9 into two stages. That is a **deliberate, owner-approved
+deviation** from dossier §15 row 9 and §17, which required a live public API; the deviation is
+recorded in the ADR rather than reinterpreted away, and the dossier is unmodified.
+
+Seven slices, all merged or verified and each audited post-merge:
+
+| Slice | Outcome |
+|---|---|
+| **9A-1** OpenAPI currency (PR #39) | Status corrected to Weeks 1–8; document byte-identical apart from that text |
+| **9A-2** PostgreSQL compatibility (PR #40 + verification) | Driver added; the existing chain validated against PostgreSQL 18.6 by execution |
+| **9A-3** production configuration (PR #41) | Production mode pinned; suppression shown to be unconditional |
+| **9A-4** secret handling (PR #42) | No secret in the tree or in any historical blob; key transport pinned |
+| **9A-5** privacy and logging (PR #43) | The 8C guarantees re-verified under production |
+| **9A-6** local end-to-end (verification only) | Real server, real PostgreSQL, all ten routes, rollback executed |
+| **9A-7** documentation (PR #44) | README current; fresh clone to a running API in 2 min 46 s |
+
+**What Checkpoint 9A does not mean.** It does not mean a public API exists. **Local execution is
+the normal operating mode and localhost is sufficient for ordinary personal use.** Deployment is
+optional and owner-triggered.
+
+**Seven Week 9B decisions remain open and none has been made:** Render vs Railway · hosted
+PostgreSQL choice · rate-limiting mechanism and values · deployed AI provider · hosted catalogue
+seeding strategy · `/docs` exposure · shared-instance access control.
+
+**Known limitations carried forward:** no hosted deployment · no public URL · no platform-log
+verification · no live Gemini call · no authentication (Phase 4) · no rate limiting (QG-007 item 10
+unmet) · uvicorn's own stderr tracebacks during a database outage, which carry file paths but no
+credentials or candidate data and are a hosted-logging consideration for 9B · one unexplained,
+unreproduced failure of a merged 9A-5 test whose assertion text was not captured, which remains an
+**open diagnostic item** rather than something later green runs have closed.
 
 ### Week 8 — Refinement, caching and cost logging · COMPLETE (Checkpoint 8)
 
@@ -377,7 +420,8 @@ governs; this is a summary.
 | **6A** | Week 6 — Excel Export (**intermediate**) | `0125703` | PR #17, merged 2026-09-19 | **Stable** |
 | **6** | Week 6 — MVP (final) | `13eb832` | PR #17 + PR #19, merged 2026-09-20 | **Stable** |
 | **7** | Week 7 — Application Preparation (final) | `6c269a0` | PR #24 + PR #28, merged 2026-09-22 | **Stable** |
-| **8** | Week 8 — Refinement, Caching and Cost Logging (final) | `9aba1f2` | PR #34 + PR #35 + PR #36, merged 2026-09-24 | **Stable — current** |
+| **8** | Week 8 — Refinement, Caching and Cost Logging (final) | `9aba1f2` | PR #34 + PR #35 + PR #36, merged 2026-09-24 | **Stable** |
+| **9A** | Week 9A — Local Production Readiness | `95a1187` | PR #39 + #40 + #41 + #42 + #43 + #44, merged 2026-09-26 | **Stable — current** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
 **Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
@@ -390,6 +434,7 @@ governs; this is a summary.
 **Checkpoint 6 full SHA:** `13eb8325149cab60a039534631265803250b767a`
 **Checkpoint 7 full SHA:** `6c269a05ec1a4fdbdc7820d0c6b0b40980ba8fb3`
 **Checkpoint 8 full SHA:** `9aba1f2b1007b0931ec9adc39afb88b15eaa2c14`
+**Checkpoint 9A full SHA:** `95a1187715851ee7a67fa8cdbc7c6e87f3fa7ec3`
 
 ```
 main
@@ -434,8 +479,17 @@ main
   |
   ├── f3fbf35  PR #35 — Week 8 Slice 8B corpus vectorizer cache (NOT a checkpoint)
   |
-  └── 9aba1f2  Checkpoint 8 — Week 8 Refinement, Caching and Cost Logging (final)  <- current
-                    ↑  PR #36 (feature/week-8-operational-logs, 3 commits)
+  ├── 9aba1f2  Checkpoint 8 — Week 8 Refinement, Caching and Cost Logging (final)
+  |                 ↑  PR #36 (feature/week-8-operational-logs, 3 commits)
+  |
+  ├── 1afd4e5  PR #38 — ADR-027 Week 9 local-first deployment model
+  |
+  ├── 65b15bb  PR #39 — 9A-1 OpenAPI status  ·  89b616a  PR #40 — 9A-2 driver
+  ├── 229acc1  PR #41 — 9A-3 production config  ·  88c884b  PR #42 — 9A-4 secrets
+  ├── 8cd6ad8  PR #43 — 9A-5 privacy and logging
+  |
+  └── 95a1187  Checkpoint 9A — Week 9A Local Production Readiness  <- current
+                    ↑  PR #44 (feature/week-9a7-documentation, 2 commits)
 ```
 
 Checkpoint 0 is the single commit `e8c68b7` — the state of `main` at the end of Phase 0 — not the
@@ -443,10 +497,11 @@ two-commit range that built it. Each checkpoint is declared stable only after th
 state is verified: merge confirmed on GitHub, tree clean, full suite run from `main`, and CI
 green on the merged commit.
 
-**Checkpoint 8 is the current rollback target; Checkpoint 7 is next.** Earlier checkpoints remain
+**Checkpoint 9A is the current rollback target; Checkpoint 8 is next.** Earlier checkpoints remain
 recoverable indefinitely and are not superseded — a regression whose cause predates the newest
-checkpoint needs an older target. Recovering from Checkpoint 8 to Checkpoint 7 is code-only: Week 8
-introduced no migration, no model and no dependency.
+checkpoint needs an older target. Recovering from Checkpoint 9A to Checkpoint 8 is code-only: Week 9
+introduced no migration and no model. Its one dependency addition is the PostgreSQL driver, which
+only a PostgreSQL deployment needs.
 
 Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: never rewrite
 `main` history, never `git reset --hard` as recovery, never roll back without human approval.
@@ -455,42 +510,59 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Await explicit instruction before starting Week 9.** Week 8 is complete — Slice 8A (PR #34),
-   Slice 8B (PR #35) and Slice 8C (PR #36) are merged and verified, and Checkpoint 8 (`9aba1f2`) is
-   the current checkpoint. Week 9 — documentation and deployment — is **not started and not
-   authorized**, and needs its own design gate. No phase rolls into the next automatically.
-2. **Next small approved change: the OpenAPI "Current status" sentence.** It still reads
-   "Weeks 1–6 of a 10-week build are complete." Correcting it touches `app/main.py` and the two
-   merged tests that pin the wording (`tests/test_full_flow.py`, `tests/test_tracker_export_endpoint.py`),
-   so it was kept out of the documentation-only Checkpoint 7 record — exactly as the equivalent
-   correction was handled at Checkpoint 6 (C-32, later closed by PR #21).
-3. Before relying on live AI: exercise Gemini's `assess_field_relatedness` (and
+1. **Nothing is pending. Week 9B is optional.** Week 9A is complete and recorded as
+   Checkpoint 9A (`95a1187`). **Week 9B — Deployment and Sharing — is not required for ordinary
+   use**, begins only when the owner decides to share EligiCore, and has seven open owner
+   decisions in front of it (ADR-027). No phase rolls into the next automatically.
+2. **Closed.** The OpenAPI "Current status" sentence was corrected in Week 9A-1 (PR #39): it now
+   reads "Weeks 1–8 of a 10-week build are complete." and the two merged tests that pinned the old
+   wording were re-aimed and strengthened. This tracked item, open since Checkpoint 6, is resolved.
+3. **Open diagnostic item.** `test_no_candidate_marker_survives_any_path_under_production` failed
+   once during Week 9A-6 and has passed in every run since, but its assertion text was not
+   captured. The cause is unknown; the subsequent green runs do not establish that it was benign.
+   Investigate if it recurs, and capture pytest output to a file so the next occurrence is
+   diagnosable.
+4. Before relying on live AI: exercise Gemini's `assess_field_relatedness` (and
    `extract_resume`) against the real service once, and confirm the model identifier. Both now
    carry cost and usage accounting, so a live call would also be the first real measurement of it.
    `generate_application_content` remains a deliberate stub; **live application generation was not
-   implemented in Week 8 and is not scheduled by any merged decision.**
-4. Before deployment (Week 9 / QG-007): verify the migration chain against PostgreSQL.
-   `batch_alter_table` has only ever run on SQLite.
-5. **If live application generation is ever approved, it needs its own explicit privacy decision on
+   implemented in Week 8 or Week 9A and is not scheduled by any merged decision.**
+5. **Closed.** The migration chain has now been verified against PostgreSQL — Week 9A-2 ran the
+   existing three revisions up, down and up again against local PostgreSQL 18.6 with data present,
+   and Week 9A-6 executed the same rollback on the assembled application. `batch_alter_table`,
+   which had only ever run on SQLite, fell through to plain `ALTER TABLE` as its docstrings claim.
+   The dossier §9 precondition for deployment is satisfied.
+6. **If live application generation is ever approved, it needs its own explicit privacy decision on
    cost logging.** Week 8 excluded `generate_application_content` from usage accounting
    structurally — no sink is threaded through it and no setting could enable one (ADR-026 D8) — and
    that exclusion is not something a later slice may quietly reverse.
+7. **If Week 9B is ever activated, seven owner decisions come first** (ADR-027): Render vs Railway ·
+   hosted PostgreSQL choice · rate-limiting mechanism and values · deployed AI provider · hosted
+   catalogue seeding strategy · `/docs` exposure · shared-instance access control. None may be
+   chosen implicitly, and an unauthenticated public API is not assumed acceptable merely because
+   deployment is optional.
 
 **Outstanding integration step:** the Gemini provider — resume extraction and field relatedness —
 has never run against the live service. Confirm the model identifier and exercise one real call before
 relying on live extraction.
 
-**Weeks 1–8 are complete; Weeks 9–10 have not started.** Checkpoint 8 (`9aba1f2`) is the final
-Week 8 record and **Stable — current**; Checkpoint 7 (`6c269a0`) is the final Week 7 record and now
-historical; Checkpoint 6 (`13eb832`) remains the final Week 6 record and the dossier's declared
+**Weeks 1–8 are complete and Week 9A is complete; Week 9B is optional and Week 10 has not
+started.** Nothing is deployed.
+
+Checkpoint 9A (`95a1187`) is the Week 9A record and **Stable — current**; Checkpoint 8
+(`9aba1f2`) is the final Week 8 record and now historical; Checkpoint 7 (`6c269a0`) is the final
+Week 7 record; Checkpoint 6 (`13eb832`) remains the final Week 6 record and the dossier's declared
 safe stopping point, with Checkpoint 6A the intermediate Week 6 one. **Week 8 has no intermediate
-checkpoint — there is no Checkpoint 8A, 8B or 8C — and there is no Checkpoint 9.** The published
-OpenAPI status still reads "Weeks 1–6 of a 10-week build are complete."; correcting it is
-application work, tracked under Next actions.
+checkpoint — there is no Checkpoint 8A, 8B or 8C. There is no Checkpoint 9: it is reserved for the
+final Week 9 state and exists only if the owner deliberately deploys.** The published OpenAPI
+status now reads **"Weeks 1–8 of a 10-week build are complete."** — corrected in Week 9A-1, closing
+the item tracked since Checkpoint 6.
 No `/matching/score` route and no `/jobs/ingest` route exists. `POST /api/v1/applications/prepare`
 exists and is POST-only, one of exactly ten routes — the same ten as at Checkpoint 7. Application
 generation runs on the **mock provider only** — the Gemini generation method is a stub that raises
-`AIProviderUnavailableError`.
+`AIProviderUnavailableError`, and no live Gemini call has ever been made from this project.
+**Nothing is deployed:** no hosted instance, no public URL, no hosting artifact in the repository,
+and no authentication or rate limiting.
 **Caching and cost logging now exist, and both are bounded exactly as ADR-026 rules them:** one
 process-local, in-memory corpus cache of capacity 4 holding catalogue-derived artifacts only, and
 operational cost/usage log records for two AI operations. **No candidate-derived cache, no
