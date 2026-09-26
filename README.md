@@ -50,8 +50,13 @@ Not senior professionals — at that level eligibility gates barely exist and fi
 
 **Pre-release development. Weeks 1–8 of a 10-week solo build complete; Week 9A (local production readiness) complete.**
 
-Current stable checkpoint: **Checkpoint 8** (`9aba1f2`) — Week 8 refinement, caching and cost
-logging. A résumé becomes a profile, the profile becomes explained eligibility verdicts and ranked
+Current stable checkpoint: **Checkpoint 9A** (`95a1187`) — Week 9A local production readiness:
+the OpenAPI document current, PostgreSQL compatibility verified by execution, production
+configuration, secret handling, privacy and logging re-verified, a local end-to-end run, and this
+documentation. It records a verified **local** product — **nothing is deployed**.
+
+The capability it certifies was reached at **Checkpoint 8** (`9aba1f2`) — Week 8 refinement,
+caching and cost logging. A résumé becomes a profile, the profile becomes explained eligibility verdicts and ranked
 recommendations over a 40-job synthetic catalogue, those become an Excel tracker, and a chosen
 job becomes a draft application in which every untraceable claim has been removed — all locally,
 with a mock AI provider and no candidate data stored anywhere on the server. Week 8 added no
@@ -79,7 +84,7 @@ Week 9 is therefore two stages:
 
 | Stage | What it is | State |
 |---|---|---|
-| **9A — local production readiness** | OpenAPI accuracy, PostgreSQL compatibility, production configuration, secret handling, privacy and logging, a local end-to-end run, and this documentation | **Complete** |
+| **9A — local production readiness** | OpenAPI accuracy, PostgreSQL compatibility, production configuration, secret handling, privacy and logging, a local end-to-end run, and this documentation | **Complete — Checkpoint 9A (`95a1187`)** |
 | **9B — deployment and sharing** | Hosting, hosted PostgreSQL, host configuration, an access decision, deployment verification | **Optional, not started** |
 
 **EligiCore is not deployed anywhere.** There is no public URL, and nothing in this README should

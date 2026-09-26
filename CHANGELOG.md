@@ -15,11 +15,37 @@ tag is created for it.
 
 ## [Unreleased]
 
-No work is pending. **Week 9 has not started and is not authorized** — documentation and
-deployment await their own design gate. Week 8 is complete and closed at **Checkpoint 8**
-(`9aba1f2`).
+No work is pending. **Week 9B — Deployment and Sharing — is optional, owner-triggered and not
+started.** It is not required for ordinary use of EligiCore and may never be performed. Week 9A is
+complete and closed at **Checkpoint 9A** (`95a1187`).
 
-### Known, tracked — after Checkpoint 8
+### Known, tracked — after Checkpoint 9A
+
+- **Nothing is deployed.** No hosted instance, no public URL, no platform account, no hosting
+  artifact in the repository. **Local execution is the normal operating mode.**
+- **No platform-log verification.** Week 9A verified application-controlled logs only.
+- **No live Gemini call, no authentication, no rate limiting.** QG-007 item 10 (rate limiting on
+  AI-cost-exposed endpoints) is unmet by design, because it governs a public deployment.
+- **Seven Week 9B owner decisions are open** and none has been made: Render vs Railway · hosted
+  PostgreSQL choice · rate-limiting mechanism and values · deployed AI provider · hosted catalogue
+  seeding strategy · `/docs` exposure · shared-instance access control.
+- **Uvicorn writes its own tracebacks to stderr** when an unhandled exception occurs — observed
+  during the deliberate database outage in Week 9A-6. They carry repository and library file paths
+  but **no credentials, no DSN, no database name and no candidate data**, and never reach the HTTP
+  response. This is a hosted-logging consideration for 9B, **not an application privacy failure**.
+- **One unexplained test failure remains an open diagnostic item.**
+  `test_no_candidate_marker_survives_any_path_under_production` failed once during Week 9A-6 and
+  has passed in every run since, but its assertion text was not captured. **The subsequent green
+  runs do not establish that the original cause was benign** — the cause is unknown.
+
+### Closed since Checkpoint 8
+
+- **The stale OpenAPI "Current status" sentence**, tracked since Checkpoint 6, was corrected in
+  Week 9A-1: it now reads "Weeks 1–8 of a 10-week build are complete."
+- **PostgreSQL migration compatibility**, unverified since Week 3, was validated by execution in
+  Week 9A-2 and again as part of the Week 9A-6 end-to-end run.
+
+### Known, tracked — carried from Checkpoint 8
 
 - **AI cost coverage excludes the application-generation path, by design.** Week 8 instruments
   `extract_resume` and `assess_field_relatedness` only. `generate_application_content` is excluded
@@ -41,9 +67,75 @@ deployment await their own design gate. Week 8 is complete and closed at **Check
 
 ---
 
+## Checkpoint 9A — Week 9A: Local Production Readiness
+
+**Date:** 2026-09-26 · **Commit on `main`:** `95a1187` · **Status:** Stable — current
+**Produced by:** PR #39 (`65b15bb`, 9A-1) + PR #40 (`89b616a`, 9A-2 prerequisite) + PR #41
+(`229acc1`, 9A-3) + PR #42 (`88c884b`, 9A-4) + PR #43 (`8cd6ad8`, 9A-5) + PR #44 (`95a1187`, 9A-7),
+on **ADR-027** (PR #38, `1afd4e5`). 9A-2's migration validation and 9A-6's end-to-end run were
+verification-only and produced no commit.
+**Full SHA:** `95a1187715851ee7a67fa8cdbc7c6e87f3fa7ec3` · **CI:** `test` success ·
+**Tests:** 1567 passing from `main` (0 failed, 0 skipped) · **Alembic head:** `b3e8d2c61a47`
+
+**This checkpoint records a verified local product, not a deployment.** EligiCore runs from a
+terminal on `localhost`, and that is the normal operating mode — **localhost is sufficient for
+ordinary personal use.** There is no hosted instance and no public URL. **Week 9B — Deployment and
+Sharing — is optional and owner-triggered**, and may never happen.
+
+**This is a checkpoint, not a release. No tag and no version bump.**
+
+**Checkpoint 9A is a stage checkpoint.** Week 9 is two stages under ADR-027. **Checkpoint 9 remains
+reserved for the final Week 9 state** and is established only if the owner deliberately deploys.
+
+### What Week 9A verified
+
+- **9A-1 — OpenAPI currency (PR #39).** Status corrected from Weeks 1–6 to Weeks 1–8. **The
+  document is byte-identical once `info.description` is removed** — 10 paths, 58 schemas, all
+  status codes unchanged. No route or schema contract change.
+- **9A-2 — PostgreSQL compatibility (PR #40 + verification).** `psycopg2-binary==2.9.10` added,
+  closing a real gap: ADR-009 names PostgreSQL for production but no driver was declared. The
+  existing three-migration chain was then run against **local PostgreSQL 18.6** — upgrade,
+  representative data, constraint probes, stepwise downgrade, re-upgrade, and `alembic check`
+  executed against PostgreSQL. **`batch_alter_table`, used by all three migrations and never
+  before run outside SQLite, fell through to plain `ALTER TABLE` as documented.** No migration
+  modified; head unchanged.
+- **9A-3 — Production configuration (PR #41).** Production mode had no test coverage at all.
+  Seven tests now pin it. The finding: **traceback suppression is unconditional**, not caused by
+  the environment setting — a stronger guarantee, because it cannot be lost by misconfiguration.
+- **9A-4 — Secret handling (PR #42).** Tree and full-history scans — 162 files, 412 reachable
+  blobs, 190 commits, every historical revision of the environment and CI files, all commit
+  messages — found **no real secret**. **`.env` has zero historical revisions: it was never
+  committed.** The API key is read in exactly one place, the request header.
+- **9A-5 — Privacy and logging (PR #43).** The Week 8C guarantees re-verified **under
+  production**, which no merged test had done. Sixteen markers, every candidate-carrying endpoint,
+  a controlled 500, cost records and a full database dump — all clean.
+- **9A-6 — Local end-to-end (verification only).** A real `uvicorn` process against local
+  PostgreSQL under production: 40 jobs seeded, **all ten routes exercised from the live OpenAPI
+  inventory, every one 200**, a genuine 500 from stopping the database, and the **rollback
+  executed** — 41 rows preserved through both data-preserving downgrades, every constraint and
+  index restored, and the application restarted against the restored schema.
+- **9A-7 — Documentation (PR #44).** README made current against the live application in both
+  directions. **Two fresh clones from GitHub reached a running API in 3 min 7 s and 2 min 46 s**,
+  with no undocumented step.
+
+### Privacy and boundaries
+
+Unchanged and re-verified: no candidate, application, evaluation or package persistence; no PII in
+logs, errors or cost records; no `candidate_id` in any cost record; no candidate-derived cache; no
+submission, browser automation or CAPTCHA/OTP handling. Tables remain exactly `jobs` and
+`ingestion_state`.
+
+### Not included
+
+No deployment, hosting, hosted database, public URL, authentication, rate limiting or live Gemini
+work. **No Week 9 migration, model, API, schema or business-logic change.** One dependency across
+all of Week 9A: the PostgreSQL driver. **None of the seven Week 9B owner decisions was made.**
+
+---
+
 ## Checkpoint 8 — Week 8: Refinement, Caching and Cost Logging (final)
 
-**Date:** 2026-09-24 · **Commit on `main`:** `9aba1f2` · **Status:** Stable — current
+**Date:** 2026-09-24 · **Commit on `main`:** `9aba1f2` · **Status:** Stable
 **Produced by:** PR #34 (`e5d6d36`, cost/usage accounting — Slice 8A, no checkpoint of its own)
 + PR #35 (`f3fbf35`, corpus vectorizer cache — Slice 8B, no checkpoint of its own)
 + PR #36 (`9aba1f2`, operational-log completeness — Slice 8C)

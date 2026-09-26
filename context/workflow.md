@@ -164,7 +164,8 @@ the single commit on `main` where that phase's merge landed.
 | **6A** | Week 6 — Excel Export (PR 6A) · **intermediate** | `0125703` | PR #17 (`feature/week-6-excel-export`), merged 2026-09-19 | ✅ `test` success on `0125703` | 1075 passed | **Stable** |
 | **6** | Week 6 — MVP (final: PR 6A + PR 6B) | `13eb832` | PR #17 (`0125703`) + PR #19 (`feature/week-6-polish`), merged 2026-09-20 | ✅ `test` success on `13eb832` | 1133 passed | **Stable** |
 | **7** | Week 7 — Application Preparation (final: Slice 7A + Slice 7B) | `6c269a0` | PR #24 (`365e7a4`, Slice 7A) + PR #28 (`feature/week-7-application-prep`), merged 2026-09-22 | ✅ `test` success on `6c269a0` | 1358 passed | **Stable** |
-| **8** | Week 8 — Refinement, Caching and Cost Logging (final: Slice 8A + Slice 8B + Slice 8C) | `9aba1f2` | PR #34 (`e5d6d36`, Slice 8A) + PR #35 (`f3fbf35`, Slice 8B) + PR #36 (`feature/week-8-operational-logs`), merged 2026-09-24 | ✅ `test` success on `9aba1f2` | 1549 passed | **Stable — current** |
+| **8** | Week 8 — Refinement, Caching and Cost Logging (final: Slice 8A + Slice 8B + Slice 8C) | `9aba1f2` | PR #34 (`e5d6d36`, Slice 8A) + PR #35 (`f3fbf35`, Slice 8B) + PR #36 (`feature/week-8-operational-logs`), merged 2026-09-24 | ✅ `test` success on `9aba1f2` | 1549 passed | **Stable** |
+| **9A** | Week 9A — Local Production Readiness (9A-1 … 9A-7) | `95a1187` | PR #39 (`65b15bb`, 9A-1) + PR #40 (`89b616a`, 9A-2 prerequisite) + PR #41 (`229acc1`, 9A-3) + PR #42 (`88c884b`, 9A-4) + PR #43 (`8cd6ad8`, 9A-5) + PR #44 (`feature/week-9a7-documentation`, 9A-7), merged 2026-09-26. 9A-2's migration validation and 9A-6's end-to-end run were verification-only and produced no commit | ✅ `test` success on `95a1187` | 1567 passed | **Stable — current** |
 
 **Checkpoint 1 full SHA:** `2e79454f787019ff29af39fcfd285aee59c8bc77`
 **Checkpoint 2 full SHA:** `91dd31d50e7749ad37acf14babd5d1ee90141abd`
@@ -177,6 +178,7 @@ the single commit on `main` where that phase's merge landed.
 **Checkpoint 6 full SHA:** `13eb8325149cab60a039534631265803250b767a`
 **Checkpoint 7 full SHA:** `6c269a05ec1a4fdbdc7820d0c6b0b40980ba8fb3`
 **Checkpoint 8 full SHA:** `9aba1f2b1007b0931ec9adc39afb88b15eaa2c14`
+**Checkpoint 9A full SHA:** `95a1187715851ee7a67fa8cdbc7c6e87f3fa7ec3`
 
 **Checkpoint 4A is intermediate, not Checkpoint 4.** Week 4 is delivered in two PRs. 4A marks the
 verified deterministic engine; **Checkpoint 4 is reserved for Week 4 as a whole** and is
@@ -225,6 +227,164 @@ rollback destinations.
 verified. It is a checkpoint, not a release, version or tag (C-28). **Checkpoint 6 (`13eb832`)
 remains the dossier's declared safe stopping point (§15)**; Checkpoint 7 remains the final Week 7
 record and is now historical rather than current.
+
+**Checkpoint 9A is a stage checkpoint, not the final Week 9 one.** Week 9 is two stages under
+[ADR-027](../artifacts/decisions/ADR-027-week-9-local-first-deployment-model.md): **9A — Local
+Production Readiness** and **9B — Deployment and Sharing**, which is optional and owner-triggered.
+9A is the stable checkpoint for the product as it is actually run; **Checkpoint 9 is reserved for
+the final Week 9 state and is established only if and when the owner deliberately deploys.**
+
+**Checkpoint 9A established 2026-09-26** at `95a1187`, after all seven 9A slices were merged or
+verified and each post-merge state was audited. It is a checkpoint, not a release, version or tag
+(C-28). **It does not mean a public API exists** — see the verification record below.
+
+### Checkpoint 9A — verification record (Week 9A Local Production Readiness)
+
+**Checkpoint:** Checkpoint 9A — Week 9A Local Production Readiness
+**Phase:** Week 9, stage A — local production readiness (ADR-027)
+**Commit on `main`:** `95a1187` — the PR #44 merge commit, parents `8cd6ad8` (previous `main`, the
+9A-5 merge) and `27d957a` (PR #44 branch head). Real merge; both PR #44 commits are preserved.
+**Merged by:** `Lakshya172` on GitHub at 2026-09-26T12:38:59Z. The post-merge gate confirmed the
+merged tree is identical to the reviewed head `27d957a`.
+**Date established:** 2026-09-26
+
+**What this checkpoint is, and what it is not.** It records that the **locally run** product is
+verified and documented. **It does not mean EligiCore is deployed.** There is no hosted instance,
+no public URL and no platform account; **local execution is the normal operating mode and
+localhost is sufficient for ordinary personal use.** Deployment is optional, owner-triggered, and
+recorded as Week 9B.
+
+**Git history of Week 9A:**
+
+| Step | Merge on `main` |
+|---|---|
+| Week 9 design ruling — ADR-027 (PR #38) | `1afd4e562d94c6327c585ee787fba59649ff09f3` |
+| 9A-1 OpenAPI status correction (PR #39) | `65b15bbc5bd078e7c6696ce4f7fb502cba17c18f` |
+| 9A-2 PostgreSQL driver prerequisite (PR #40) | `89b616a6133b1cda2de1018259a7651970f1e90f` |
+| 9A-2 migration validation | **verification only — no commit** |
+| 9A-3 production configuration (PR #41) | `229acc1efc0a4747eb8aff232de442eec994e07a` |
+| 9A-4 secret handling (PR #42) | `88c884bf8b80395807ccec21b7a38b5ab95ed600` |
+| 9A-5 privacy and logging (PR #43) | `8cd6ad8b1dce8614d72666e2987dc215c4b2b758` |
+| 9A-6 local end-to-end run | **verification only — no commit** |
+| 9A-7 documentation (PR #44) — **Checkpoint 9A** | `95a1187715851ee7a67fa8cdbc7c6e87f3fa7ec3` |
+
+**The seven slices, as verified.**
+
+*9A-1 — OpenAPI currency.* The published status was corrected from *"Weeks 1–6 of a 10-week build
+are complete."* to Weeks 1–8, with a paragraph stating what Week 8 actually did. **The OpenAPI
+document is byte-identical once `info.description` is removed** — same 10 paths, same methods, same
+58 schemas, same status codes. No route or schema contract changed. The two merged tests that
+pinned the sentence were re-aimed and strengthened, and a new test pins the whole contract surface.
+
+*9A-2 — PostgreSQL compatibility, verified by execution.* `psycopg2-binary==2.9.10` was added and
+merged as a prerequisite, closing a real gap: ADR-009 names PostgreSQL for production but no driver
+was a declared dependency. The existing three-migration chain `54a85d64881e` → `7c2f1a9b4d30` →
+`b3e8d2c61a47` was then run against **local PostgreSQL 18.6**: `upgrade head`, representative
+operational data, the table set and all four CHECK constraints read from `pg_catalog`, eight
+constraint probes behaving exactly as declared, a stepwise `downgrade` through the whole chain, a
+re-`upgrade`, and **`alembic check` executed against PostgreSQL** ("No new upgrade operations
+detected"). The catalog snapshots before and after the cycle are byte-identical as JSON.
+**`batch_alter_table` — the risk this existed to retire, used by all three migrations and never
+before run outside SQLite — fell through to plain `ALTER TABLE` as documented.** No migration was
+modified and the head is unchanged.
+
+*9A-3 — Production configuration.* Under `ELIGICORE_ENVIRONMENT=production`: `debug` false,
+`is_production` true, Starlette's own debug flag false, and a controlled 500 returning the generic
+envelope with none of eleven internal markers. **Nothing in the production configuration
+implementation changed.** The finding recorded with it matters: **traceback suppression is
+unconditional**, coming from the merged exception handler and from the application never being
+built with `debug=True`, not from the environment setting — a stronger guarantee, because it cannot
+be lost by misconfiguring the variable, and the tests pin it in that form.
+
+*9A-4 — Secret handling.* Repository scan across 162 tracked files and **history scan across every
+blob reachable from any ref** (412 blobs, 190 commits), plus every historical revision of `.env`,
+`.env.example`, `app/config.py`, `alembic.ini`, CI, `requirements.txt` and `.gitignore`, all commit
+messages, and a high-entropy literal sweep. **No real secret, current or historical.** Every one of
+the eight pattern hits was inspected manually and classified as a false positive — a keyword
+argument reading configuration, and the synthetic `test-key-not-real` marker. **`.env` has zero
+historical revisions: it was never committed, ever**, and `git check-ignore` proves it is ignored.
+`.env.example` holds names with empty or placeholder values. The OpenAPI document contains no
+secret and not one configuration name. The API key is **read in exactly one place**, the
+`x-goog-api-key` header; there is no `params=` call in the provider, so it cannot reach a query
+string, and no logging call references it.
+
+*9A-5 — Privacy and logging under production.* Sixteen synthetic markers across every
+candidate-carrying endpoint, a controlled 500 through an existing path, and the AI relatedness stage
+forced so cost records genuinely existed. **No marker in any log, error response, cost record or the
+database. No `candidate_id` in any cost record.** The request record kept exactly its five fields,
+and the database was byte-identical by full dump across the sweep.
+
+*9A-6 — Local end-to-end, production-like.* A real `uvicorn` process against local PostgreSQL 18.6
+under `ELIGICORE_ENVIRONMENT=production`: migrations applied, **40 jobs seeded through the existing
+`python -m app.cli seed-catalogue`**, and **all ten implemented routes exercised from the running
+application's own OpenAPI inventory — every one 200, no unexpected 5xx.** `/docs`, `/redoc` and
+`/openapi.json` all served. Controlled failures covered 404, 405, 422 and a **genuine 500 produced
+by stopping the database**, which returned the generic envelope and from which the server recovered.
+The migration downgrade and re-upgrade were **executed on the assembled database**, preserving all
+41 seeded rows through both data-preserving steps and restoring every table, CHECK constraint and
+index identically; **the application then started again against the restored schema** and served
+the re-seeded catalogue. The disposable database was dropped and both server processes stopped.
+
+*9A-7 — Documentation.* The README was made current against the live application: the test count,
+the Week 9 roadmap row, the quickstart preamble, the PostgreSQL parity claim, the job-detail path
+parameter, and `/redoc` and `/openapi.json` were all corrected or added, and **every endpoint named
+in the README matches the live surface in both directions**. The local-first operating model is
+documented as normal, with deployment optional. **Two genuine fresh clones from GitHub, with pip's
+cache disabled, reached a running API in 3 min 7 s and 2 min 46 s** — tests green at 4 min 38 s and
+4 min 12 s — **with no undocumented step required.**
+
+| Check | Result |
+|---|---|
+| PR #44 merged on GitHub | `merged: true`, `merge_commit_sha` = `95a1187715851ee7a67fa8cdbc7c6e87f3fa7ec3` |
+| Tree on `main` vs reviewed PR head `27d957a` | **Identical** |
+| Working tree / `origin/main` | Clean; local `main` = `origin/main` = `95a1187` |
+| Full suite from `main` | **1567 total — 1567 passed, 0 failed, 0 skipped**, offline |
+| CI | `test` success on every 9A merge, including `95a1187` |
+| API surface | Exactly **10 routes**, unchanged; OpenAPI structurally identical apart from the status text |
+| Migration chain | Unchanged — three migrations, head `b3e8d2c61a47`; **no Week 9 migration**; validated against PostgreSQL 18.6 by execution |
+| Tables | Exactly `jobs`, `ingestion_state` (+ `alembic_version`); no candidate, application, evaluation or package table |
+| Dependencies | One addition across all of Week 9A: `psycopg2-binary==2.9.10`, the driver ADR-009 already implied |
+| Secrets | None in the tree or in any reachable historical blob; `.env` never committed |
+| Privacy | No PII in logs, errors, cost records or the database, verified under production |
+| Deployment | **None.** No hosted instance, no public URL, no hosting artifact in the repository |
+| Fresh-clone quickstart | 2 min 46 s to a running API, no undocumented step |
+
+**Gates:** QG-001 PASS · QG-004 PASS (the OpenAPI correction, with contract equivalence proved) ·
+QG-005 PASS (privacy, secrets, logging) · QG-006 PASS (no new migration; the existing chain
+validated against PostgreSQL) · QG-002 N/A (no eligibility change) · QG-003 N/A (no AI behaviour
+change) · QG-007 **not applicable yet — it governs 9B**, and items 10 and 12 (rate limiting,
+bounded AI spend) remain unmet by design · QG-008 N/A.
+
+**Known limitations — recorded, not resolved:**
+
+1. **No hosted deployment.** Nothing is running anywhere but a local machine.
+2. **No public URL.**
+3. **No platform-log verification.** 9A verified application-controlled logs only.
+4. **No live Gemini call.** The provider is exercised only through a mocked transport; the model
+   identifier remains a configured default rather than a verified one, and application generation
+   is still a stub.
+5. **No authentication** (Phase 4).
+6. **No rate limiting.** QG-007 item 10 requires it for a public deployment and it is unmet.
+7. **Seven 9B owner decisions remain open** — see below.
+8. **Uvicorn emitted source-path tracebacks to its own stderr** during the deliberate PostgreSQL
+   outage in 9A-6. They contain repository and library file paths but **no credentials, no DSN, no
+   database name, no host or port and no candidate data**, and they never reached the HTTP
+   response, which stayed generic. This is the ASGI server's own behaviour, **a hosted-logging
+   consideration for 9B rather than an application privacy failure** — it matters when a platform
+   captures stdout and stderr.
+9. **One intermittent, unexplained failure of a merged 9A-5 test remains an open diagnostic item.**
+   `test_no_candidate_marker_survives_any_path_under_production` failed once, in a run launched
+   immediately after heavy teardown, and its assertion text was not captured before it was lost.
+   It has passed in every run since. **That is not proof the original cause was benign** — the
+   cause is unknown, and the item stays open rather than being closed by subsequent green runs.
+
+**The seven Week 9B decisions, explicitly not made here:** Render vs Railway · hosted PostgreSQL
+choice · rate-limiting mechanism and values · which AI provider a deployed instance runs · how a
+hosted catalogue is seeded · whether `/docs` stays public on a shared instance · access control for
+a shared instance. Each is the owner's, and none is chosen by this checkpoint.
+
+**Next state: Week 9B — Deployment and Sharing, optional and deferred.** It is not required for
+ordinary use of EligiCore and may never be performed. Week 10 remains buffer and final polish.
 
 ### Checkpoint 8 — verification record (final Week 8)
 
@@ -1065,18 +1225,21 @@ Notes that remove the ambiguities this registry exists to close:
 
 | Priority | Checkpoint | Commit | Role |
 |---|---|---|---|
-| **1st** | Checkpoint 8 — Week 8 Refinement, Caching and Cost Logging (final) | `9aba1f2` | **Current stable point.** If a future phase introduces a regression, this is the immediate rollback reference. |
-| **2nd** | Checkpoint 7 — Week 7 Application Preparation (final) | `6c269a0` | **Historical fallback.** Week 7 without any Week 8 instrumentation or caching. Reached by reverting the Week 8 merges as appropriate — PR #36, then PR #35, then PR #34; **no database step** (Week 8 introduced no migration and no dependency). |
-| **3rd** | Checkpoint 6 — Week 6 MVP (final) | `13eb832` | **Historical fallback — the dossier's declared safe stopping point (§15).** The complete demoable MVP without application preparation. Reached by also reverting the PR #28 merge; no database step. |
-| **4th** | Checkpoint 6A — Week 6 Excel Export (intermediate) | `0125703` | The export without the demo path. Reached by also reverting the PR #19 merge; no database step. |
-| **5th** | Checkpoint 5 — Week 5 Matching Engine (final) | `0aaaa1d` | Last state before any Week 6 code. Reached by also reverting the PR #17 merge; no database step (`openpyxl` and `et-xmlfile` leave `requirements.txt` with it). |
-| **6th** | Checkpoint 5A — Week 5 deterministic matching engine | `05534af` | Matching engine without the recommendations endpoint. Reached by also reverting the PR #15 merge; no database step. |
-| **7th** | Checkpoint 4 — Week 4 Eligibility Intelligence | `f56d7df` | Last state before any matching code. Reached by also reverting the PR #13 merge; no database step (scikit-learn leaves `requirements.txt` with it). |
-| **8th** | Checkpoint 4A — Week 4 deterministic engine | `4a5cb84` | Deterministic eligibility without the AI stage. Reached by also reverting the PR #11 merge; no database step. |
-| **9th** | Checkpoint 3 — Week 3 | `2cfd4f0` | Last state before any eligibility code. |
-| **10th** | Checkpoint 2 — Week 2 | `91dd31d` | Known-good state before the job catalogue. |
-| **11th** | Checkpoint 1 — Week 1 | `2e79454` | Remains available indefinitely as a historical recovery point. |
-| **12th** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
+| **1st** | Checkpoint 9A — Week 9A Local Production Readiness | `95a1187` | **Current stable point.** If a future phase introduces a regression, this is the immediate rollback reference. |
+| **2nd** | Checkpoint 8 — Week 8 Refinement, Caching and Cost Logging (final) | `9aba1f2` | **Historical fallback.** Week 8 without the Week 9A corrections, verification tests and documentation. Reached by reverting the Week 9A merges as appropriate — PR #44, #43, #42, #41, #40, #39, and the ADR-027 record PR #38; **no database step** (Week 9 introduced no migration). Note that reverting PR #40 removes the PostgreSQL driver, so a PostgreSQL deployment would need it reinstated. |
+| **3rd** | Checkpoint 7 — Week 7 Application Preparation (final) | `6c269a0` | **Historical fallback.** Week 7 without any Week 8 instrumentation or caching. Reached by also reverting the Week 8 merges as appropriate — PR #36, then PR #35, then PR #34; **no database step** (Week 8 introduced no migration and no dependency). |
+| **4th** | Checkpoint 6 — Week 6 MVP (final) | `13eb832` | **Historical fallback — the dossier's declared safe stopping point (§15).** The complete demoable MVP without application preparation. Reached by also reverting the PR #28 merge; no database step. |
+| **5th** | Checkpoint 6A — Week 6 Excel Export (intermediate) | `0125703` | The export without the demo path. Reached by also reverting the PR #19 merge; no database step. |
+| **6th** | Checkpoint 5 — Week 5 Matching Engine (final) | `0aaaa1d` | Last state before any Week 6 code. Reached by also reverting the PR #17 merge; no database step (`openpyxl` and `et-xmlfile` leave `requirements.txt` with it). |
+| **7th** | Checkpoint 5A — Week 5 deterministic matching engine | `05534af` | Matching engine without the recommendations endpoint. Reached by also reverting the PR #15 merge; no database step. |
+| **8th** | Checkpoint 4 — Week 4 Eligibility Intelligence | `f56d7df` | Last state before any matching code. Reached by also reverting the PR #13 merge; no database step (scikit-learn leaves `requirements.txt` with it). |
+| **9th** | Checkpoint 4A — Week 4 deterministic engine | `4a5cb84` | Deterministic eligibility without the AI stage. Reached by also reverting the PR #11 merge; no database step. |
+| **10th** | Checkpoint 3 — Week 3 | `2cfd4f0` | Last state before any eligibility code. |
+| **11th** | Checkpoint 2 — Week 2 | `91dd31d` | Known-good state before the job catalogue. |
+| **12th** | Checkpoint 1 — Week 1 | `2e79454` | Remains available indefinitely as a historical recovery point. |
+| **13th** | Checkpoint 0 — Phase 0 | `e8c68b7` | Engineering layer only, no product code. |
+
+**Neither the Week 9A nor the Week 8 rollback chain needs a database step.** Week 9 added no migration and no model; its one dependency addition is the PostgreSQL driver, which only a PostgreSQL deployment needs.
 
 **The Week 8 rollback chain needs no database step.** Week 8 added no migration, no model and no
 dependency, so recovering from Checkpoint 8 to Checkpoint 7 is code-only: revert the PR #36, #35
