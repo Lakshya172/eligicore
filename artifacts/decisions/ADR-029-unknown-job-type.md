@@ -149,41 +149,43 @@ less forthcoming — that would punish the candidate for a gap in the data.
 
 ### Preference and catalogue filtering
 
-**D8 — a typed filter never returns a job of a *different known* type.** `?job_type=INTERNSHIP`
-never returns a `FULL_TIME` job and vice versa; the exact-match core of
-`Job.job_type == job_type` is preserved for the two real types. What D9 adds on top of it is the
-unknown-type case, and only that.
+**D8 — `GET /api/v1/jobs?job_type=` keeps exact-match semantics, unchanged.** A filter naming a
+known type returns **only** jobs of that known type. `?job_type=INTERNSHIP` returns internships and
+nothing else; `?job_type=FULL_TIME` returns full-time roles and nothing else. **Neither ever
+returns an unknown-type job.** The existing implementation — `Job.job_type == job_type` — stands
+exactly as merged, and the published meaning of both filters is untouched.
 
-**D9 — Unknown-type jobs are surfaced by default, explicitly labelled, never reclassified.**
-**OD-1 is resolved: surface, do not silently hide.** A typed filter therefore returns the requested
-type **plus** unknown-type jobs, and every one of them is returned carrying `job_type: "UNKNOWN"`
-so a client can see exactly what it is being given.
+**D9 — The default, unfiltered listing surfaces unknown-type jobs; explicit typed filters do
+not.** **OD-1 is resolved: surface, do not silently hide** — and that surfacing is scoped to the
+**default listing**, where a client has expressed no type constraint. `GET /api/v1/jobs` with no
+`job_type` parameter returns internships, full-time roles and unknown-type jobs together, each
+carrying its own `job_type` so a client can see exactly what it is being given.
 
-A boolean query parameter — working name `include_unknown_type`, **defaulting to `true`** — lets a
-client that genuinely needs strict matching opt back out with `include_unknown_type=false`.
+A client that wants unknown-type jobs specifically asks for them with **`?job_type=UNKNOWN`**,
+which returns only those. That, plus the default listing, covers both needs without touching the
+two existing filters.
 
-**This is a deliberate semantic widening of an existing parameter, and it is recorded as one
-rather than presented as additive.** Under ADR-010, *"changing what an existing one means is
-breaking"*, and `?job_type=INTERNSHIP` moves from "jobs of type INTERNSHIP" to "jobs of type
-INTERNSHIP, plus jobs whose type the source did not state". No response changes on the day the
-migration runs, because no `UNKNOWN` row exists yet — but the contract statement changes then, not
-later, and the endpoint's published description must say so. The owner accepted this trade
-knowingly: silently hiding real, open jobs from every client that filters is the worse outcome,
-and the label plus the opt-out keep the behaviour honest and reversible per caller.
+**No new query parameter is introduced.** An earlier draft proposed an `include_unknown_type`
+toggle to widen typed filters; it is rejected. It would have changed what `?job_type=INTERNSHIP`
+means, which ADR-010 classes as breaking, in exchange for a capability the default listing and
+`?job_type=UNKNOWN` already provide. Keeping the API surface as it is was the better answer, and
+it is also the simpler one — the jobs router's filters are described as *"deliberately minimal"*
+and stay that way.
 
 **The complete deterministic matrix.** Rows are the filter the client sends; columns are the stored
 job type:
 
 | Client filter | `INTERNSHIP` job | `FULL_TIME` job | `UNKNOWN` job |
 |---|---|---|---|
-| `?job_type=INTERNSHIP` | returned | not returned | **returned, labelled `UNKNOWN`** (default) · not returned with `include_unknown_type=false` |
-| `?job_type=FULL_TIME` | not returned | returned | **returned, labelled `UNKNOWN`** (default) · not returned with `include_unknown_type=false` |
-| `?job_type=UNKNOWN` | not returned | not returned | **returned** |
-| no `job_type` parameter | returned | returned | **returned** |
+| **no `job_type` parameter** | returned | returned | **returned** |
+| `?job_type=INTERNSHIP` | returned | excluded | **excluded** |
+| `?job_type=FULL_TIME` | excluded | returned | **excluded** |
+| `?job_type=UNKNOWN` | excluded | excluded | **returned** |
 
-In every cell where an `UNKNOWN` job is returned it is returned **as `UNKNOWN`**. It is never
-relabelled, never silently folded into the requested type, and never omitted from the response
-body's `job_type` field.
+Every cell is exact match, with the single exception of the unfiltered row, which returns
+everything. In every cell where an `UNKNOWN` job is returned it is returned **as `UNKNOWN`** — never
+relabelled, never folded into another type, and never omitted from the response body's `job_type`
+field.
 
 **D10 — Any future server-side preference filtering inherits this matrix.** When
 `CandidatePreferences.job_types` is eventually consumed — it is consumed by nothing today — an
@@ -275,7 +277,13 @@ three ATS sources; reordering unblocks none of them cleanly.
 enum — but the *database's* constraint is the one created by migration `7c2f1a9b4d30`, and only a
 migration changes that.
 
-**API.** `JobType` is published in OpenAPI as
+**API.** **The existing `INTERNSHIP` and `FULL_TIME` filter semantics are unchanged (D8), so
+nothing about this change is breaking for them.** A client filtering by either known type receives
+exactly what it received before; the only way to see an unknown-type job is to omit the filter or
+to ask for `?job_type=UNKNOWN` explicitly. The change is therefore a pure enum widening, which
+ADR-010 classes as additive.
+
+`JobType` is published in OpenAPI as
 `{"type": "string", "enum": ["INTERNSHIP", "FULL_TIME"]}` and is referenced by **two** schemas:
 
 - **`JobRead`** — a **response** widening. Additive under ADR-010: *"Adding a state is additive;
@@ -402,9 +410,11 @@ trigger.** An AST or import-level guard asserting that the eligibility engine do
 **Matching and recommendation** — match scores for an `UNKNOWN`-type job are identical to those for
 the same job with a real type; ranking position is unchanged; `UNKNOWN` is not a penalty (D7).
 
-**Filter matrix** — every cell of the D9 table asserted explicitly, under both values of
-`include_unknown_type`, including that a returned `UNKNOWN` job is reported **as** `UNKNOWN` in the
-response body and is never relabelled as the requested type.
+**Filter matrix** — all twelve cells of the D9 table asserted explicitly. The three that matter
+most are the exclusions: **`?job_type=INTERNSHIP` must not return an `UNKNOWN`-type job**,
+**`?job_type=FULL_TIME` must not either**, and **`?job_type=UNKNOWN` must return only those**.
+Also asserted: the unfiltered listing returns all three types, and a returned `UNKNOWN` job is
+reported **as** `UNKNOWN` in the response body rather than relabelled.
 
 **Preference rejection (D15)** — `preferences.job_types: ["UNKNOWN"]` returns a deterministic
 validation failure; `["INTERNSHIP", "UNKNOWN"]` is rejected too rather than silently filtered down
@@ -426,7 +436,7 @@ Neither is authorized by this ADR; each needs its own gate.
 
 | PR | Objective | Migration |
 |---|---|---|
-| **A** | `JobType.UNKNOWN` — enum, `RawJob` default, model, API contract, the additive filter parameter, the migration widening the CHECK, and the OD-3 downgrade behaviour, with the full test set above including PostgreSQL execution | **Yes** |
+| **A** | `JobType.UNKNOWN` — enum, `RawJob` default, model, API contract (**no new query parameter**), the migration widening the CHECK, and the D16 downgrade behaviour, with the full test set above including PostgreSQL execution | **Yes** |
 | **B** | Greenhouse adapter (the blocked PR #50), mapping `job_type=UNKNOWN` | No |
 
 PR A must leave the suite green and the 40 curated jobs byte-identical in type. PR B then lands as
@@ -448,9 +458,10 @@ instead of silently filling it.
 - **`UNKNOWN` is visible in the `CandidatePreferences` schema but invalid as a value** (D15). The
   published enum and the accepted values diverge unless the implementation splits the enum, and
   that divergence has to be documented rather than left for a client to discover by 422.
-- **The `?job_type=` filter changes meaning** (D9). Accepted deliberately, but it is a contract
-  change under ADR-010 and clients relying on strict matching must pass
-  `include_unknown_type=false`.
+- **Unknown-type jobs are invisible to a client that always filters by a known type** (D8, D9).
+  That is the deliberate cost of keeping the existing filters exact: such a client sees them only
+  by dropping the filter or asking for `?job_type=UNKNOWN`. **The existing `INTERNSHIP` and
+  `FULL_TIME` filters keep their meaning, so nothing here is a breaking change to them.**
 - **The downgrade path becomes conditional** on the data present, and will now refuse outright once
   any live unknown-type job has been ingested (D16). That is the correct behaviour and it still
   makes rollback harder than it was.
@@ -477,7 +488,7 @@ pattern rather than three one-off enum members.
 
 | # | Decision | Resolution |
 |---|---|---|
-| **OD-1** | Filter default on `GET /api/v1/jobs` | **SURFACE.** Unknown-type jobs are returned rather than silently hidden, and are **visibly labelled `UNKNOWN`**. `include_unknown_type` defaults to `true`; a client needing strict matching opts out. Recorded as a deliberate semantic widening under ADR-010 (D9). |
+| **OD-1** | Filter default on `GET /api/v1/jobs` | **SURFACE, in the default listing.** With no `job_type` parameter, unknown-type jobs are returned rather than silently hidden and are **visibly labelled `UNKNOWN`**. **This does not alter the existing explicit type filters:** `?job_type=INTERNSHIP` and `?job_type=FULL_TIME` remain exact and never include `UNKNOWN`, which is queried explicitly with `?job_type=UNKNOWN`. No new query parameter (D8, D9). |
 | **OD-2** | `UNKNOWN` in `CandidatePreferences.job_types` | **REJECT.** `UNKNOWN` is **not** a valid candidate employment-type preference. A client sending it receives a **deterministic validation error**, never a wildcard and never a silent drop (D15). |
 | **OD-3** | Downgrade when `UNKNOWN` rows exist | **FAIL SAFELY.** The downgrade detects `UNKNOWN` rows and aborts. It must **not** delete, convert or reinterpret them. The downgrade test must include existing `UNKNOWN` rows (D16). |
 | **OD-4** | The core semantics in D2 | **APPROVED.** `JobType.UNKNOWN` is the explicit representation of missing source employment-type information, and nothing else. |
@@ -491,7 +502,9 @@ seven remain open and untouched.
 
 Every PR in this sequence is checked against this ADR at review: no inference of employment type
 from prose (D3), no `Optional[JobType]` (D4), no normalizer translation of `UNKNOWN` (D5), no
-`job_type` reference introduced into the eligibility or matching engines (D6, D7), unknown-type
-jobs surfaced and labelled rather than hidden or reclassified (D9), `UNKNOWN` rejected as a
-candidate preference (D15), no curated row converted (D11), and a downgrade that aborts with every
-row intact, tested with `UNKNOWN` rows actually present (D16).
+`job_type` reference introduced into the eligibility or matching engines (D6, D7), **an explicit
+`?job_type=INTERNSHIP` or `?job_type=FULL_TIME` filter that returns an `UNKNOWN`-type job** (D8),
+no new query parameter widening those filters (D9), the unfiltered listing still returning all
+three types (D9), `UNKNOWN` rejected as a candidate preference (D15), no curated row converted
+(D11), and a downgrade that aborts with every row intact, tested with `UNKNOWN` rows actually
+present (D16).
