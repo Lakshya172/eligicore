@@ -36,7 +36,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CLI_PATH = ROOT / "app" / "cli.py"
 DATASET = ROOT / "app" / "data" / "curated_jobs.json"
 CURATED_COUNT = len(json.loads(DATASET.read_text(encoding="utf-8")))
-HEAD_REVISION = "b3e8d2c61a47"
+HEAD_REVISION = "c4f1a8b92d63"
 PREVIOUS_REVISION = "7c2f1a9b4d30"
 
 

@@ -61,7 +61,15 @@ class RawJob(BaseModel):
 
     company_name: str = Field(min_length=1, max_length=300)
     role_title: str = Field(min_length=1, max_length=300)
-    job_type: JobType
+    job_type: JobType = Field(
+        default=JobType.UNKNOWN,
+        description=(
+            "Employment type **as the source stated it**. Defaults to `UNKNOWN`, which means "
+            "the source did not state one — so an adapter for a source that publishes no "
+            "employment type omits this field rather than inventing a value (ADR-029 D4). "
+            "**Never infer it** from a title, description or any other prose (ADR-029 D3)."
+        ),
+    )
 
     location: str | None = Field(default=None, max_length=300)
     description: str = Field(default="", max_length=50_000)
