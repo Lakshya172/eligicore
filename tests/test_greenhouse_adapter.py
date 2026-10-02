@@ -182,7 +182,7 @@ async def test_c_multiple_boards_are_each_fetched_in_order() -> None:
 
     assert len(recorder.requests) == 4
     assert {job.company_name for job in jobs} == {ORG_NAME, SECOND_ORG}
-    assert {job.source_job_id for job in jobs} == {"1", "2"}
+    assert {job.source_job_id for job in jobs} == {f"{TOKEN}:1", f"{SECOND_TOKEN}:2"}
 
 
 def test_c_duplicate_tokens_are_collapsed_preserving_order() -> None:
@@ -208,7 +208,7 @@ async def test_defghi_the_full_mapping_is_exactly_what_greenhouse_supplied() -> 
 
     assert job.company_name == ORG_NAME                                       # D
     assert job.role_title == "Software Engineering Intern"                    # E
-    assert job.source_job_id == "123"                                         # F
+    assert job.source_job_id == f"{TOKEN}:123"                                # F
     assert job.apply_link == f"https://boards.greenhouse.io/{TOKEN}/jobs/123"  # G
     assert job.description == DESCRIPTION                                     # H
     assert job.location == "New York, NY"                                     # I
@@ -222,8 +222,8 @@ async def test_f_the_job_post_id_is_used_not_the_internal_job_id() -> None:
     )
     job = (await adapter.fetch())[0]
 
-    assert job.source_job_id == "123"
-    assert job.source_job_id != "999999"
+    assert job.source_job_id == f"{TOKEN}:123"
+    assert "999999" not in job.source_job_id
 
 
 @pytest.mark.anyio
@@ -373,7 +373,7 @@ async def test_o_a_duplicate_job_id_within_one_board_is_collapsed() -> None:
     )
     jobs = await adapter.fetch()
 
-    assert [job.source_job_id for job in jobs] == ["5", "6"]
+    assert [job.source_job_id for job in jobs] == [f"{TOKEN}:5", f"{TOKEN}:6"]
 
 
 @pytest.mark.anyio
@@ -410,7 +410,7 @@ async def test_p_a_malformed_record_is_skipped_and_the_good_ones_survive(
     adapter, _ = build(one_board(jobs_payload(broken, job_payload(77))))
     jobs = await adapter.fetch()
 
-    assert [job.source_job_id for job in jobs] == ["77"]
+    assert [job.source_job_id for job in jobs] == [f"{TOKEN}:77"]
 
 
 @pytest.mark.anyio
@@ -802,3 +802,306 @@ def test_the_curated_catalogue_is_untouched_and_still_states_real_types() -> Non
     )
     assert len(entries) == 40
     assert {entry["job_type"] for entry in entries} == {"INTERNSHIP", "FULL_TIME"}
+
+
+# ---------------------------------------------------------------------------------------
+# Board-scoped identity — the collision this correction exists to prevent
+# ---------------------------------------------------------------------------------------
+#
+# A Greenhouse job-post id is scoped by its board: every documented endpoint addresses a
+# post as /v1/boards/{board_token}/jobs/{id}, and nothing guarantees `id` is unique across
+# boards. Persisting the bare id made two employers sharing a post id collide — ingestion
+# collapsed or overwrote one, and a real job vanished with no error. These tests pin the
+# qualified identity that fixes it, through the real pipeline rather than in isolation.
+
+TOKEN_A, TOKEN_B = "company_a", "company_b"
+
+
+def rival_routes(
+    *, a_title: str = "Backend Engineer", b_title: str = "Data Scientist"
+) -> dict[str, Any]:
+    """Two different employers whose boards both expose job post 123."""
+    return {
+        f"/boards/{TOKEN_A}/jobs": jobs_payload(
+            job_payload(
+                123,
+                title=a_title,
+                content="Board A description.",
+                absolute_url=f"https://boards.greenhouse.io/{TOKEN_A}/jobs/123",
+            )
+        ),
+        f"/boards/{TOKEN_A}": board_payload("Company A"),
+        f"/boards/{TOKEN_B}/jobs": jobs_payload(
+            job_payload(
+                123,
+                title=b_title,
+                content="Board B description.",
+                absolute_url=f"https://boards.greenhouse.io/{TOKEN_B}/jobs/123",
+            )
+        ),
+        f"/boards/{TOKEN_B}": board_payload("Company B"),
+    }
+
+
+def only_board(routes: dict[str, Any], token: str) -> dict[str, Any]:
+    """The subset of routes belonging to one board."""
+    return {key: value for key, value in routes.items() if f"/boards/{token}" in key}
+
+
+def test_the_identity_is_the_board_token_and_the_post_id() -> None:
+    assert GreenhouseAdapter.qualified_job_id("company_a", 123) == "company_a:123"
+    assert GreenhouseAdapter.qualified_job_id("company_a", "123") == "company_a:123"
+
+
+@pytest.mark.anyio
+async def test_the_post_id_is_qualified_not_the_internal_job_id() -> None:
+    """The qualifier is the board; the id is still the post id, never internal_job_id."""
+    adapter, _ = build(one_board(jobs_payload(job_payload(123, internal_job_id=999999))))
+    job = (await adapter.fetch())[0]
+
+    assert job.source_job_id == f"{TOKEN}:123"
+    assert "999999" not in job.source_job_id
+
+
+@pytest.mark.anyio
+async def test_the_same_post_id_on_two_boards_yields_two_distinct_identities() -> None:
+    adapter, _ = build(rival_routes(), tokens=[TOKEN_A, TOKEN_B])
+    jobs = await adapter.fetch()
+
+    assert {job.source_job_id for job in jobs} == {"company_a:123", "company_b:123"}
+
+
+@pytest.mark.anyio
+async def test_the_qualified_ids_also_separate_the_content_hashes() -> None:
+    """Verified rather than assumed: source_job_id is a hash input, so the hashes differ."""
+    from app.services.job_normalizer import normalize_job
+
+    adapter, _ = build(rival_routes(), tokens=[TOKEN_A, TOKEN_B])
+    hashes = {
+        normalize_job(job, "greenhouse").content_hash for job in await adapter.fetch()
+    }
+    assert len(hashes) == 2
+
+
+@pytest.mark.anyio
+async def test_id_generation_is_stable_across_adapter_instances() -> None:
+    """A fresh adapter on the same board and payload must produce the identical id."""
+    produced = []
+    for _ in range(3):
+        adapter, _ = build(only_board(rival_routes(), TOKEN_A), tokens=[TOKEN_A])
+        produced.append((await adapter.fetch())[0].source_job_id)
+
+    assert produced == ["company_a:123"] * 3
+
+
+# -- through the real ingestion pipeline ------------------------------------------------
+
+
+def _rows(db: Session) -> list[Any]:
+    from app.models.job import Job
+
+    return db.query(Job).order_by(Job.source_job_id).all()
+
+
+def test_collision_two_boards_sharing_a_post_id_persist_as_two_rows(
+    session: Session,
+) -> None:
+    """The regression this correction exists for.
+
+    Before qualification this produced ONE row — `duplicates_collapsed=1`, with Company B's
+    job silently discarded as though the source had listed one posting twice.
+    """
+    from app.services.job_ingestion import ingest_source
+
+    adapter, _ = build(rival_routes(), tokens=[TOKEN_A, TOKEN_B])
+    outcome = ingest_source(session, adapter)
+
+    assert outcome.jobs_created == 2
+    assert outcome.duplicates_collapsed == 0
+
+    rows = _rows(session)
+    assert len(rows) == 2
+    assert [row.source_job_id for row in rows] == ["company_a:123", "company_b:123"]
+    assert [row.company_name for row in rows] == ["Company A", "Company B"]
+    assert [row.role_title for row in rows] == ["Backend Engineer", "Data Scientist"]
+    assert [row.apply_link for row in rows] == [
+        f"https://boards.greenhouse.io/{TOKEN_A}/jobs/123",
+        f"https://boards.greenhouse.io/{TOKEN_B}/jobs/123",
+    ]
+    assert {row.source for row in rows} == {"greenhouse"}
+
+
+@pytest.mark.parametrize(
+    "order",
+    [
+        pytest.param([TOKEN_A, TOKEN_B], id="a-then-b"),
+        pytest.param([TOKEN_B, TOKEN_A], id="b-then-a"),
+    ],
+)
+def test_collision_resists_either_ingestion_order(
+    session: Session, order: list[str]
+) -> None:
+    """Separate runs, both orders — neither board may overwrite the other."""
+    from app.services.job_ingestion import ingest_source
+
+    for token in order:
+        adapter, _ = build(only_board(rival_routes(), token), tokens=[token])
+        ingest_source(session, adapter)
+
+    rows = _rows(session)
+    assert len(rows) == 2
+    assert {row.company_name for row in rows} == {"Company A", "Company B"}
+    assert {row.source_job_id for row in rows} == {"company_a:123", "company_b:123"}
+
+
+def test_repeated_ingestion_of_both_boards_still_yields_two_rows(
+    session: Session,
+) -> None:
+    from app.services.job_ingestion import ingest_source
+
+    for _ in range(3):
+        adapter, _ = build(rival_routes(), tokens=[TOKEN_A, TOKEN_B])
+        ingest_source(session, adapter)
+
+    rows = _rows(session)
+    assert len(rows) == 2
+    assert [row.source_job_id for row in rows] == ["company_a:123", "company_b:123"]
+    assert [row.company_name for row in rows] == ["Company A", "Company B"]
+    assert [row.role_title for row in rows] == ["Backend Engineer", "Data Scientist"]
+
+
+def test_the_same_board_and_post_id_updates_rather_than_duplicating(
+    session: Session,
+) -> None:
+    from app.services.job_ingestion import ingest_source
+
+    first, _ = build(only_board(rival_routes(), TOKEN_A), tokens=[TOKEN_A])
+    ingest_source(session, first)
+
+    changed, _ = build(
+        only_board(rival_routes(a_title="Senior Backend Engineer"), TOKEN_A),
+        tokens=[TOKEN_A],
+    )
+    outcome = ingest_source(session, changed)
+
+    assert outcome.jobs_updated == 1
+    assert outcome.jobs_created == 0
+
+    rows = _rows(session)
+    assert len(rows) == 1
+    assert rows[0].role_title == "Senior Backend Engineer"
+    assert rows[0].source_job_id == "company_a:123"
+
+
+def test_an_identical_repeat_is_unchanged_not_updated(session: Session) -> None:
+    from app.services.job_ingestion import ingest_source
+
+    outcomes = []
+    for _ in range(2):
+        adapter, _ = build(only_board(rival_routes(), TOKEN_A), tokens=[TOKEN_A])
+        outcomes.append(ingest_source(session, adapter))
+
+    assert outcomes[1].jobs_unchanged == 1
+    assert outcomes[1].jobs_created == 0
+    assert outcomes[1].jobs_updated == 0
+    assert len(_rows(session)) == 1
+
+
+def test_one_ingestion_state_row_covers_every_board(session: Session) -> None:
+    """ADR-015 unchanged: `source` is the namespace, not the board."""
+    from app.models.ingestion_state import IngestionState
+    from app.services.job_ingestion import ingest_source
+
+    adapter, _ = build(rival_routes(), tokens=[TOKEN_A, TOKEN_B])
+    ingest_source(session, adapter)
+
+    states = session.query(IngestionState).all()
+    assert [state.source for state in states] == ["greenhouse"]
+    for token in (TOKEN_A, TOKEN_B):
+        assert token not in states[0].source
+
+
+def test_the_source_filter_still_means_all_greenhouse_jobs(session: Session) -> None:
+    """`?source=greenhouse` must keep spanning every board."""
+    from app.models.job import Job
+    from app.services.job_ingestion import ingest_source
+
+    adapter, _ = build(rival_routes(), tokens=[TOKEN_A, TOKEN_B])
+    ingest_source(session, adapter)
+
+    matched = session.query(Job).filter(Job.source == "greenhouse").all()
+    assert len(matched) == 2
+    assert {row.company_name for row in matched} == {"Company A", "Company B"}
+
+
+def test_a_missing_posting_still_does_not_close_anything(session: Session) -> None:
+    """Qualification must not have made the source authoritative by accident."""
+    from app.models.job import JobStatus
+    from app.services.job_ingestion import ingest_source
+
+    first, _ = build(rival_routes(), tokens=[TOKEN_A, TOKEN_B])
+    ingest_source(session, first)
+
+    second, _ = build(only_board(rival_routes(), TOKEN_A), tokens=[TOKEN_A])
+    outcome = ingest_source(session, second)
+
+    assert outcome.jobs_deactivated == 0
+    rows = _rows(session)
+    assert len(rows) == 2
+    assert all(row.status is JobStatus.ACTIVE for row in rows)
+
+
+# -- privacy: persisted deliberately, diagnosed never ------------------------------------
+
+
+def test_the_token_is_persisted_in_the_identity_and_absent_from_logs(
+    session: Session,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Both halves matter: the token belongs in the id, and nowhere in diagnostics."""
+    from app.services.job_ingestion import ingest_source
+
+    adapter, _ = build(rival_routes(), tokens=[TOKEN_A, TOKEN_B])
+    with caplog.at_level(logging.DEBUG):
+        ingest_source(session, adapter)
+
+    rows = _rows(session)
+    assert all(":" in row.source_job_id for row in rows)
+    assert rows[0].source_job_id.startswith(f"{TOKEN_A}:")
+
+    emitted = "\n".join(record.getMessage() for record in caplog.records)
+    for token in (TOKEN_A, TOKEN_B):
+        assert token not in emitted, f"{token!r} leaked into a log line"
+
+
+def test_a_board_failure_names_no_token_anywhere(session: Session) -> None:
+    from app.models.ingestion_state import IngestionState, IngestionStatus
+    from app.services.job_ingestion import ingest_all
+
+    routes = rival_routes()
+    routes[f"/boards/{TOKEN_B}"] = httpx.Response(503)
+    adapter, _ = build(routes, tokens=[TOKEN_A, TOKEN_B])
+
+    assert ingest_all(session, [adapter]) == []
+
+    state = session.get(IngestionState, "greenhouse")
+    assert state is not None
+    assert state.last_status is IngestionStatus.FAILED
+    assert state.last_error is not None
+    for token in (TOKEN_A, TOKEN_B):
+        assert token not in state.last_error
+
+
+def test_the_adapter_no_longer_persists_a_bare_post_id() -> None:
+    """A static guard against the defect returning."""
+    import pathlib
+
+    source = (
+        pathlib.Path(__file__).resolve().parent.parent
+        / "app"
+        / "adapters"
+        / "greenhouse_adapter.py"
+    ).read_text(encoding="utf-8")
+
+    assert "source_job_id=str(identifier)" not in source
+    assert "source_job_id=self.qualified_job_id(board_token, identifier)" in source

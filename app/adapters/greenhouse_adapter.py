@@ -113,6 +113,33 @@ class GreenhouseAdapter(LiveHTTPAdapter):
         """The boards this adapter will read. Deduplicated, order preserved."""
         return self._board_tokens
 
+    @staticmethod
+    def qualified_job_id(board_token: str, job_post_id: int | str) -> str:
+        """``board_token:job_post_id`` — the persisted identity of a Greenhouse post.
+
+        **A Greenhouse job-post id is board-scoped, not global.** Every documented endpoint
+        that addresses a post does so through its board — ``/v1/boards/{board_token}/jobs/{id}``
+        — and Greenhouse nowhere guarantees that ``id`` is unique across boards. Persisting
+        the bare id would therefore have been an undocumented assumption, and the way it
+        fails is silent: two employers whose boards happen to share a post id resolve to the
+        same ``(source, source_job_id)``, so ingestion collapses one into the other and the
+        second employer's job — its company, title and apply URL — disappears without an
+        error. Verified against the real pipeline before this was changed.
+
+        Qualifying the id makes EligiCore's stored identity match the source's own
+        addressing scope. ``source`` stays ``"greenhouse"`` for every board, so one
+        ``ingestion_state`` row and the ``?source=greenhouse`` filter are unaffected
+        (ADR-015, ADR-028 D3).
+
+        The ``:`` delimiter is unambiguous: Greenhouse board tokens are lowercase
+        alphanumeric, so the separator cannot occur inside one.
+
+        **The token is deliberately persisted here and deliberately absent from logs and
+        errors.** It is public — the apply URL this adapter stores already contains it —
+        but it is still kept out of diagnostics, like anything else that travels in a URL.
+        """
+        return f"{board_token}:{job_post_id}"
+
     # -- the walk -------------------------------------------------------------------------
 
     async def fetch(self) -> list[RawJob]:
@@ -248,7 +275,7 @@ class GreenhouseAdapter(LiveHTTPAdapter):
         duplicates = 0
 
         for position, entry in enumerate(entries):
-            mapped = self._map_job(entry, company_name)
+            mapped = self._map_job(entry, company_name, token)
             if mapped is None:
                 skipped += 1
                 logger.warning(
@@ -279,7 +306,9 @@ class GreenhouseAdapter(LiveHTTPAdapter):
         )
         return jobs
 
-    def _map_job(self, entry: Any, company_name: str) -> RawJob | None:
+    def _map_job(
+        self, entry: Any, company_name: str, board_token: str
+    ) -> RawJob | None:
         """One Greenhouse job post as a :class:`RawJob`, or ``None`` when unusable.
 
         Only fields Greenhouse actually supplies are mapped. Everything else — every
@@ -317,9 +346,7 @@ class GreenhouseAdapter(LiveHTTPAdapter):
                 else None,
                 # Not published by the list endpoint, and never inferred from text.
                 deadline=None,
-                # The **job post** id, not internal_job_id: the post is what the apply URL
-                # addresses and what a reader applies to.
-                source_job_id=str(identifier),
+                source_job_id=self.qualified_job_id(board_token, identifier),
             )
         except ValidationError:
             # error_count is not even recorded: pydantic's detail embeds the offending

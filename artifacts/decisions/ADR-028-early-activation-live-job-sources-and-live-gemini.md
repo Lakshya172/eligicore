@@ -165,6 +165,26 @@ company · role/title · location · job type · description · requirements · 
 explicit deadline · posted/updated timestamps · source provenance. Where the source does not supply
 a field, it is absent — D9 and D10 govern.
 
+> **Clarification, added 2026-10-02 (D11a).** `source_job_id` holds the source's own
+> identifier **at the scope the source itself addresses it**. Where a source namespaces its
+> identifiers, the stored value is the stable source-qualified form, not the bare id.
+>
+> **Greenhouse must use `board_token + ":" + job_post_id`.** Every documented Greenhouse
+> endpoint addresses a post through its board — `/v1/boards/{board_token}/jobs/{id}` — and
+> Greenhouse nowhere guarantees that `id` is unique across boards. Storing the bare id was
+> an undocumented assumption, and it failed silently: two employers whose boards share a
+> post id resolved to one `(source, source_job_id)`, so ingestion collapsed or overwrote
+> one and a real job disappeared with no error. Confirmed against the real pipeline before
+> the correction.
+>
+> This changes no contract. `source` stays `"greenhouse"` for every board, so ADR-015's one
+> `ingestion_state` row per source and the `?source=` filter are untouched, and
+> `(source, source_job_id)` remains the identity. No schema change and no migration follow
+> from it — the existing column and unique constraint already express it.
+>
+> A source whose ids are genuinely global keeps using the bare id. The rule is to match the
+> source's documented scope, not to qualify for its own sake.
+
 ### Adapter contract
 
 **D12 — `JobSourceAdapter` remains unchanged.** The interface is not modified unless a later
