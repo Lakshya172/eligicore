@@ -271,6 +271,32 @@ default, not a verified one"* stands as the record of what was true then. **The 
 in `app/config.py` is still `gemini-2.0-flash` and is deliberately not changed by this
 documentation-only ADR** — updating it belongs to the live-enablement PR.
 
+> **Amendment, added 2026-10-03 (D19a). Superseded by ADR-030 D15.** **The approved target model
+> is now `gemini-3.8-flash`.**
+>
+> D19's selection of `gemini-2.5-flash` was correct when made and is superseded on the facts
+> rather than on the reasoning: Google's documentation has moved. `gemini-3.8-flash` is the
+> currently documented stable Flash model, with structured output support and no announced
+> shutdown date. **`gemini-2.0-flash`, still the value in `app/config.py`, was shut down on
+> 2026-06-01** — D19's observation that it was *"a configured default, not a verified one"* now
+> understates the position: it is not merely unverified, it is a dead identifier, and it **must
+> not be used when Gemini is enabled.**
+>
+> **Architecture decision — settled here.** The model identifier is `gemini-3.8-flash`.
+>
+> **Future implementation and configuration work — not performed here, and not authorized by this
+> amendment.** The live-enablement PR must still update `app/config.py`, and the provider migration
+> must account for the current API contract (ADR-030 D15): remove the deprecated sampling
+> parameters `temperature`, `top_p`, `top_k` and `candidate_count`, which this model generation
+> ignores; use the current documented thinking configuration (`thinking_level`) where applicable;
+> and preserve structured JSON output. That migration reaches the **two existing** provider calls
+> as well, since both currently send `temperature: 0.0` — their determinism control is inert until
+> it lands.
+>
+> **No configuration is changed, no dependency is touched and no Gemini request is made by this
+> amendment.** D20's mock-default guarantee is unaffected: an unconfigured checkout still cannot
+> make a paid call.
+
 **D20 — The provider abstraction and the mock default are preserved.** `AIProvider` stays the only
 thing the service layer knows about (INV-5). The mock provider **remains the default for tests and
 for any unconfigured environment**, so an unconfigured checkout and CI can never make a paid call by
