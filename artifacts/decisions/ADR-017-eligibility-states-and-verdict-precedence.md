@@ -145,6 +145,41 @@ representation — and until that PR lands, nothing in the engine changes.
 Whenever a job carries free-text requirement notes, the summary discloses that they were not
 evaluated — including when structured requirements also exist.
 
+> **Amendment, added 2026-10-03. The disclosure covers *any* unevaluated source text, not only
+> `requirements` notes.**
+>
+> As written, R-4 named one place free text lives. The curated catalogue states its criteria in
+> typed columns and uses `requirements` for prose beside them, so an empty structured object there
+> genuinely did mean the posting gates nothing, and saying so was honest. **A live posting states
+> everything in its description.** The first real Greenhouse fetch returned seven jobs with 3–6 KB
+> descriptions and not one structured criterion, and the summary read *"this job states no
+> structured eligibility requirements"* — true of the columns, and read by a person as *"this job
+> has no requirements"*.
+>
+> **An empty structured requirements object must not be reported as "there are no eligibility
+> requirements" while description prose exists.** The summary must distinguish two things:
+>
+> - **no structured requirements are currently available or evaluated** — which R-4's original
+>   sentence states correctly, and which is retained verbatim; and
+> - **the posting carries source text that was not evaluated**, so a requirement stated only
+>   there is not reflected in the result.
+>
+> The second disclosure **asserts nothing about what the text contains.** Claiming it holds
+> requirements would be the inference ADR-028 D9 forbids; claiming it holds none is the defect
+> this amendment fixes. What is disclosed is the only thing known: there is source text, and it
+> was not read.
+>
+> **This is already the shipped behaviour, and this amendment changes no code.** PR #54 added the
+> description disclosure on 2026-10-02; R-4's wording had simply not caught up. The neutral
+> phrasing, the whitespace-only rule and the source-agnostic behaviour of that fix are preserved
+> exactly as shipped.
+>
+> **Independent of ADR-030.** It describes disclosure, not extraction, and remains correct whether
+> or not any requirement is ever derived from prose. Once ADR-030's capability exists, a posting
+> whose criteria have been verified and promoted will have them evaluated as requirements; text
+> that was not promoted stays disclosed-only and is still never a requirement
+> (ADR-030 D6, D10, D10a).
+
 ### Confidence
 
 Per requirement only: deterministic `PASS`/`FAIL` are `HIGH`, `UNKNOWN` is `LOW`. There is no
