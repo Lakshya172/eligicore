@@ -576,6 +576,23 @@ def _has_unevaluated_notes(job: JobRead) -> bool:
     )
 
 
+def _has_unevaluated_description(job: JobRead) -> bool:
+    """True when the posting carries description text the engine does not read.
+
+    A second place free text lives, and the one that matters for a live source. The
+    curated catalogue states its criteria in typed columns and leaves the prose
+    decorative, so an empty ``requirements`` there really did mean the posting gates
+    nothing. A live posting states everything in prose: the first real Greenhouse fetch
+    returned seven jobs with 3-6 KB descriptions and **no** structured criterion at all
+    (ADR-028 D9 forbids extracting them). Reading only ``requirements`` therefore let the
+    engine answer "this job states no structured eligibility requirements" about a posting
+    whose description may say a great deal — true as written, and misleading as read.
+
+    Whitespace-only text is not content, exactly as for a blank note above.
+    """
+    return bool(job.description.strip())
+
+
 def build_summary(
     state: EligibilityState, results: list[RequirementResult], job: JobRead
 ) -> str:
@@ -628,6 +645,15 @@ def build_summary(
     if _has_unevaluated_notes(job):
         summary += (
             " The job also lists free-text requirement notes, which were not evaluated."
+        )
+    if _has_unevaluated_description(job):
+        # Deliberately says nothing about what the description contains. The engine has
+        # not read it, so claiming it holds requirements would be exactly the inference
+        # ADR-028 D9 forbids; claiming it holds none is the bug this sentence fixes. What
+        # is disclosed is the only thing known: there is source text, and it was not read.
+        summary += (
+            " The job description was not evaluated, so any requirement stated only in"
+            " its text is not reflected here."
         )
     return summary
 
