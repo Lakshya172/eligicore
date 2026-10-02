@@ -32,6 +32,7 @@ import subprocess
 import sys
 import textwrap
 from collections.abc import Iterator
+from datetime import datetime, timezone
 from typing import Any
 
 import pytest
@@ -387,6 +388,51 @@ PRIVACY_MARKERS = {
     "language": "Zzquese",
 }
 
+#: A marker made only of digits and dots - ``cgpa``, because a grade has to stay a number -
+#: cannot be looked for as a bare substring. The text these sweeps scan is full of unrelated
+#: numbers that legitimately contain one, and two such collisions were observed in practice,
+#: both for ``6.83``:
+#:
+#: * a SQLite ``iterdump`` carries the seeded row's ``created_at``, and
+#:   ``'2026-10-02 06:01:36.834134'`` contains it - roughly one run in 1500;
+#: * :class:`Sink` records ``repr(record.args)``, and the request middleware's duration
+#:   argument is an *unrounded* float, so ``16.830941107869148`` contains it too. The
+#:   rendered line is safe (``duration_ms=%.1f``); the raw argument is not.
+#:
+#: Neither is a leak, and neither can be fixed by making the marker longer: a float repr
+#: carries up to seventeen significant digits, so any decimal remains a possible substring
+#: of one. Requiring that a numeric marker not be *part of a longer number* removes both
+#: classes outright and deterministically, with nothing left to wall-clock timing.
+#:
+#: The assertion keeps its full strength, because a real leak renders the value as a value -
+#: ``cgpa=6.83``, ``"cgpa": 6.83``, ``6.83 (SCALE_10)``, ``... is 6.83.`` - and never with a
+#: digit against it. A trailing ``.`` is deliberately still a hit, since prose ends that way.
+_PURELY_NUMERIC = re.compile(r"[0-9.]+\Z")
+
+#: The seeded job's timestamps. A constant instant, so the database dump the sweep compares
+#: contains no wall-clock text at all. Its digits are round on purpose: nothing in it can be
+#: mistaken for a marker even if the anchoring above were removed.
+SEEDED_AT = datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+
+def markers_present(haystack: str) -> list[str]:
+    """Which privacy markers `haystack` contains, as markers rather than as digit runs.
+
+    Text markers are matched by plain containment, exactly as before - they are nonsense
+    strings that nothing else can emit. Numeric markers are matched only where they are the
+    whole number, for the reason recorded above :data:`_PURELY_NUMERIC`.
+    """
+    found: list[str] = []
+    for key, value in PRIVACY_MARKERS.items():
+        text = str(value)
+        if _PURELY_NUMERIC.match(text):
+            hit = re.search(rf"(?<![0-9.]){re.escape(text)}(?!\d)", haystack) is not None
+        else:
+            hit = text in haystack
+        if hit:
+            found.append(key)
+    return sorted(found)
+
 MARKED_PROFILE: dict[str, Any] = {
     "candidate_id": PRIVACY_MARKERS["candidate_id"],
     "name": PRIVACY_MARKERS["name"],
@@ -484,6 +530,13 @@ def run_privacy_sweep() -> dict[str, Any]:
                 source_job_id="A",
                 content_hash="0" * 64,
                 status=JobStatus.ACTIVE,
+                # Pinned, not defaulted. `before` and `after` are compared byte for byte,
+                # and these three columns default to `utcnow()` - the only wall-clock text
+                # in the dump. Fixing them makes the fixture reproducible and leaves the
+                # comparison with nothing to observe but what the requests actually wrote.
+                last_verified_at=SEEDED_AT,
+                created_at=SEEDED_AT,
+                updated_at=SEEDED_AT,
             )
         )
         seed.commit()
@@ -563,15 +616,12 @@ def run_privacy_sweep() -> dict[str, Any]:
     middleware = [line.strip() for line in records
                   if MIDDLEWARE_RECORD.match(line.strip())]
 
-    def present(haystack: str) -> list[str]:
-        return sorted(k for k, v in PRIVACY_MARKERS.items() if str(v) in haystack)
-
     return {
         "statuses": statuses,
-        "markers_in_logs": present(logs),
-        "markers_in_bodies": present(" ".join(bodies)),
-        "markers_in_cost": present("\n".join(cost)),
-        "markers_in_db": present(after),
+        "markers_in_logs": markers_present(logs),
+        "markers_in_bodies": markers_present(" ".join(bodies)),
+        "markers_in_cost": markers_present("\n".join(cost)),
+        "markers_in_db": markers_present(after),
         "candidate_id_in_cost": "candidate_id" in "\n".join(cost),
         "cost_record_count": len(cost),
         "middleware_field_sets": sorted(
@@ -651,3 +701,86 @@ def test_the_database_is_byte_identical_across_production_requests() -> None:
     result = sweep_under_production()
     assert result["db_identical"] is True
     assert result["markers_in_db"] == []
+
+
+# -------------------------------------------------------------------------------------
+# The marker scan itself, pinned.
+#
+# Every assertion above is only as good as `markers_present`. These tests hold it from
+# both sides: it must not report the numbers that really did collide, and it must still
+# report a marker that a leak would actually render. Neither depends on the clock.
+# -------------------------------------------------------------------------------------
+
+
+def test_the_numeric_marker_is_not_reported_inside_an_unrelated_number() -> None:
+    """The two collisions that actually happened, pinned so neither can return.
+
+    Both are reproduced verbatim: the first came out of a failing run, the second out of
+    the middleware's own argument tuple. Each genuinely contains the marker as a substring
+    - that is asserted first, so this test cannot pass by the collision having quietly
+    disappeared from the sample rather than from the matcher.
+    """
+    cgpa = PRIVACY_MARKERS["cgpa"]
+
+    dumped_row = (
+        "INSERT INTO jobs VALUES('job-1','Zzq Target Co','Backend Engineer',"
+        "'INTERNSHIP','ACTIVE','2026-10-02 06:01:36.834134',"
+        "'2026-10-02 06:01:36.834134');"
+    )
+    logged_args = "('req-1', 'POST', '/api/v1/eligibility/check', 200, 16.830941107869148)"
+
+    assert cgpa in dumped_row, "the colliding timestamp no longer contains the marker"
+    assert cgpa in logged_args, "the colliding duration no longer contains the marker"
+
+    assert markers_present(dumped_row) == []
+    assert markers_present(logged_args) == []
+
+
+def test_a_real_numeric_marker_leak_is_still_reported() -> None:
+    """The anchoring must not have bought its determinism by going blind."""
+    cgpa = PRIVACY_MARKERS["cgpa"]
+    for leak in (
+        f"cgpa={cgpa}",
+        f'{{"cgpa": {cgpa}}}',
+        f"{cgpa} (SCALE_10)",
+        f"Minimum CGPA 7.0 not met; candidate has {cgpa}.",
+        f"[{cgpa}]",
+        cgpa,
+    ):
+        assert markers_present(leak) == ["cgpa"], leak
+
+
+def test_the_numeric_marker_is_searched_in_the_form_it_is_injected_in() -> None:
+    """`MARKED_PROFILE` carries a float; the scan searches a string. They must agree.
+
+    If `float(cgpa)` ever stopped rendering back to the literal - an extra digit, a
+    trailing zero - every CGPA assertion in this module would pass by searching for text
+    the application could never emit.
+    """
+    cgpa = PRIVACY_MARKERS["cgpa"]
+    assert str(float(cgpa)) == cgpa
+    assert MARKED_PROFILE["education"][0]["cgpa"] == float(cgpa)
+
+
+def test_text_markers_are_still_matched_by_plain_containment() -> None:
+    """Only the numeric marker is anchored. The nonsense strings keep substring matching."""
+    assert markers_present("prefix" + PRIVACY_MARKERS["name"] + "suffix") == ["name"]
+    assert markers_present(PRIVACY_MARKERS["resume_text"] + "9") == ["resume_text"]
+    assert markers_present("nothing to see here") == []
+
+
+def test_every_privacy_marker_is_covered_by_one_of_the_two_rules() -> None:
+    """A marker added later gets anchoring automatically, or it is a nonsense string.
+
+    A short, purely numeric marker that slipped past both would reintroduce exactly the
+    flake this module just removed, so the set is checked rather than assumed.
+    """
+    for key, value in PRIVACY_MARKERS.items():
+        text = str(value)
+        assert text, key
+        if _PURELY_NUMERIC.match(text):
+            # Anchored, so being inside a longer number is not a hit.
+            assert markers_present(f"1{text}1") == [], key
+        else:
+            # Not a number, so no generated timestamp, duration or id can contain it.
+            assert any(not ch.isdigit() and ch != "." for ch in text), key
