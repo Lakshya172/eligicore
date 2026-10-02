@@ -19,19 +19,36 @@ permanently (ADR-008, INV-10).
   into a log line (ADR-028 D13). A subclass supplies three hooks: where to start, how to
   read a page, and where the next page is.
 
-**No live source exists yet.** ``LiveHTTPAdapter`` is abstract and has no concrete
-subclass, nothing imports it outside its tests, and the curated dataset remains the only
-source the application ever ingests. Greenhouse, Lever and Ashby are the named initial
-targets (ADR-028 D5), each requiring its own implementation gate and its own Terms-of-Service
-confirmation (ADR-028 D8).
+**Greenhouse** is the first concrete live source (ADR-028 D5):
+
+* **Public GET API only** — ``GET /v1/boards/{board_token}`` for the organization's name
+  and ``GET /v1/boards/{board_token}/jobs?content=true`` for its posts. Greenhouse
+  documents both as publicly available, so **no authentication and no credential** is
+  involved. **No application-submission endpoint is ever called** (ADR-008, INV-10).
+* **Board tokens are constructor input**, nothing else. There is no environment variable
+  and no default token, so a checkout that configures none makes zero requests — source
+  configuration is its own later slice.
+* **``company_name`` comes from the board endpoint**, because list-jobs does not supply one
+  and deriving it from the token would be inventing an employer's name.
+* **``source_job_id`` is the Greenhouse job *post* id** (``id``), not ``internal_job_id``:
+  the post is what the apply URL addresses.
+* **Employment type is always ``UNKNOWN``** — Greenhouse publishes none, and inferring one
+  from a title or description is forbidden (ADR-029 D3). **No structured eligibility
+  criterion is extracted** from prose either (ADR-028 D9); absent stays absent.
+* **Non-authoritative**, so a job missing from one fetch is never closed (ADR-028 D14).
+
+Lever and Ashby remain named targets, each needing its own implementation gate and its own
+Terms-of-Service confirmation (ADR-028 D8).
 """
 
 from app.adapters.base_adapter import JobSourceAdapter
 from app.adapters.curated_adapter import CuratedJobAdapter
+from app.adapters.greenhouse_adapter import GreenhouseAdapter
 from app.adapters.live_http_adapter import LiveHTTPAdapter, PageRequest, RateLimiter
 
 __all__ = [
     "CuratedJobAdapter",
+    "GreenhouseAdapter",
     "JobSourceAdapter",
     "LiveHTTPAdapter",
     "PageRequest",

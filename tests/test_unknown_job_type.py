@@ -683,12 +683,10 @@ def test_the_migration_leaves_no_temporary_or_duplicate_tables(
 # ---------------------------------------------------------------------------------------
 
 
-def test_this_change_added_no_table_and_no_source_adapter() -> None:
+def test_the_unknown_type_change_added_no_table() -> None:
+    """The server-side table set is still operational data only (INV-1).
+
+    The adapter list is deliberately no longer asserted here: Greenhouse was added by its
+    own later gate, and `tests/test_greenhouse_adapter.py` pins the package contents.
+    """
     assert set(Base.metadata.tables) == {"jobs", "ingestion_state"}
-    adapters = {path.name for path in (REPO / "app" / "adapters").glob("*.py")}
-    assert adapters == {
-        "__init__.py",
-        "base_adapter.py",
-        "curated_adapter.py",
-        "live_http_adapter.py",
-    }
