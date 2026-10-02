@@ -5,7 +5,7 @@
 **Decided by:** project owner, across the ADR-030 design gate, owner-decision gate, sub-decision gate and decision lock
 **Enforces:** INV-1, INV-3, INV-4, INV-5, INV-10, INV-12 · **Refines:** ADR-003, ADR-004, ADR-006, ADR-007, ADR-017, ADR-018, ADR-019, ADR-026, ADR-028
 **Supersedes:** nothing directly — **ADR-028 D9 and D19 require a later additive amendment (§ Relationship to earlier ADRs); no ADR is amended by this document**
-**Rules on:** D1–D27 · **Resolves:** ADR-028 open **OD-6** · **Owner decisions:** OD-1 … OD-10 and the storage decision, **all resolved** (see § Owner decisions)
+**Rules on:** D1–D27 and D23a · **Resolves:** ADR-028 open **OD-6** · **Owner decisions:** OD-1 … OD-10 and the storage decision, **all resolved** (see § Owner decisions)
 
 ---
 
@@ -252,12 +252,33 @@ computed and used at verification time. **Evidence text is what is persisted** (
 
 **D10 — Only `REQUIRED` affects eligibility.**
 
+**Two outcomes exist for an extracted statement, and they must not be confused:**
+
+- **Verified derived eligibility requirement** — a statement that passed all eight conditions of
+  D6. It enters the requirement set, is evaluated, and appears in the breakdown under the capped
+  authority of D2 and D4.
+- **Disclosed / observed** — a statement the system noticed in the source text but did **not**
+  promote. It is never evaluated, never appears as a requirement, and contributes nothing to the
+  verdict. At most it is shown to a reader as something the posting says.
+
 | Strength | Effect |
 |---|---|
-| `REQUIRED` | May become a verified derived requirement and participate in evaluation under D2/D4. |
-| `PREFERRED` | **Disclosure only.** Never a gate, never a requirement, never evaluated. |
-| `CONDITIONAL` | **Disclosure, or `NEEDS_REVIEW` semantics only.** Never a deterministic hard failure. The system cannot evaluate "unless you have two years' experience", and saying so is honest. |
-| `INFORMATIONAL` | **Disclosure only.** |
+| `REQUIRED` | The **only** strength that satisfies D6 condition 7. May become a verified derived requirement and participate in evaluation under D2/D4. |
+| `PREFERRED` | **Disclosed / observed only.** Never a gate, never a requirement, never evaluated. |
+| `CONDITIONAL` | **Disclosed / observed only within ADR-030.** Fails D6 condition 7, so it is **not promoted** and never enters the verified requirement set. It must not bypass condition 7, must not reach evaluation through any other path, and can therefore never produce a deterministic hard failure. |
+| `INFORMATIONAL` | **Disclosed / observed only.** |
+
+**On `CONDITIONAL` specifically.** The owner's decision (OD-5) is that a conditional statement
+never creates a deterministic hard failure and is limited to disclosure or `NEEDS_REVIEW`
+semantics. Within this ADR that resolves to **disclosure only**, because condition 7 admits
+`REQUIRED` and nothing else: there is no promotion path a conditional statement could take, and
+**this ADR creates none.** A conditional statement may be *retained as non-authoritative extracted
+metadata* if the future schema explicitly supports that, but retention is not promotion and
+confers no evaluation effect whatever.
+
+Routing a conditional statement to `NEEDS_REVIEW` would require a mechanism that does not exist
+here and would need its own decision. It is deliberately **not** invented by this ADR — a second
+execution path into the requirement set is exactly the kind of bypass D6 exists to prevent.
 
 *"Students from CS/IT or related backgrounds preferred"* must never become an authoritative
 exclusion. A recruiter's soft wish converted into a system-stated barrier produces a candidate who
@@ -289,7 +310,7 @@ the go conditions in § Implementation sequencing.
 | Required skills | ADR-018 assigns skills to matching, not eligibility; see D20's note on double counting. |
 | Requirement strength classification | Needs discourse understanding; the hardest and most safety-critical judgement in the capability. |
 | Degree-level mapping from a degree name | ADR-018 is explicit: *"A level is never guessed from a degree name."* |
-| Deadlines | Out of scope entirely (D23). |
+| Deadlines | Out of scope entirely (D23a). |
 
 **A deterministic extraction is not self-evidently correct and is not exempt from anything.** A
 regular expression locates a number; it does not establish that the number is a CGPA requirement
@@ -414,6 +435,17 @@ from `jobs` columns. The boundary this ADR fixes is:
   requirement exists and where it came from. This is the ADR-017 amendment described below, and it
   is what makes D2 auditable from the response rather than merely true internally.
 
+**This is an explainability change, and ADR-006 governs it.** ADR-006 fixes the breakdown entry at
+`requirement`, `candidate_value`, `status`, `confidence`, `method` and an optional `note`, and says
+of `method` that it *"is how a reader knows which evaluation stage produced a verdict, and it makes
+ADR-003 auditable from the output."* Provenance does the same job for D2: without it, a reader
+cannot tell whether a requirement was published by the employer or read out of prose, and the
+authority rule is true internally but invisible externally — which ADR-006 treats as a failure, not
+a result. Evidence text extends the same principle, letting a reader see the sentence a derived
+requirement rests on. ADR-006's accepted cost applies unchanged: payloads grow, and a rule change
+that does not update its explanation is a defect. Its INV-4 caution also applies — evidence is job
+text, never candidate text, and is still never logged. **ADR-006 itself is not modified.**
+
 **Three alternatives are rejected explicitly, so a later PR cannot choose one silently:**
 
 | Rejected | Why |
@@ -467,6 +499,18 @@ committed.**
 The fetch is a single public-board GET, no application endpoint, no authentication, no candidate
 data, no production mutation. **It is not performed by this ADR.**
 
+**The authorization is for exactly one fetch and is consumed by it.** Once that fetch has been
+performed, this ADR authorizes no further live Greenhouse request: **any additional fetch, retry
+for a better corpus, or refresh of the corpus requires a new owner decision.** No repeated
+polling, scheduled fetching or re-fetching is implicitly authorized by OD-7 or by anything in this
+document. Raw and full fetched job text remains **local-only and uncommitted** under this ADR, and
+the committed artifact remains limited to the derived-corpus shape below.
+
+A consequence follows and is accepted deliberately: because the raw corpus is never committed and
+the authorization is single-use, **a lost local corpus cannot be recreated without a new owner
+decision.** That is the price of not redistributing third-party text, and it argues for capturing
+the derived artifact promptly once the fetch is made.
+
 The committed artifact is a **derived corpus**:
 
 - structural metadata
@@ -490,11 +534,17 @@ enough surrounding text to exercise the contradiction window (D9), which bounds 
 can be. Where a real case needs more context than the artifact policy permits, it is tested with
 synthetic text and the real case is exercised against the local corpus only.
 
-**Deadlines are outside this capability** (D23 continues): deadline extraction and freshness belong
-to ADR-028's freshness slice, remain deterministic, and are not part of ADR-030. Greenhouse exposes
+### Deadlines
+
+**D23a — Deadline extraction and freshness are outside ADR-030.** They belong to ADR-028's
+freshness slice, remain deterministic, and are not part of this capability. Greenhouse exposes
 `application_deadline` as a real API field — null on all seven observed jobs, but present — so a
 source may simply supply it, and routing a solved problem through a model and an eight-condition
 gate buys nothing.
+
+*Numbered `D23a` rather than `D28` following the repository's additive convention (ADR-028 D11a),
+so D1–D27 stay contiguous. It is a decision in its own right, not a sub-clause of the fixture
+corpus decision above.*
 
 ### Privacy and security
 
@@ -549,7 +599,7 @@ Explicitly excluded, and not reintroducible by an implementation PR:
 - **Browser automation.**
 - **Candidate-data persistence** of any kind (ADR-011, INV-1).
 - **Extracting required skills into eligibility** (D12; ADR-018 assigns skills to matching).
-- **Deadline handling** as part of this capability (D23).
+- **Deadline handling** as part of this capability (D23a).
 - **Unrestricted AI eligibility judgement.** AI never evaluates a candidate against a requirement
   here; it reads a job (ADR-019 §2 remains in force).
 - **Model confidence as authority** (D7).
@@ -805,8 +855,8 @@ the implementing PR with evidence rather than guessed here.
 | **OD-1** | Authorize extraction from prose | **APPROVED**, only through the evidence-verification contract (D6). ADR-028 D9 must not be weakened implicitly; a D9a amendment is required. |
 | **OD-2** | May extraction create `NOT_ELIGIBLE`? | **PROVENANCE-BASED AUTHORITY.** Any prose-derived requirement is capped, equally for deterministic and AI extraction (D1–D4). No new state. |
 | **OD-3** | Persistence of provenance | **PERSIST** requirement, evidence text, extractor identity, model/version, timestamp. Offsets are not authoritative (D18, D9). |
-| **OD-4** | Deadlines | **SEPARATE** — outside ADR-030 (D23). |
-| **OD-5** | Strength | **ONLY `REQUIRED` gates.** `PREFERRED` and `INFORMATIONAL` disclosure only; `CONDITIONAL` at most `NEEDS_REVIEW` (D10). |
+| **OD-4** | Deadlines | **SEPARATE** — outside ADR-030 (D23a). |
+| **OD-5** | Strength | **ONLY `REQUIRED` gates**, and it is the only strength D6 condition 7 admits. `PREFERRED` and `INFORMATIONAL` are disclosed only. `CONDITIONAL` never creates a deterministic hard failure and, because no promotion path admits it, resolves within this ADR to **disclosed only**; any `NEEDS_REVIEW` routing would need its own decision (D10). |
 | **OD-6** | Gemini model | **`gemini-3.8-flash`**, with the deprecated sampling parameters removed. No configuration change here (D15). |
 | **OD-7** | Fixture corpus | **ONE controlled live fetch authorized; DERIVED CORPUS committed**, raw stays local (D23). |
 | **OD-8** | Trigger and re-extraction | **INGESTION-TIME ONLY; HYBRID re-extraction** — content change routine, version change explicit (D21, D22). |
