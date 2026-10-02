@@ -679,20 +679,29 @@ def test_o_the_curated_adapter_is_untouched_by_the_new_base() -> None:
     assert CuratedJobAdapter.source_name == "curated"
 
 
-def test_p_no_concrete_live_source_exists_and_nothing_wires_one_in() -> None:
-    """The base is abstract and unusable on its own; the seed path stays curated-only."""
+def test_p_no_live_source_is_wired_into_the_default_path() -> None:
+    """The base is abstract; concrete sources exist but none is wired in.
+
+    Greenhouse became the first concrete subclass (ADR-028 D5). What this still guards is
+    the property that matters: **the seed path remains curated-only**, so a default
+    checkout contacts nothing.
+    """
     with pytest.raises(TypeError):
         LiveHTTPAdapter()  # type: ignore[abstract]
 
     from app.adapters.curated_adapter import CuratedJobAdapter
+    from app.adapters.greenhouse_adapter import GreenhouseAdapter
     from app.cli import seed_catalogue
 
-    concrete = [
-        cls
+    concrete = {
+        cls.__name__
         for cls in LiveHTTPAdapter.__subclasses__()
         if not cls.__abstractmethods__ and cls.__module__.startswith("app.")
-    ]
-    assert concrete == [], f"A live source adapter shipped in app/: {concrete}"
+    }
+    assert concrete == {"GreenhouseAdapter"}, f"Unexpected live source adapter: {concrete}"
+
+    # Configured with nothing, it reaches nothing.
+    assert GreenhouseAdapter().board_tokens == ()
 
     referenced = {
         constant
@@ -700,7 +709,10 @@ def test_p_no_concrete_live_source_exists_and_nothing_wires_one_in() -> None:
         if isinstance(constant, str)
     }
     assert "CuratedJobAdapter" in referenced
-    assert not any("Live" in name or "http" in name.lower() for name in referenced)
+    assert not any(
+        "Live" in name or "Greenhouse" in name or "http" in name.lower()
+        for name in referenced
+    )
     assert CuratedJobAdapter.is_authoritative is True
 
 
