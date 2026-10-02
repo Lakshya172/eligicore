@@ -96,7 +96,15 @@ async def list_jobs(
         Query(description="Filter by active status. Defaults to active jobs only."),
     ] = True,
     job_type: Annotated[
-        JobType | None, Query(description="Filter by internship or full-time.")
+        JobType | None,
+        Query(
+            description=(
+                "Filter by employment type. **Exact match** — `INTERNSHIP` returns only "
+                "internships and `FULL_TIME` only full-time roles; neither includes jobs "
+                "whose source omitted the type. Pass `UNKNOWN` to retrieve exactly those, "
+                "or omit this parameter to get all three (ADR-029 D8, D9)."
+            )
+        ),
     ] = None,
     source: Annotated[
         str | None, Query(max_length=100, description="Filter by adapter source name.")

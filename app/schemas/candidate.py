@@ -72,10 +72,29 @@ class DegreeLevel(str, Enum):
 
 
 class JobType(str, Enum):
-    """Job types the candidate is interested in (dossier §10.2 ``job_type``)."""
+    """A job's employment type (dossier §10.2 ``job_type``).
+
+    ``UNKNOWN`` means exactly one thing: **the source did not explicitly provide the
+    employment type** (ADR-029 D2). It is a statement about what EligiCore was told, not
+    about the job — a job whose type is ``UNKNOWN`` has a real employment type in the
+    world, and this system has not been told it.
+
+    It is **not** unrestricted, not "either type", not an inferred type, not evidence of
+    eligibility or ineligibility, and **not a wildcard**. Converting it to ``INTERNSHIP``
+    or ``FULL_TIME`` without the source saying so is fabrication (ADR-007, ADR-028 D9).
+
+    It is also **not a valid candidate preference** — see
+    :meth:`CandidatePreferences._reject_unknown_preference` (ADR-029 D15).
+    """
 
     INTERNSHIP = "INTERNSHIP"
     FULL_TIME = "FULL_TIME"
+    UNKNOWN = "UNKNOWN"
+
+
+#: The employment types a *candidate* may state a preference for. ``UNKNOWN`` describes a
+#: gap in what a source told us about a job; it cannot describe what a person wants.
+PREFERABLE_JOB_TYPES = frozenset({JobType.INTERNSHIP, JobType.FULL_TIME})
 
 
 class WorkMode(str, Enum):
@@ -219,8 +238,35 @@ class CandidatePreferences(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     locations: list[ShortText] = Field(default_factory=list)
-    job_types: list[JobType] = Field(default_factory=list)
+    job_types: list[JobType] = Field(
+        default_factory=list,
+        description=(
+            "Employment types the candidate wants. **`UNKNOWN` is not accepted here** — it "
+            "records that a job's source omitted the employment type, which cannot describe "
+            "what a person is looking for. Sending it is a validation error, never a "
+            "wildcard (ADR-029 D15)."
+        ),
+    )
     work_mode: WorkMode = WorkMode.ANY
+
+    @field_validator("job_types")
+    @classmethod
+    def _reject_unknown_preference(cls, value: list[JobType]) -> list[JobType]:
+        """Reject ``UNKNOWN`` as a stated preference (ADR-029 D15).
+
+        **Rejected, never silently dropped.** Filtering it out would let a client believe a
+        preference had been recorded when it had not, and treating it as "any type" would
+        make it the wildcard ADR-029 D2 forbids. A 422 is the only honest answer.
+
+        Mixed input is rejected whole: ``["INTERNSHIP", "UNKNOWN"]`` fails rather than
+        quietly becoming ``["INTERNSHIP"]``.
+        """
+        if any(entry not in PREFERABLE_JOB_TYPES for entry in value):
+            raise ValueError(
+                "job_types may contain only INTERNSHIP or FULL_TIME; UNKNOWN describes a "
+                "job whose source omitted the employment type and is not a preference"
+            )
+        return value
 
 
 # ---------------------------------------------------------------------------------------
