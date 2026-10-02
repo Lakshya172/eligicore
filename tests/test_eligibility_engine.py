@@ -882,3 +882,227 @@ def test_curated_degree_requirement_fails_a_diploma_holder() -> None:
     assert verdict.eligibility_state is E.NOT_ELIGIBLE
     degree = [e for e in verdict.requirement_breakdown if e.requirement_type is RequirementType.MIN_DEGREE_LEVEL]
     assert degree[0].reason_code is ReasonCode.BELOW_LEVEL
+
+
+# ---------------------------------------------------------------------------------------
+# Unevaluated description disclosure
+#
+# `requirements` is not the only place a posting's free text lives, and for a live source
+# it is not the place at all. The curated catalogue states its criteria in typed columns,
+# so an empty `requirements` genuinely meant "this posting gates nothing". The first real
+# Greenhouse fetch returned seven jobs with 3-6 KB descriptions and zero structured
+# criteria, and the engine answered "this job states no structured eligibility
+# requirements" - true of the columns, and read by a person as "this job has no
+# requirements".
+#
+# These tests pin the correction and, just as importantly, pin what it must NOT do: the
+# description is disclosed, never parsed. Nothing here may start extracting requirements
+# from prose (ADR-028 D9).
+# ---------------------------------------------------------------------------------------
+
+#: Live-shaped prose. Every sentence below states something the engine could in principle
+#: act on, and must not: this fixture exists to prove the disclosure is not an extractor.
+LIVE_DESCRIPTION = (
+    "About the role. You will own video content end to end. Eligibility: minimum CGPA "
+    "7.5/10 required. Open to B.Tech CSE or IT students only. No active backlogs. "
+    "Graduating in 2026. Apply by 30 November 2026. Skills: Premiere Pro, After Effects."
+)
+
+DISCLOSURE = "The job description was not evaluated"
+
+
+def greenhouse_shaped_job(**overrides: Any) -> JobRead:
+    """A job in the exact shape the merged Greenhouse adapter produces.
+
+    Synthetic. No request is made here or anywhere in this module - the shape is taken
+    from the adapter's mapping, not from the network.
+    """
+    base: dict[str, Any] = {
+        "source": "greenhouse",
+        "source_job_id": "groww:4956817101",
+        "job_type": JobType.UNKNOWN,
+        "company_name": "Zzq Boards Inc",
+        "role_title": "Video Editor Intern",
+        "location": "Bengaluru-VTP, India",
+        "description": LIVE_DESCRIPTION,
+        "requirements": {},
+        "apply_link": "https://job-boards.example.invalid/zzq/jobs/4956817101",
+    }
+    base.update(overrides)
+    return make_job(**base)
+
+
+# -- A. structured requirements present -> unchanged ------------------------------------
+
+
+def test_structured_requirements_behave_exactly_as_before() -> None:
+    """A curated job with typed criteria and no prose is untouched by this change."""
+    verdict = evaluate_job(make_profile(), make_job(**CGPA_JOB))
+    assert verdict.eligibility_state is E.ELIGIBLE
+    assert [r.requirement_type for r in verdict.requirement_breakdown] == [
+        RequirementType.MIN_CGPA
+    ]
+    assert verdict.summary == "Eligible: meets all 1 stated eligibility requirement(s)."
+    assert DISCLOSURE not in verdict.summary
+
+
+def test_a_failing_structured_requirement_is_unchanged() -> None:
+    """The disclosure must not reach, soften or reword a NOT_ELIGIBLE verdict."""
+    verdict = evaluate_job(make_profile([edu(cgpa=6.0)]), make_job(**CGPA_JOB))
+    assert verdict.eligibility_state is E.NOT_ELIGIBLE
+    assert verdict.summary.startswith("Not eligible: 1 of 1")
+    assert DISCLOSURE not in verdict.summary
+
+
+# -- B. empty requirements + empty description -> still honest --------------------------
+
+
+def test_no_requirements_and_no_description_still_states_so_plainly() -> None:
+    """Nothing was withheld, so nothing is disclosed. This is the one honest 'no'."""
+    verdict = evaluate_job(make_profile(), make_job(description=""))
+    assert verdict.eligibility_state is E.ELIGIBLE
+    assert verdict.requirement_breakdown == []
+    assert verdict.summary == (
+        "Eligible: this job states no structured eligibility requirements."
+    )
+    assert "not evaluated" not in verdict.summary
+
+
+# -- C/D. empty requirements + description -> the claim is no longer made alone ---------
+
+
+def test_a_description_is_disclosed_when_no_requirement_is_structured() -> None:
+    verdict = evaluate_job(make_profile(), make_job(description="Some posting text."))
+    assert verdict.eligibility_state is E.ELIGIBLE
+    assert verdict.requirement_breakdown == []
+    # The ADR-017 R-4 sentence is kept verbatim - it is true of the columns - but it no
+    # longer stands alone, which is what made it read as "this job has no requirements".
+    assert "no structured eligibility requirements" in verdict.summary
+    assert DISCLOSURE in verdict.summary
+    assert (
+        "any requirement stated only in its text is not reflected here" in verdict.summary
+    )
+
+
+def test_a_long_live_style_description_is_disclosed() -> None:
+    verdict = evaluate_job(make_profile(), greenhouse_shaped_job())
+    assert verdict.requirement_breakdown == []
+    assert DISCLOSURE in verdict.summary
+
+
+def test_a_description_is_disclosed_alongside_structured_requirements_too() -> None:
+    """ADR-017 R-4 discloses notes 'including when structured requirements also exist'.
+
+    The same holds for the description: text the engine did not read is text the
+    candidate should be told about, whether or not something else was evaluated.
+    """
+    verdict = evaluate_job(
+        make_profile(), make_job(**CGPA_JOB, description=LIVE_DESCRIPTION)
+    )
+    assert verdict.eligibility_state is E.ELIGIBLE
+    assert verdict.summary.startswith("Eligible: meets all 1 stated")
+    assert DISCLOSURE in verdict.summary
+
+
+def test_both_disclosures_appear_when_both_kinds_of_text_exist() -> None:
+    verdict = evaluate_job(
+        make_profile(),
+        make_job(requirements={"notes": "Final year only."}, description="Prose."),
+    )
+    assert "notes, which were not evaluated" in verdict.summary
+    assert DISCLOSURE in verdict.summary
+
+
+# -- E. whitespace-only description -> deterministic, and documented --------------------
+
+
+@pytest.mark.parametrize("description", ["", " ", "   ", "\n", "\t\n  \t"])
+def test_a_blank_description_is_not_disclosed(description: str) -> None:
+    """Whitespace is not content, exactly as for a blank requirement note."""
+    verdict = evaluate_job(make_profile(), make_job(description=description))
+    assert DISCLOSURE not in verdict.summary
+    assert verdict.summary == (
+        "Eligible: this job states no structured eligibility requirements."
+    )
+
+
+def test_markup_only_text_counts_as_content() -> None:
+    """Greenhouse content is HTML. Tags are not whitespace, so the text was still unread."""
+    verdict = evaluate_job(make_profile(), make_job(description="<p>&nbsp;</p>"))
+    assert DISCLOSURE in verdict.summary
+
+
+# -- F. apparent eligibility language must NOT be extracted or evaluated ----------------
+
+
+def test_apparent_requirements_in_prose_are_disclosed_never_extracted() -> None:
+    """The headline guard. This PR discloses text; it must not read it.
+
+    The profile below fails every requirement the description states - CGPA 5.0 against
+    7.5, Mechanical against CSE/IT, 2024 against 2026, nine backlogs against none. If a
+    single one of them were being extracted, this verdict would not be ELIGIBLE and the
+    breakdown would not be empty.
+    """
+    profile = make_profile(
+        [edu(cgpa=5.0, field_of_study="Mechanical Engineering", grad_year=2024)],
+        backlogs=9,
+    )
+    verdict = evaluate_job(profile, greenhouse_shaped_job())
+
+    assert verdict.requirement_breakdown == [], "prose became a structured requirement"
+    assert verdict.eligibility_state is E.ELIGIBLE
+    assert DISCLOSURE in verdict.summary
+
+
+def test_the_verdict_is_identical_with_and_without_the_prose() -> None:
+    """Strongest form: the description changes the disclosure and nothing else.
+
+    Two jobs differing only in their description must produce the same state and the same
+    breakdown. An extractor would break this; a disclosure cannot.
+    """
+    profile = make_profile(
+        [edu(cgpa=5.0, field_of_study="Mechanical Engineering", grad_year=2024)],
+        backlogs=9,
+    )
+    bare = evaluate_job(profile, greenhouse_shaped_job(description=""))
+    loud = evaluate_job(profile, greenhouse_shaped_job())
+
+    assert bare.eligibility_state is loud.eligibility_state
+    assert bare.requirement_breakdown == loud.requirement_breakdown == []
+    assert DISCLOSURE not in bare.summary
+    assert DISCLOSURE in loud.summary
+
+
+def test_the_disclosure_quotes_nothing_from_the_description() -> None:
+    """It discloses that text exists, never what it says (ADR-028 D9, INV-4)."""
+    verdict = evaluate_job(make_profile(), greenhouse_shaped_job())
+    for fragment in ("7.5", "CSE", "backlog", "2026", "Premiere", "November"):
+        assert fragment not in verdict.summary, fragment
+
+
+# -- H. a live-shaped job never receives the bare misleading statement ------------------
+
+
+def test_a_live_shaped_job_never_gets_the_bare_no_requirements_claim() -> None:
+    verdict = evaluate_job(make_profile(), greenhouse_shaped_job())
+    assert verdict.summary != (
+        "Eligible: this job states no structured eligibility requirements."
+    )
+    assert DISCLOSURE in verdict.summary
+
+
+def test_the_disclosure_is_source_agnostic() -> None:
+    """No source-specific branch exists, so any future live source inherits the fix."""
+    for source in ("greenhouse", "lever", "ashby", "curated", "some-future-source"):
+        verdict = evaluate_job(
+            make_profile(), make_job(source=source, description=LIVE_DESCRIPTION)
+        )
+        assert DISCLOSURE in verdict.summary, source
+
+
+def test_the_disclosure_names_no_candidate_value() -> None:
+    """INV-4: a client logging summaries must not be logging grades."""
+    profile = make_profile([edu(cgpa=8.37, field_of_study="Xylography")])
+    verdict = evaluate_job(profile, greenhouse_shaped_job())
+    for marker in ("8.37", "Xylography"):
+        assert marker not in verdict.summary
