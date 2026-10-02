@@ -5,7 +5,7 @@
 **Decided by:** project owner, across the ADR-030 design gate, owner-decision gate, sub-decision gate and decision lock
 **Enforces:** INV-1, INV-3, INV-4, INV-5, INV-10, INV-12 · **Refines:** ADR-003, ADR-004, ADR-006, ADR-007, ADR-017, ADR-018, ADR-019, ADR-026, ADR-028
 **Supersedes:** nothing directly — **ADR-028 D9 and D19 require a later additive amendment (§ Relationship to earlier ADRs); no ADR is amended by this document**
-**Rules on:** D1–D27 and D23a · **Resolves:** ADR-028 open **OD-6** · **Owner decisions:** OD-1 … OD-10 and the storage decision, **all resolved** (see § Owner decisions)
+**Rules on:** D1–D27, plus D10a and D23a · **Resolves:** ADR-028 open **OD-6** · **Owner decisions:** OD-1 … OD-10 and the storage decision, **all resolved** (see § Owner decisions)
 
 ---
 
@@ -171,7 +171,7 @@ meaning. Adding one would still require its own ADR (ADR-017, QG-002 item 15).
 | 4 | That evidence exists in the **pinned normalized source text** (D9). |
 | 5 | A **deterministic verifier** confirms the extracted value and type are supported by that evidence. |
 | 6 | The semantic requirement type is one the engine recognises (ADR-018's five). |
-| 7 | The strength classification is `REQUIRED` (D10). |
+| 7 | The strength classification has been **established** as `REQUIRED` from an explicit marker in the evidence — **never inferred** (D10). |
 | 8 | No contradicting or qualifying text within the contradiction window invalidates the proposal (D9). |
 
 Any condition failing means the proposal **does not become a requirement**. It is discarded, not
@@ -198,8 +198,10 @@ An extractor proposing `min_cgpa = 7.5` with the evidence *"CGPA 7.5 preferred"*
 1–6 **cleanly**. The text exists. The span is locatable. The value 7.5 genuinely appears in it.
 `MIN_CGPA` is a recognised type. Nothing about the proposal is fabricated.
 
-- **Condition 7 refuses it.** The evidence says *preferred*, so strength is `PREFERRED`, which does
-  not gate (D10). The proposal is discarded.
+- **Condition 7 refuses it.** The evidence carries an explicit marker — *preferred* — so strength
+  is recognised, not inferred, as `PREFERRED`, which does not gate (D10, D10a). The proposal is
+  discarded. Had the evidence been a bare *"CGPA 7.5"*, condition 7 would refuse it too, because
+  no strength would have been established at all.
 - **Condition 8 refuses it independently**, because *"7.0 required"* sits inside the contradiction
   window and qualifies it.
 
@@ -285,6 +287,41 @@ exclusion. A recruiter's soft wish converted into a system-stated barrier produc
 self-deselects from a role the employer never excluded them from — a harm the system causes and the
 employer never intended.
 
+**D10a — Explicit strength *recognition* is permitted; strength *inference* is not.**
+
+Condition 7 asks whether a strength was **established**, and there is exactly one way to establish
+one: the evidence contains an explicit marker and the extractor recognises it. The two operations
+must never be confused.
+
+| | Operation | Permitted? |
+|---|---|---|
+| **A** | **Strength inference** — concluding a strength the text does not state, from context, phrasing, position, how emphatic the sentence sounds, or how often a value recurs | **Never.** |
+| **B** | **Explicit strength recognition** — reading a strength marker that is present in the same evidence text, where that marker is deterministic and unambiguous | **Permitted**, in both phases. |
+
+Worked, and normative:
+
+| Evidence | Strength | Promotable? |
+|---|---|---|
+| *"minimum CGPA 7.5"* | explicit `REQUIRED` marker → `REQUIRED` | Yes, if conditions 1–6 and 8 also hold |
+| *"CGPA 7.5 preferred"* | explicit `PREFERRED` marker → `PREFERRED` | **No** — fails condition 7 |
+| *"CGPA 7.5"* | **no marker** → strength **not established** | **No** — an unestablished strength is not `REQUIRED` |
+| *"CGPA 7.5 may be waived…"* | marker present but **contradicted or ambiguous** → not safely established | **No** |
+
+**An unestablished strength is not a weak `REQUIRED`; it is the absence of a strength**, and
+condition 7 refuses it exactly as it refuses `PREFERRED`. The third row is the one that matters
+most in practice, because a bare *"CGPA 7.5"* is the commonest shape in real prose and the most
+tempting to promote.
+
+The implementation must **never** transform any of the following into `REQUIRED`: the **absence**
+of a marker · semantic intuition about what the employer "clearly meant" · how often a value or
+phrase recurs in the posting · a regex's or a model's reported confidence (D7). Each of these is
+inference wearing recognition's clothes.
+
+**This does not weaken condition 7.** The condition is unchanged in effect — only a proposal whose
+strength is `REQUIRED` may enter the verified derived requirement path. D10a narrows *how* that
+strength may come to be known: **"`REQUIRED` was explicitly stated and recognised" is admissible;
+"`REQUIRED` was inferred" is not.**
+
 ### Deterministic first
 
 **D11 — Phase 1 is deterministic extraction; Phase 2 is AI extraction, and only afterwards.**
@@ -302,13 +339,32 @@ would weaken deterministic-before-probabilistic rather than apply it.
 Phase 2 may begin only once the verifier and the Phase 1 path are proven in the repository, under
 the go conditions in § Implementation sequencing.
 
+**How each phase establishes strength** (D10a), since condition 7 applies to both and Phase 1 has
+no model to lean on:
+
+| | Phase 1 — deterministic | Phase 2 — AI |
+|---|---|---|
+| Extracts | the three approved fields above | the harder fields, per their own gate |
+| Strength | **recognises explicit, deterministic markers only** when one occurs in the evidence | may interpret harder discourse to classify strength |
+| Inference | **forbidden** — no fallback, no default, no "clearly means required" | still subject to D10a: a strength it cannot ground in an explicit marker is not established |
+| Proposal with no explicit `REQUIRED` marker | **cannot enter the verified derived requirement set** | same |
+
+So Phase 1 is a working capability rather than a no-op: *"minimum CGPA 7.5"* carries its own
+marker and is promotable, while a bare *"CGPA 7.5"* is extracted, found to have no established
+strength, and refused by condition 7. **Phase 1 is deliberately expected to promote less than
+Phase 2** — recognising markers is a narrow, auditable operation, and the postings Phase 1 cannot
+safely read are precisely the reason Phase 2 exists.
+
+Nothing here expands Phase 1 into general discourse understanding, and the Phase 1 → Phase 2
+ordering is unchanged.
+
 **D12 — Excluded from deterministic extraction, permanently or pending a separate decision:**
 
 | Excluded | Why |
 |---|---|
 | Field / branch ontology | Requires the synonym table ADR-018 A-2 forbids as *"an ontology in disguise, and a source of silent false passes."* |
 | Required skills | ADR-018 assigns skills to matching, not eligibility; see D20's note on double counting. |
-| Requirement strength classification | Needs discourse understanding; the hardest and most safety-critical judgement in the capability. |
+| Requirement strength **classification** — reading a strength the text does not explicitly state | Needs discourse understanding; the hardest and most safety-critical judgement in the capability. **Recognising an explicit, unambiguous marker already present in the evidence is not classification and is permitted** (D10a). What stays out is inferred, general or ambiguous strength: there is no fallback, no default and no best guess, and an unestablished or ambiguous strength is simply not promoted. |
 | Degree-level mapping from a degree name | ADR-018 is explicit: *"A level is never guessed from a degree name."* |
 | Deadlines | Out of scope entirely (D23a). |
 
@@ -877,7 +933,8 @@ seven remain open and untouched.
 
 Every PR in the sequence above is checked against this ADR at review: no requirement promoted
 without all eight conditions (D6), no confidence admitted as evidence (D7), no `PREFERRED` or
-`CONDITIONAL` statement gating eligibility (D10), no prose-derived `NOT_ELIGIBLE` (D2), **no
+`CONDITIONAL` statement gating eligibility (D10), no strength inferred rather than recognised
+from an explicit marker (D10a), no prose-derived `NOT_ELIGIBLE` (D2), **no
 all-`PASS` derived evaluation returning plain `ELIGIBLE`** (D4), no new eligibility state (D5), no
 authority tied to extractor technology (D3), no ontology, skill or degree-level inference (D12), no
 `extract_resume` overload (D13), a mock that extracts nothing with a literal zero-call test (D14),
