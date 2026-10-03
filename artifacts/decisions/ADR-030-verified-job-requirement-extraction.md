@@ -543,6 +543,73 @@ description`, so live job prose *already* participates in match scoring. Feeding
 into `required_skills` would double-count terms already present and silently reweight every score,
 which is why D12 excludes skills and why this ADR changes no matching behaviour at all.
 
+> **Amendment, added 2026-10-03 (D20a). Owner ruling at the Phase 1 implementation design gate.**
+> **R-COLLISION — when a job carries both a `SOURCE_STATED` and a verified `PROSE_DERIVED`
+> requirement of the same `RequirementType`, the source-stated one is the only one evaluated.**
+>
+> D20 fixes *how* derived requirements reach evaluation but not what happens when both kinds exist
+> for one type. This ADR named the question only as a revisit condition — *"a source begins
+> publishing structured criteria that were previously derived — needs a precedence rule for
+> source-stated superseding derived"*. The owner has now ruled it, and it is recorded here rather
+> than left to an implementation PR to settle by accident.
+>
+> **The rule.** For each `RequirementType`, if the job's source-owned fields state that
+> requirement, the source-stated requirement is the **only** one evaluated for that type, and any
+> verified derived requirement of the same type is excluded from the effective evaluation set.
+>
+> *"The source states requirement T"* is the engine's existing condition for emitting a requirement
+> at all, so no new notion of statedness is introduced:
+>
+> | Type | Source-stated iff |
+> |---|---|
+> | `MIN_CGPA` | `job.min_cgpa is not None` |
+> | `GRAD_YEAR_WINDOW` | `job.min_grad_year is not None` or `job.max_grad_year is not None` |
+> | `MAX_BACKLOGS` | `job.max_backlogs is not None` |
+>
+> **Presence wins, not usability.** A job stating `min_cgpa` with no scale yields a source-stated
+> `UNKNOWN` (`JOB_SCALE_MISSING`), and the derived requirement still does **not** step in. Letting
+> it substitute would let a prose-read value decide a cell the employer's own structured statement
+> could not — making derived data *more* authoritative than source-stated data in precisely the
+> case D2 and D3 exist to prevent.
+>
+> **Ordering.** R-COLLISION is applied **before** ADR-017's precedence rules, while the effective
+> requirement set is assembled. It is not a seventh precedence rule and it changes none of the six.
+>
+> **A suppressed derived requirement produces no `RequirementResult`.** It never enters the
+> breakdown, never reaches `compose_verdict`, and contributes nothing to the verdict.
+>
+> **Suppression is read-time and mutates nothing.** The derived row keeps its stored state, its
+> provenance, its evidence text, its extractor identity and its timestamp. A stored status meaning
+> "outranked by the source" would couple the derived table's lifecycle to the job's column values,
+> so every ingestion that set or cleared `min_cgpa` would have to rewrite derived rows — a second
+> write path into derived data, which is exactly what D17 keeps out.
+>
+> **Lifecycle consequences, each following from suppression being read-time:**
+>
+> | Event | Result |
+> |---|---|
+> | The source-stated value later disappears | An active derived requirement of that type becomes effective automatically at the next evaluation, provided it was derived from the job's current description. No backfill and no repair step. |
+> | The derived value changes | The ordinary derived lifecycle applies — the old record is invalidated when the pinned text changes and a new one is written. If the source still states the type, the new record is suppressed too. |
+> | The two values contradict | Nothing is reconciled, because only the source-stated requirement is ever evaluated. The disagreement stays visible in storage for audit. |
+>
+> **Three properties this guarantees:**
+>
+> - **At most one effective requirement per `RequirementType`.** D8's competing-proposal rule and
+>   storage uniqueness give at most one derived requirement per type; R-COLLISION then selects at
+>   most one of the two.
+> - **Provenance is preserved.** Every effective requirement carries it, and every suppressed one
+>   keeps its full record in storage (D18).
+> - **No requirement is silently weakened.** The rule can only ever remove a *derived* requirement.
+>   It never removes, relaxes, overrides or re-scales a source-stated one, and it never "upgrades"
+>   a source-stated `UNKNOWN`.
+>
+> **Rule 1 is unreachable through suppression.** Suppression fires only when a source-stated
+> requirement of that type exists, and that requirement itself produces an entry — so the effective
+> set can never be emptied this way, and *"zero structured requirements → `ELIGIBLE`"* cannot be
+> reached by this route.
+>
+> **No new eligibility state** (D5), and `JobRead` is unchanged (D20).
+
 ### Ingestion and re-extraction
 
 **D21 — Extraction runs at ingestion time only.** Never during an eligibility request, never per
@@ -793,6 +860,12 @@ behaviour, then mutate to prove the test has teeth.
   — the D4 rule-5 test
 - a `SOURCE_STATED` deterministic `FAIL` still produces `NOT_ELIGIBLE`, unchanged
 - no new eligibility state appears in any response
+- a source-stated requirement suppresses a derived requirement of the same type, which produces
+  **no breakdown entry** — including when the source-stated value is unusable, such as a CGPA
+  stated without its scale (D20a)
+- suppression leaves the derived record unmodified, and the derived requirement becomes effective
+  once the source-stated value disappears (D20a)
+- at most one effective requirement exists per `RequirementType` (D20a)
 - a `PROSE_DERIVED` deterministic `PASS` or `FAIL` reports `MEDIUM` confidence, and a
   `SOURCE_STATED` one still reports `HIGH` (D7a)
 
