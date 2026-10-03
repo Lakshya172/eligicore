@@ -156,6 +156,46 @@ structurally. Widening rule 5 prevents exactly that: such an evaluation returns
 `LIKELY_ELIGIBLE`, whose existing meaning — *every stated requirement passed, at least one by
 something other than a deterministic source-stated check* — already fits without alteration.
 
+> **Amendment, added 2026-10-03 (D4a). Owner ruling at the Phase 1 implementation design gate.**
+> **A `PROSE_DERIVED` deterministic `FAIL` does not close the job to the AI field-relatedness
+> stage.**
+>
+> D4 narrows rule 2 to `SOURCE_STATED`, and that narrowing has a control-flow consequence this ADR
+> did not state. `ambiguous_requirements` returns nothing for a job with a verified hard failure,
+> and `has_verified_hard_failure` is the predicate that decides it. Under D2 and D4 a prose-derived
+> `FAIL` **does not satisfy the provenance condition** of that predicate, so the guard does not
+> fire and the ambiguous field-of-study entry is still released to ADR-019's stage.
+>
+> | Failing requirement | Verified hard failure? | AI field-relatedness | Final state |
+> |---|---|---|---|
+> | `SOURCE_STATED` deterministic `FAIL` | **Yes** | **Closed, unchanged** — no provider is built, and ambiguous entries are reported `SKIPPED_AFTER_HARD_FAILURE` | `NOT_ELIGIBLE` (rule 2) |
+> | `PROSE_DERIVED` deterministic `FAIL` | **No** — capped by provenance | **Reachable** | `NEEDS_REVIEW` (rule 4), **whatever the AI answers** |
+>
+> **The verdict cannot move.** Rule 4 fires on *any UNKNOWN, any AI-reasoned FAIL, or any
+> `PROSE_DERIVED` FAIL*. The derived failure is present, so an AI *related* answer turns the field
+> entry to `PASS` while rule 4 still holds, and an AI *not related* answer simply adds a second
+> rule-4 trigger. `ELIGIBLE`, `LIKELY_ELIGIBLE` and `NOT_ELIGIBLE` are all unreachable from this
+> position, so **INV-2 is untouched: nothing is overridden.**
+>
+> **Why the job is not closed anyway.** Closing it would treat a prose-derived failure as a hard
+> failure in control flow while refusing to treat it as one in the verdict — two different
+> authorities for one entry, which is the inconsistency D3 exists to prevent. It would also replace
+> a real answer to the field question with `SKIPPED_AFTER_HARD_FAILURE`, justified by a requirement
+> the system itself declines to reject on, and ADR-006 treats a missing explanation as a failure
+> rather than a result. The additional cost is bounded by the existing concurrency limit and
+> per-request memoization in the AI stage.
+>
+> **No new eligibility state and no third `EvaluationMethod`** (D5). A deterministic extractor's
+> result is labelled `DETERMINISTIC`, and authority continues to key on provenance alone (D3) —
+> this resolves open implementation note 6.
+>
+> **Cross-reference debt, recorded and deliberately not fixed here.** ADR-017 section *Evaluation
+> after a hard failure (C-13)* still reads *"Once any deterministic requirement fails, the job is
+> closed to the AI stage"*, which was exact before D4 and is imprecise after it. The correct
+> narrowed wording already exists in ADR-017's merged provenance amendment — *"a job with a
+> **verified hard failure** is still closed to the AI stage"*. ADR-017 is not amended by this
+> ruling; the pointer it needs under the C-13 section belongs to a separate documentation gate.
+
 **D5 — No new eligibility state.** The five states of ADR-017 are unchanged in number, name and
 meaning. Adding one would still require its own ADR (ADR-017, QG-002 item 15).
 
@@ -859,6 +899,11 @@ behaviour, then mutate to prove the test has teeth.
 - **an all-`PASS` evaluation built only from derived requirements does not return plain `ELIGIBLE`**
   — the D4 rule-5 test
 - a `SOURCE_STATED` deterministic `FAIL` still produces `NOT_ELIGIBLE`, unchanged
+- a `SOURCE_STATED` deterministic `FAIL` closes the AI stage and the provider is **never called**
+  — the literal zero-call form, unchanged (D4a)
+- **a `PROSE_DERIVED` deterministic `FAIL` does not close the AI stage** — the direct D4a test
+- a `PROSE_DERIVED` `FAIL` returns `NEEDS_REVIEW` whether the AI answers *related* or *not
+  related*, and never `NOT_ELIGIBLE` (D4a)
 - no new eligibility state appears in any response
 - a source-stated requirement suppresses a derived requirement of the same type, which produces
   **no breakdown entry** — including when the source-stated value is unusable, such as a CGPA
@@ -988,6 +1033,7 @@ the implementing PR with evidence rather than guessed here.
 6. **Whether a deterministic extractor's result is labelled `DETERMINISTIC` or a new
    `EvaluationMethod` value** — immaterial to authority under D3, which keys on provenance, but it
    must be chosen deliberately and must not re-enable the rule-5 failure D4 closes.
+   **Resolved 2026-10-03 (D4a): labelled `DETERMINISTIC`; no third `EvaluationMethod` is created.**
 
 ---
 
