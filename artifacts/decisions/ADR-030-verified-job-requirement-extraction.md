@@ -649,6 +649,15 @@ which is why D12 excludes skills and why this ADR changes no matching behaviour 
 > reached by this route.
 >
 > **No new eligibility state** (D5), and `JobRead` is unchanged (D20).
+>
+> **This narrows one sentence of D10, and the narrowing is stated rather than left implied.** D10's
+> first bullet says a verified derived requirement *"enters the requirement set, is evaluated, and
+> appears in the breakdown"*. That remains true of every verified derived requirement **except one
+> suppressed by this rule**, which is promoted but not effective. Passing all eight conditions of
+> D6 is what makes a requirement *promotable*; R-COLLISION decides whether a promoted requirement
+> is *evaluated*. D10's two outcomes are therefore three: **discarded** (failed D6) ·
+> **promoted but suppressed** (passed D6, outranked here) · **effective**. Nothing moves between
+> those tiers by any route other than D6 and this rule.
 
 ### Ingestion and re-extraction
 
