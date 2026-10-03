@@ -238,6 +238,15 @@ def test_extractor_version_is_populated_and_within_the_schema_bound() -> None:
     assert 1 <= len(EXTRACTOR_VERSION) <= 50
 
 
+def test_the_evidence_cap_is_pinned_to_a_literal() -> None:
+    """Asserted against a number, not against the constant.
+
+    Every other test measures evidence with ``MAX_EVIDENCE_CHARS`` itself, which keeps them
+    readable but means none of them would notice the cap being raised. This one would.
+    """
+    assert MAX_EVIDENCE_CHARS == 300
+
+
 def test_extracted_types_are_exactly_the_phase_1_three() -> None:
     """D11 and D12. A fourth field is a new ADR, never a new branch in this module."""
     produced = {
@@ -327,14 +336,23 @@ def test_unknown_is_never_produced_as_a_scale() -> None:
         "Posted 2026-01-15, applications close 2026-03-01.",
         "Call 98765 43210 for details.",
         "Team of 12 engineers, 3 designers.",
+        # The other half of the pair: a number that *does* carry a scale, and still is not
+        # a grade. Without the keyword guard every one of these becomes a CGPA cutoff.
+        "Rated 9/10 by our own employees.",
+        "Satisfaction score 80% last quarter.",
+        "Completed 8 out of 10 sprints on time.",
+        "Uptime 99% last year.",
+        "We ship 4 out of 5 releases on schedule.",
     ],
 )
 def test_numbers_that_are_not_grades_produce_no_cgpa_proposal(text: str) -> None:
     """The canonical false positive of D6 condition 5, refused before it is ever proposed.
 
-    None of these carries both a grade word and an explicit scale, which is what the
-    mandatory scale is for: *"7.5 years of experience"* has the number and the sentence
-    shape of a cutoff and none of its meaning.
+    Two guards are needed and both are load-bearing. The **mandatory scale** refuses
+    *"7.5 years of experience"*, which has the number and the sentence shape of a cutoff and
+    none of its meaning. The **grade keyword** refuses *"rated 9/10"* and *"score 80%"*,
+    which carry a perfectly good scale and are not about grades at all — and ``score`` is
+    deliberately absent from the keyword set for exactly that reason.
     """
     assert cgpa_values(text) == []
 
