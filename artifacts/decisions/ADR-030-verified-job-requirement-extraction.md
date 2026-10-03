@@ -156,6 +156,46 @@ structurally. Widening rule 5 prevents exactly that: such an evaluation returns
 `LIKELY_ELIGIBLE`, whose existing meaning — *every stated requirement passed, at least one by
 something other than a deterministic source-stated check* — already fits without alteration.
 
+> **Amendment, added 2026-10-03 (D4a). Owner ruling at the Phase 1 implementation design gate.**
+> **A `PROSE_DERIVED` deterministic `FAIL` does not close the job to the AI field-relatedness
+> stage.**
+>
+> D4 narrows rule 2 to `SOURCE_STATED`, and that narrowing has a control-flow consequence this ADR
+> did not state. `ambiguous_requirements` returns nothing for a job with a verified hard failure,
+> and `has_verified_hard_failure` is the predicate that decides it. Under D2 and D4 a prose-derived
+> `FAIL` **does not satisfy the provenance condition** of that predicate, so the guard does not
+> fire and the ambiguous field-of-study entry is still released to ADR-019's stage.
+>
+> | Failing requirement | Verified hard failure? | AI field-relatedness | Final state |
+> |---|---|---|---|
+> | `SOURCE_STATED` deterministic `FAIL` | **Yes** | **Closed, unchanged** — no provider is built, and ambiguous entries are reported `SKIPPED_AFTER_HARD_FAILURE` | `NOT_ELIGIBLE` (rule 2) |
+> | `PROSE_DERIVED` deterministic `FAIL` | **No** — capped by provenance | **Reachable** | `NEEDS_REVIEW` (rule 4), **whatever the AI answers** |
+>
+> **The verdict cannot move.** Rule 4 fires on *any UNKNOWN, any AI-reasoned FAIL, or any
+> `PROSE_DERIVED` FAIL*. The derived failure is present, so an AI *related* answer turns the field
+> entry to `PASS` while rule 4 still holds, and an AI *not related* answer simply adds a second
+> rule-4 trigger. `ELIGIBLE`, `LIKELY_ELIGIBLE` and `NOT_ELIGIBLE` are all unreachable from this
+> position, so **INV-2 is untouched: nothing is overridden.**
+>
+> **Why the job is not closed anyway.** Closing it would treat a prose-derived failure as a hard
+> failure in control flow while refusing to treat it as one in the verdict — two different
+> authorities for one entry, which is the inconsistency D3 exists to prevent. It would also replace
+> a real answer to the field question with `SKIPPED_AFTER_HARD_FAILURE`, justified by a requirement
+> the system itself declines to reject on, and ADR-006 treats a missing explanation as a failure
+> rather than a result. The additional cost is bounded by the existing concurrency limit and
+> per-request memoization in the AI stage.
+>
+> **No new eligibility state and no third `EvaluationMethod`** (D5). A deterministic extractor's
+> result is labelled `DETERMINISTIC`, and authority continues to key on provenance alone (D3) —
+> this resolves open implementation note 6.
+>
+> **Cross-reference debt, recorded and deliberately not fixed here.** ADR-017 section *Evaluation
+> after a hard failure (C-13)* still reads *"Once any deterministic requirement fails, the job is
+> closed to the AI stage"*, which was exact before D4 and is imprecise after it. The correct
+> narrowed wording already exists in ADR-017's merged provenance amendment — *"a job with a
+> **verified hard failure** is still closed to the AI stage"*. ADR-017 is not amended by this
+> ruling; the pointer it needs under the C-13 section belongs to a separate documentation gate.
+
 **D5 — No new eligibility state.** The five states of ADR-017 are unchanged in number, name and
 meaning. Adding one would still require its own ADR (ADR-017, QG-002 item 15).
 
@@ -189,6 +229,34 @@ confidence is capped downward and never raised — and this extends it.
 A confidence score is a model's opinion of its own output. Admitting it as evidence would make the
 verifier a rubber stamp wearing a verifier's name, which is worse than having no verifier, because
 it would be reported as verification.
+
+> **Amendment, added 2026-10-03 (D7a). Owner ruling at the Phase 1 implementation design gate.**
+> **A `PROSE_DERIVED` deterministic result reports `MEDIUM` confidence.**
+>
+> D7 above governs a *model's* reported confidence as an **input**. This amendment governs the
+> *system's* reported confidence as an **output**, which this ADR had left to the implementing PR.
+>
+> `_result` in the engine assigns `HIGH` to every deterministic `PASS` or `FAIL` and `LOW` to
+> `UNKNOWN`, on the rule that confidence follows from *how* a result was reached. For a derived
+> requirement the comparison is still exact — but the requirement it compares against was read out
+> of prose rather than published structurally by the source, and a `HIGH` beside it would read as
+> source-level assurance. It is therefore capped at `MEDIUM`, exactly as ADR-019 caps an
+> AI-reasoned entry at `MEDIUM` because *"an interpretation ... is never as trustworthy as a
+> comparison"*. Confidence is still only ever lowered, never raised (ADR-019 section 4, D7).
+>
+> **Confidence is descriptive, never authority.** It describes how much the system trusts its own
+> determination (ADR-003). It gates nothing, caps nothing and licenses nothing:
+> **provenance remains the sole authority boundary** (D3). Lowering this value changes no verdict,
+> and raising it would change none either — which is the property that makes D3 stable across
+> every future extractor.
+>
+> **This does not change provenance, and it does not permit a `PROSE_DERIVED` requirement to
+> produce `NOT_ELIGIBLE`** (D2, D4).
+>
+> **QG-002 item 13 is unaffected.** That item requires *"a deterministic hard failure reports HIGH
+> confidence"*. After D2 a prose-derived `FAIL` is not a hard failure — it cannot produce
+> `NOT_ELIGIBLE` — and every requirement that can still produce one is `SOURCE_STATED` and
+> continues to report `HIGH`.
 
 **D8 — The worked case: "CGPA 7.5 preferred, 7.0 required".**
 
@@ -515,6 +583,82 @@ description`, so live job prose *already* participates in match scoring. Feeding
 into `required_skills` would double-count terms already present and silently reweight every score,
 which is why D12 excludes skills and why this ADR changes no matching behaviour at all.
 
+> **Amendment, added 2026-10-03 (D20a). Owner ruling at the Phase 1 implementation design gate.**
+> **R-COLLISION — when a job carries both a `SOURCE_STATED` and a verified `PROSE_DERIVED`
+> requirement of the same `RequirementType`, the source-stated one is the only one evaluated.**
+>
+> D20 fixes *how* derived requirements reach evaluation but not what happens when both kinds exist
+> for one type. This ADR named the question only as a revisit condition — *"a source begins
+> publishing structured criteria that were previously derived — needs a precedence rule for
+> source-stated superseding derived"*. The owner has now ruled it, and it is recorded here rather
+> than left to an implementation PR to settle by accident.
+>
+> **The rule.** For each `RequirementType`, if the job's source-owned fields state that
+> requirement, the source-stated requirement is the **only** one evaluated for that type, and any
+> verified derived requirement of the same type is excluded from the effective evaluation set.
+>
+> *"The source states requirement T"* is the engine's existing condition for emitting a requirement
+> at all, so no new notion of statedness is introduced:
+>
+> | Type | Source-stated iff |
+> |---|---|
+> | `MIN_CGPA` | `job.min_cgpa is not None` |
+> | `GRAD_YEAR_WINDOW` | `job.min_grad_year is not None` or `job.max_grad_year is not None` |
+> | `MAX_BACKLOGS` | `job.max_backlogs is not None` |
+>
+> **Presence wins, not usability.** A job stating `min_cgpa` with no scale yields a source-stated
+> `UNKNOWN` (`JOB_SCALE_MISSING`), and the derived requirement still does **not** step in. Letting
+> it substitute would let a prose-read value decide a cell the employer's own structured statement
+> could not — making derived data *more* authoritative than source-stated data in precisely the
+> case D2 and D3 exist to prevent.
+>
+> **Ordering.** R-COLLISION is applied **before** ADR-017's precedence rules, while the effective
+> requirement set is assembled. It is not a seventh precedence rule and it changes none of the six.
+>
+> **A suppressed derived requirement produces no `RequirementResult`.** It never enters the
+> breakdown, never reaches `compose_verdict`, and contributes nothing to the verdict.
+>
+> **Suppression is read-time and mutates nothing.** The derived row keeps its stored state, its
+> provenance, its evidence text, its extractor identity and its timestamp. A stored status meaning
+> "outranked by the source" would couple the derived table's lifecycle to the job's column values,
+> so every ingestion that set or cleared `min_cgpa` would have to rewrite derived rows — a second
+> write path into derived data, which is exactly what D17 keeps out.
+>
+> **Lifecycle consequences, each following from suppression being read-time:**
+>
+> | Event | Result |
+> |---|---|
+> | The source-stated value later disappears | An active derived requirement of that type becomes effective automatically at the next evaluation, provided it was derived from the job's current description. No backfill and no repair step. |
+> | The derived value changes | The ordinary derived lifecycle applies — the old record is invalidated when the pinned text changes and a new one is written. If the source still states the type, the new record is suppressed too. |
+> | The two values contradict | Nothing is reconciled, because only the source-stated requirement is ever evaluated. The disagreement stays visible in storage for audit. |
+>
+> **Three properties this guarantees:**
+>
+> - **At most one effective requirement per `RequirementType`.** D8's competing-proposal rule and
+>   storage uniqueness give at most one derived requirement per type; R-COLLISION then selects at
+>   most one of the two.
+> - **Provenance is preserved.** Every effective requirement carries it, and every suppressed one
+>   keeps its full record in storage (D18).
+> - **No requirement is silently weakened.** The rule can only ever remove a *derived* requirement.
+>   It never removes, relaxes, overrides or re-scales a source-stated one, and it never "upgrades"
+>   a source-stated `UNKNOWN`.
+>
+> **Rule 1 is unreachable through suppression.** Suppression fires only when a source-stated
+> requirement of that type exists, and that requirement itself produces an entry — so the effective
+> set can never be emptied this way, and *"zero structured requirements → `ELIGIBLE`"* cannot be
+> reached by this route.
+>
+> **No new eligibility state** (D5), and `JobRead` is unchanged (D20).
+>
+> **This narrows one sentence of D10, and the narrowing is stated rather than left implied.** D10's
+> first bullet says a verified derived requirement *"enters the requirement set, is evaluated, and
+> appears in the breakdown"*. That remains true of every verified derived requirement **except one
+> suppressed by this rule**, which is promoted but not effective. Passing all eight conditions of
+> D6 is what makes a requirement *promotable*; R-COLLISION decides whether a promoted requirement
+> is *evaluated*. D10's two outcomes are therefore three: **discarded** (failed D6) ·
+> **promoted but suppressed** (passed D6, outranked here) · **effective**. Nothing moves between
+> those tiers by any route other than D6 and this rule.
+
 ### Ingestion and re-extraction
 
 **D21 — Extraction runs at ingestion time only.** Never during an eligibility request, never per
@@ -764,7 +908,20 @@ behaviour, then mutate to prove the test has teeth.
 - **an all-`PASS` evaluation built only from derived requirements does not return plain `ELIGIBLE`**
   — the D4 rule-5 test
 - a `SOURCE_STATED` deterministic `FAIL` still produces `NOT_ELIGIBLE`, unchanged
+- a `SOURCE_STATED` deterministic `FAIL` closes the AI stage and the provider is **never called**
+  — the literal zero-call form, unchanged (D4a)
+- **a `PROSE_DERIVED` deterministic `FAIL` does not close the AI stage** — the direct D4a test
+- a `PROSE_DERIVED` `FAIL` returns `NEEDS_REVIEW` whether the AI answers *related* or *not
+  related*, and never `NOT_ELIGIBLE` (D4a)
 - no new eligibility state appears in any response
+- a source-stated requirement suppresses a derived requirement of the same type, which produces
+  **no breakdown entry** — including when the source-stated value is unusable, such as a CGPA
+  stated without its scale (D20a)
+- suppression leaves the derived record unmodified, and the derived requirement becomes effective
+  once the source-stated value disappears (D20a)
+- at most one effective requirement exists per `RequirementType` (D20a)
+- a `PROSE_DERIVED` deterministic `PASS` or `FAIL` reports `MEDIUM` confidence, and a
+  `SOURCE_STATED` one still reports `HIGH` (D7a)
 
 **Boundary and privacy**
 
@@ -885,6 +1042,7 @@ the implementing PR with evidence rather than guessed here.
 6. **Whether a deterministic extractor's result is labelled `DETERMINISTIC` or a new
    `EvaluationMethod` value** — immaterial to authority under D3, which keys on provenance, but it
    must be chosen deliberately and must not re-enable the rule-5 failure D4 closes.
+   **Resolved 2026-10-03 (D4a): labelled `DETERMINISTIC`; no third `EvaluationMethod` is created.**
 
 ---
 
@@ -923,6 +1081,20 @@ the implementing PR with evidence rather than guessed here.
 **No new owner decision is created by this ADR.** ADR-028's remaining open decisions and Week 9B's
 seven remain open and untouched.
 
+> **Amendment, added 2026-10-03.** Three further owner decisions were taken later, at the
+> **Phase 1 implementation design gate**, on questions this ADR left open rather than ones it
+> created. They are recorded here as **OD-11 ... OD-13** and are normative.
+>
+> | # | Decision | Resolution |
+> |---|---|---|
+> | **OD-11** | Confidence of a `PROSE_DERIVED` deterministic result | **`MEDIUM`.** Confidence is descriptive, never authority; provenance remains the authority boundary (D7a). |
+> | **OD-12** | A `SOURCE_STATED` and a `PROSE_DERIVED` requirement of the same type | **R-COLLISION RATIFIED** — the source-stated requirement is the only one evaluated; the derived record is retained and suppressed at read time (D20a). |
+> | **OD-13** | Does a `PROSE_DERIVED` deterministic `FAIL` close the AI stage? | **NO.** It is not a verified hard failure, so ADR-019's stage stays reachable and the verdict stays `NEEDS_REVIEW` (D4a). |
+>
+> The sentence above remains accurate as written: ADR-030 itself created no owner decision. These
+> three arose from the Phase 1 design gate and were decided by the project owner on 2026-10-03.
+> ADR-028's remaining open decisions and Week 9B's seven are still open and untouched.
+
 > **Numbering note.** These OD numbers belong to the ADR-030 gates and are **not** ADR-028's
 > OD-1 … OD-7. ADR-028's own **OD-6** — the structured-eligibility gap — is resolved by this ADR as
 > OD-1 above. ADR-030's OD-6 is the Gemini model.
@@ -941,3 +1113,10 @@ authority tied to extractor technology (D3), no ontology, skill or degree-level 
 no derived value in a hashed or source-updatable field (D16, D17), no extraction during an
 eligibility request (D21), no candidate data anywhere in the path (D24), the description always a
 labelled untrusted data block (D25), and an ingestion run that survives an extraction failure (D26).
+
+**Added 2026-10-03 by the Phase 1 owner rulings.** Each of the following is a review failure in its
+own right: a `PROSE_DERIVED` deterministic result reporting anything other than `MEDIUM` confidence
+(D7a) · a derived requirement evaluated alongside a source-stated requirement of the same type
+(D20a) · a suppressed derived requirement appearing in a breakdown, or being mutated by suppression
+(D20a) · a prose-derived failure closing the AI field-relatedness stage (D4a) · any third
+`EvaluationMethod` value (D4a).
