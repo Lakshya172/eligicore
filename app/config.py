@@ -112,6 +112,17 @@ class Settings(BaseSettings):
     # An unbounded retry loop against a paid API is a financial bug (standards/ai.md §7).
     ai_max_retries: int = Field(default=2, ge=0, le=5)
 
+    # --- Job requirement extraction (ADR-030 D11, D21) -----------------------------------
+    # Whether ingestion derives requirements from job-description prose. **False by
+    # default, and that default is the safety property**: ADR-030 sequences each step to be
+    # mergeable with the capability off, so an unconfigured checkout and CI ingest exactly
+    # as they did before this setting existed.
+    #
+    # Enabling it turns on the *deterministic* path only — regular expressions over public
+    # job text, behind the same verifier. It authorizes no AI call of any kind: Phase 2 is a
+    # separate gate with its own provider operation (D13), and `ai_provider` is unaffected.
+    extraction_enabled: bool = False
+
     # --- AI cost accounting (ADR-026, dossier §9.2, §10.2) ------------------------------
     # Maps "<provider>:<model>" to its rate, e.g.
     #   ELIGICORE_AI_COST_RATES={"gemini:gemini-2.0-flash":
