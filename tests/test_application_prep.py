@@ -1276,9 +1276,10 @@ def test_the_service_touches_no_file_no_cache_and_no_global_state() -> None:
 def test_no_table_or_migration_was_added() -> None:
     assert set(Base.metadata.tables) == ALLOWED_OPERATIONAL_TABLES
     versions = sorted(p.name for p in pathlib.Path("alembic/versions").glob("*.py"))
-    # Four, not three, since ADR-029 added the constraint-widening revision
-    # c4f1a8b92d63. Week 7 still added none of them, which is what this guards.
-    assert len(versions) == 4, versions
+    # Five, not three: ADR-029 added the constraint-widening revision c4f1a8b92d63 and
+    # ADR-030 D16 added e7b4c0d21a95 for extracted_requirements. Week 7 still added none of
+    # them, which is what this guards.
+    assert len(versions) == 5, versions
 
 
 # ---------------------------------------------------------------------------------------

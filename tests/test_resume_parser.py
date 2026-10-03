@@ -376,6 +376,8 @@ async def test_parse_resume_does_not_persist_anything() -> None:
     """INV-1, at the service layer: parsing must not register or create a table."""
     from app.database import Base
 
+    from tests.conftest import ALLOWED_OPERATIONAL_TABLES
+
     service = AIService(MockAIProvider())
     await parse_resume(build_pdf(SAMPLE_RESUME_LINES), "r.pdf", service)
-    assert not (set(Base.metadata.tables) - {"jobs", "ingestion_state"})
+    assert not (set(Base.metadata.tables) - ALLOWED_OPERATIONAL_TABLES)
