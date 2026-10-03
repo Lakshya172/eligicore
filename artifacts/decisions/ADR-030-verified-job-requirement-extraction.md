@@ -1072,6 +1072,20 @@ the implementing PR with evidence rather than guessed here.
 **No new owner decision is created by this ADR.** ADR-028's remaining open decisions and Week 9B's
 seven remain open and untouched.
 
+> **Amendment, added 2026-10-03.** Three further owner decisions were taken later, at the
+> **Phase 1 implementation design gate**, on questions this ADR left open rather than ones it
+> created. They are recorded here as **OD-11 ... OD-13** and are normative.
+>
+> | # | Decision | Resolution |
+> |---|---|---|
+> | **OD-11** | Confidence of a `PROSE_DERIVED` deterministic result | **`MEDIUM`.** Confidence is descriptive, never authority; provenance remains the authority boundary (D7a). |
+> | **OD-12** | A `SOURCE_STATED` and a `PROSE_DERIVED` requirement of the same type | **R-COLLISION RATIFIED** — the source-stated requirement is the only one evaluated; the derived record is retained and suppressed at read time (D20a). |
+> | **OD-13** | Does a `PROSE_DERIVED` deterministic `FAIL` close the AI stage? | **NO.** It is not a verified hard failure, so ADR-019's stage stays reachable and the verdict stays `NEEDS_REVIEW` (D4a). |
+>
+> The sentence above remains accurate as written: ADR-030 itself created no owner decision. These
+> three arose from the Phase 1 design gate and were decided by the project owner on 2026-10-03.
+> ADR-028's remaining open decisions and Week 9B's seven are still open and untouched.
+
 > **Numbering note.** These OD numbers belong to the ADR-030 gates and are **not** ADR-028's
 > OD-1 … OD-7. ADR-028's own **OD-6** — the structured-eligibility gap — is resolved by this ADR as
 > OD-1 above. ADR-030's OD-6 is the Gemini model.
@@ -1090,3 +1104,10 @@ authority tied to extractor technology (D3), no ontology, skill or degree-level 
 no derived value in a hashed or source-updatable field (D16, D17), no extraction during an
 eligibility request (D21), no candidate data anywhere in the path (D24), the description always a
 labelled untrusted data block (D25), and an ingestion run that survives an extraction failure (D26).
+
+**Added 2026-10-03 by the Phase 1 owner rulings.** Each of the following is a review failure in its
+own right: a `PROSE_DERIVED` deterministic result reporting anything other than `MEDIUM` confidence
+(D7a) · a derived requirement evaluated alongside a source-stated requirement of the same type
+(D20a) · a suppressed derived requirement appearing in a breakdown, or being mutated by suppression
+(D20a) · a prose-derived failure closing the AI field-relatedness stage (D4a) · any third
+`EvaluationMethod` value (D4a).
