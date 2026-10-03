@@ -802,15 +802,27 @@ def test_recognised_backlog_phrasings_are_supported(evidence: str, count: int) -
 @pytest.mark.parametrize(
     ("evidence", "count"),
     [
+        # Number after the word — the shapes a naive "find a number nearby" rule would take.
         ("we maintain a product backlog of 12 items", 12),
         ("the sprint backlog has 5 tickets", 5),
         ("required: clearing the backlog of 4 support requests", 4),
+        # Number *before* the word, which is the same hazard from the other side. A mutation
+        # that accepted any digit adjacent to "backlog" survived the suite until these
+        # existed, so they are here because the tests were proven blind to it.
+        ("we closed 15 backlog tickets last sprint", 15),
+        ("required: triaging 8 backlog items each week", 8),
+        ("the 30 backlog entries must be groomed", 30),
     ],
 )
 def test_unrelated_uses_of_backlog_are_not_eligibility_requirements(
     evidence: str, count: int
 ) -> None:
-    """A backlog with no quantifier frame is software jargon, not an academic criterion."""
+    """A backlog with no quantifier frame is software jargon, not an academic criterion.
+
+    Adjacency to the word is not a frame. *"maximum 2 backlogs"* states a limit; *"15 backlog
+    tickets"* states a workload, and the only thing separating them is the stock wording the
+    scanner requires.
+    """
     outcome = verify_proposal(
         backlog_proposal(count=count, evidence=evidence), sourced(evidence)
     )
