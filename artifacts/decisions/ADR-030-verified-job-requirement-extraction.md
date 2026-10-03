@@ -190,6 +190,34 @@ A confidence score is a model's opinion of its own output. Admitting it as evide
 verifier a rubber stamp wearing a verifier's name, which is worse than having no verifier, because
 it would be reported as verification.
 
+> **Amendment, added 2026-10-03 (D7a). Owner ruling at the Phase 1 implementation design gate.**
+> **A `PROSE_DERIVED` deterministic result reports `MEDIUM` confidence.**
+>
+> D7 above governs a *model's* reported confidence as an **input**. This amendment governs the
+> *system's* reported confidence as an **output**, which this ADR had left to the implementing PR.
+>
+> `_result` in the engine assigns `HIGH` to every deterministic `PASS` or `FAIL` and `LOW` to
+> `UNKNOWN`, on the rule that confidence follows from *how* a result was reached. For a derived
+> requirement the comparison is still exact — but the requirement it compares against was read out
+> of prose rather than published structurally by the source, and a `HIGH` beside it would read as
+> source-level assurance. It is therefore capped at `MEDIUM`, exactly as ADR-019 caps an
+> AI-reasoned entry at `MEDIUM` because *"an interpretation ... is never as trustworthy as a
+> comparison"*. Confidence is still only ever lowered, never raised (ADR-019 section 4, D7).
+>
+> **Confidence is descriptive, never authority.** It describes how much the system trusts its own
+> determination (ADR-003). It gates nothing, caps nothing and licenses nothing:
+> **provenance remains the sole authority boundary** (D3). Lowering this value changes no verdict,
+> and raising it would change none either — which is the property that makes D3 stable across
+> every future extractor.
+>
+> **This does not change provenance, and it does not permit a `PROSE_DERIVED` requirement to
+> produce `NOT_ELIGIBLE`** (D2, D4).
+>
+> **QG-002 item 13 is unaffected.** That item requires *"a deterministic hard failure reports HIGH
+> confidence"*. After D2 a prose-derived `FAIL` is not a hard failure — it cannot produce
+> `NOT_ELIGIBLE` — and every requirement that can still produce one is `SOURCE_STATED` and
+> continues to report `HIGH`.
+
 **D8 — The worked case: "CGPA 7.5 preferred, 7.0 required".**
 
 This sentence is the reason conditions 7 and 8 exist, and it must be in the test corpus.
@@ -765,6 +793,8 @@ behaviour, then mutate to prove the test has teeth.
   — the D4 rule-5 test
 - a `SOURCE_STATED` deterministic `FAIL` still produces `NOT_ELIGIBLE`, unchanged
 - no new eligibility state appears in any response
+- a `PROSE_DERIVED` deterministic `PASS` or `FAIL` reports `MEDIUM` confidence, and a
+  `SOURCE_STATED` one still reports `HIGH` (D7a)
 
 **Boundary and privacy**
 
