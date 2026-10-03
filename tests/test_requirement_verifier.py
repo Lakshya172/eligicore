@@ -367,6 +367,92 @@ def test_value_absent_from_evidence_is_refused() -> None:
     assert VerificationFailure.VALUE_NOT_IN_EVIDENCE in outcome.failures
 
 
+@pytest.mark.parametrize(
+    ("value", "scale", "evidence", "why"),
+    [
+        (7.0, GradeScale.SCALE_10, "minimum CGPA 7.5/10 required", "7 inside 7.5"),
+        (10.0, GradeScale.SCALE_10, "minimum CGPA 10.5/10 required", "10 inside 10.5"),
+        (3.0, GradeScale.SCALE_4, "minimum GPA 3.2/4 required", "3 inside 3.2"),
+    ],
+)
+def test_a_value_is_not_stated_merely_because_its_digits_appear(
+    value: float, scale: GradeScale, evidence: str, why: str
+) -> None:
+    """Condition 1 compares numeric tokens, never rendered substrings.
+
+    Formatting a value and searching for it as text collapses it: ``7.0`` renders as ``"7"``,
+    which occurs inside ``"7.5"``. Condition 5 refused these anyway, but a condition that
+    cannot fail is not one of the eight — so each case asserts the **condition 1** code, not
+    merely that the proposal was refused.
+    """
+    outcome = verify_proposal(
+        cgpa_proposal(value=value, scale=scale, evidence=evidence), sourced(evidence)
+    )
+
+    assert not outcome.verified, why
+    assert VerificationFailure.VALUE_NOT_IN_EVIDENCE in outcome.failures, why
+
+
+@pytest.mark.parametrize(
+    ("value", "scale", "evidence"),
+    [
+        (7.0, GradeScale.SCALE_10, "minimum CGPA 7/10 required"),
+        (7.0, GradeScale.SCALE_10, "minimum CGPA 7.0/10 required"),
+        (7.5, GradeScale.SCALE_10, "minimum CGPA 7.5/10 required"),
+        (10.0, GradeScale.SCALE_10, "minimum CGPA 10/10 required"),
+        (60.0, GradeScale.PERCENTAGE, "minimum aggregate 60% required"),
+        (3.2, GradeScale.SCALE_4, "minimum GPA 3.2/4 required"),
+    ],
+)
+def test_token_comparison_preserves_the_supported_cgpa_phrasings(
+    value: float, scale: GradeScale, evidence: str
+) -> None:
+    """Integer-written, decimal-written and percentage grades all still verify.
+
+    The guard against the previous regression: tightening condition 1 must not start
+    refusing a cutoff the posting really does state, in any of the forms real prose uses.
+    """
+    outcome = verify_proposal(
+        cgpa_proposal(value=value, scale=scale, evidence=evidence), sourced(evidence)
+    )
+
+    assert outcome.verified, codes(outcome)
+
+
+def test_a_scale_denominator_is_not_a_stated_grade() -> None:
+    """The ``10`` in *"CGPA 10.5/10"* is how the grade is written, not a second grade.
+
+    Without excluding denominators, a proposal of ``10.0`` would find a matching token in a
+    sentence that states ``10.5`` and condition 1 would pass for the wrong reason.
+    """
+    evidence = "minimum CGPA 10.5/10 required"
+    outcome = verify_proposal(
+        cgpa_proposal(value=10.0, evidence=evidence), sourced(evidence)
+    )
+
+    assert VerificationFailure.VALUE_NOT_IN_EVIDENCE in outcome.failures
+
+
+def test_a_backlog_limit_is_not_stated_by_a_longer_number() -> None:
+    """A limit of ``1`` is not stated by *"maximum 15 backlogs"*."""
+    evidence = "maximum 15 backlogs"
+    outcome = verify_proposal(
+        backlog_proposal(count=1, evidence=evidence), sourced(evidence)
+    )
+
+    assert not outcome.verified
+    assert VerificationFailure.VALUE_NOT_IN_EVIDENCE in outcome.failures
+
+
+def test_a_graduation_year_is_not_stated_by_a_longer_number() -> None:
+    """``2026`` is not stated by *"12026"* — years are matched on word boundaries."""
+    evidence = "required: 12026 graduating batch"
+    outcome = verify_proposal(year_proposal(evidence=evidence), sourced(evidence))
+
+    assert not outcome.verified
+    assert VerificationFailure.VALUE_NOT_IN_EVIDENCE in outcome.failures
+
+
 def test_seven_point_five_years_of_experience_is_not_a_cgpa() -> None:
     """Condition 5 — the canonical false positive ADR-030 D6 exists to refuse.
 
@@ -739,6 +825,117 @@ def test_every_occurrence_of_the_evidence_is_checked() -> None:
 
     assert not outcome.verified
     assert VerificationFailure.CONTRADICTED_IN_WINDOW in outcome.failures
+
+
+# ---------------------------------------------------------------------------------------
+# Condition 8 at the boundary (ADR-030 D9) — the radius is 300, measured from the anchor
+# ---------------------------------------------------------------------------------------
+
+#: Filler that cannot be mistaken for anything: no digits, and non-word characters so a
+#: ``\b`` before an adjacent contradiction word still matches.
+PAD = "-"
+
+#: The longest contradiction phrase the verifier recognises. Named rather than inlined so a
+#: reader can see that the boundary holds for the worst case, not just a short word.
+LONGEST_CONTRADICTION = "subject to approval"
+
+
+def trailing(phrase: str, distance: int, anchor_offset: int = 0) -> str:
+    """Pinned text whose contradiction anchor sits ``distance`` chars after the evidence."""
+    return EVIDENCE + PAD * (distance - anchor_offset) + phrase
+
+
+def leading(phrase: str, distance: int, anchor_offset: int = 0) -> str:
+    """Pinned text whose contradiction anchor sits ``distance`` chars before the evidence."""
+    return phrase + PAD * (distance - len(phrase) + anchor_offset) + EVIDENCE
+
+
+#: The default evidence, hoisted so the boundary helpers can measure against it.
+EVIDENCE = "minimum CGPA 7.5/10"
+
+#: A competing CGPA value, and where its number — the anchor — sits inside the phrase.
+COMPETING = "CGPA 8.0/10"
+COMPETING_ANCHOR = COMPETING.index("8.0")
+
+
+@pytest.mark.parametrize(
+    ("label", "phrase", "anchor_offset"),
+    [
+        ("short phrase", "waived", 0),
+        ("longest phrase", LONGEST_CONTRADICTION, 0),
+        ("competing value", COMPETING, COMPETING_ANCHOR),
+    ],
+)
+@pytest.mark.parametrize("side", ["trailing", "leading"])
+def test_contradiction_is_caught_at_exactly_the_radius(
+    label: str, phrase: str, anchor_offset: int, side: str
+) -> None:
+    """A contradiction anchored at exactly 300 characters is inside the radius.
+
+    The reach must not depend on how long the matched phrase is, nor on which side of the
+    evidence it falls. Before this was fixed, a trailing *"subject to approval"* was missed
+    from 282 characters onward while a leading one was caught to 300 — the window failed
+    **open** at the trailing edge, promoting a proposal the posting had qualified.
+    """
+    build = trailing if side == "trailing" else leading
+    pinned = build(phrase, CONTRADICTION_WINDOW, anchor_offset)
+    outcome = verify_proposal(cgpa_proposal(evidence=EVIDENCE), pinned)
+
+    assert not outcome.verified, (label, side)
+    assert VerificationFailure.CONTRADICTED_IN_WINDOW in outcome.failures
+
+
+@pytest.mark.parametrize(
+    ("label", "phrase", "anchor_offset"),
+    [
+        ("short phrase", "waived", 0),
+        ("longest phrase", LONGEST_CONTRADICTION, 0),
+        ("competing value", COMPETING, COMPETING_ANCHOR),
+    ],
+)
+@pytest.mark.parametrize("side", ["trailing", "leading"])
+def test_contradiction_one_character_beyond_the_radius_is_not_caught(
+    label: str, phrase: str, anchor_offset: int, side: str
+) -> None:
+    """At 301 characters the contradiction is outside, and the requirement stands.
+
+    The other half of the boundary. The scan deliberately *reads* further than 300 so a
+    phrase starting at the edge can be matched whole; this proves the padding widens what is
+    read and not what counts, so the semantic radius is still exactly
+    :data:`CONTRADICTION_WINDOW`.
+    """
+    build = trailing if side == "trailing" else leading
+    pinned = build(phrase, CONTRADICTION_WINDOW + 1, anchor_offset)
+    outcome = verify_proposal(cgpa_proposal(evidence=EVIDENCE), pinned)
+
+    assert outcome.verified, (label, side, codes(outcome))
+
+
+@pytest.mark.parametrize("side", ["trailing", "leading"])
+def test_contradiction_at_the_very_edge_of_the_source_text(side: str) -> None:
+    """Clamping holds when the radius runs past the start or the end of the text.
+
+    A short posting has no 300 characters to either side, so the slice is clipped. The
+    contradiction must still be found rather than lost with the clipped region.
+    """
+    pinned = f"{EVIDENCE}. waived" if side == "trailing" else f"waived. {EVIDENCE}"
+    outcome = verify_proposal(cgpa_proposal(evidence=EVIDENCE), pinned)
+
+    assert not outcome.verified
+    assert VerificationFailure.CONTRADICTED_IN_WINDOW in outcome.failures
+
+
+@pytest.mark.parametrize("position", ["start", "end"])
+def test_evidence_at_the_very_edge_of_the_source_text_verifies(position: str) -> None:
+    """Clipping the radius must not invent a contradiction either.
+
+    Evidence flush against the beginning or the end of the description is the normal shape
+    for a short posting, and it is not a reason to refuse anything.
+    """
+    pinned = EVIDENCE if position == "start" else f"Role overview. {EVIDENCE}"
+    outcome = verify_proposal(cgpa_proposal(evidence=EVIDENCE), pinned)
+
+    assert outcome.verified, codes(outcome)
 
 
 def test_window_size_is_configurable_without_changing_the_default() -> None:
