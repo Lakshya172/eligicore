@@ -756,6 +756,65 @@ def test_the_migration_round_trips_on_sqlite(tmp_path: pathlib.Path) -> None:
     assert _tables(db) == ALLOWED_OPERATIONAL_TABLES | {"alembic_version"}
 
 
+#: Every named constraint the contract requires, as it must appear in the DDL the migration
+#: actually produces.
+MIGRATED_CONSTRAINTS = (
+    "uq_extracted_requirements_job_digest_type",
+    "ck_extracted_requirements_provenance_derived",
+    "ck_extracted_requirements_strength_required",
+    "ck_extracted_requirements_scale_known",
+    "ck_extracted_requirements_value_columns",
+    "requirementtype",
+    "requirementprovenance",
+    "requirementstrength",
+    "gradescale",
+    "extractionstatus",
+)
+
+
+@pytest.mark.parametrize("constraint", MIGRATED_CONSTRAINTS)
+def test_the_migrated_schema_carries_every_constraint(
+    tmp_path: pathlib.Path, constraint: str
+) -> None:
+    """The constraints must exist in the schema the **migration** builds, not just the model.
+
+    This is the gap ``alembic check`` cannot close: autogenerate does not compare CHECK
+    constraints, so a migration that silently omitted one would still report no drift while
+    the tests — which build their schema from ``Base.metadata`` — kept passing. Production
+    schemas come from the migration, so a constraint missing there is missing in the only
+    place it matters. Found by mutation: removing the value-column CHECK from the migration
+    alone left the whole suite green until this existed.
+    """
+    import sqlite3
+
+    db = tmp_path / "constraints.sqlite3"
+    assert _alembic(db, "upgrade", "head").returncode == 0
+
+    with sqlite3.connect(db) as con:
+        ddl = con.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (TABLE,)
+        ).fetchone()[0]
+
+    assert constraint in ddl
+
+
+def test_the_migrated_schema_declares_the_cascading_foreign_key(
+    tmp_path: pathlib.Path,
+) -> None:
+    """The cascade is in the migration's DDL too, not only in the model."""
+    import sqlite3
+
+    db = tmp_path / "fk.sqlite3"
+    assert _alembic(db, "upgrade", "head").returncode == 0
+
+    with sqlite3.connect(db) as con:
+        ddl = con.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (TABLE,)
+        ).fetchone()[0]
+
+    assert "REFERENCES jobs (id) ON DELETE CASCADE" in ddl
+
+
 def test_alembic_check_reports_no_drift(tmp_path: pathlib.Path) -> None:
     """The migration and the model describe the same schema.
 
