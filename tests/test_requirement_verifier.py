@@ -395,6 +395,33 @@ def test_value_disagreeing_with_its_evidence_is_refused() -> None:
     assert VerificationFailure.VALUE_NOT_SUPPORTED_BY_EVIDENCE in outcome.failures
 
 
+@pytest.mark.parametrize(
+    ("evidence", "value", "scale"),
+    [
+        ("a minimum of 8/10 sprints must be delivered", 8.0, GradeScale.SCALE_10),
+        ("candidates rated 4/5 by the panel must be shortlisted", 4.0, GradeScale.SCALE_5),
+        ("at least 70% of tickets must be closed each week", 70.0, GradeScale.PERCENTAGE),
+    ],
+)
+def test_a_scaled_number_is_not_a_grade_without_a_grade_word(
+    evidence: str, value: float, scale: GradeScale
+) -> None:
+    """``8/10`` is a ratio until the sentence says it is a grade.
+
+    Each fixture clears every other condition — the scale is explicit, the value is in the
+    evidence, and an explicit ``REQUIRED`` marker is present — so the grade keyword is the
+    only thing refusing it. Mutation testing added these: deleting the keyword requirement
+    left the suite green, which meant nothing was checking that a delivery ratio does not
+    become an eligibility cutoff.
+    """
+    outcome = verify_proposal(
+        cgpa_proposal(value=value, scale=scale, evidence=evidence), sourced(evidence)
+    )
+
+    assert not outcome.verified
+    assert VerificationFailure.VALUE_NOT_SUPPORTED_BY_EVIDENCE in outcome.failures
+
+
 def test_a_number_in_a_grade_sentence_still_needs_a_scale() -> None:
     """A grade keyword nearby is not enough — the scale carries the *"7.5 years"* refusal.
 
