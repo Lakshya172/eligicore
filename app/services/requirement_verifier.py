@@ -389,23 +389,59 @@ def _value_key(value: DerivedValue) -> object:
     return value.max_backlogs
 
 
+#: A number acting as the denominator of a scale rather than as a stated value: the ``10``
+#: in ``7.5/10``, ``7.5 out of 10`` or ``on a 10 point scale``. Matched against the text
+#: immediately preceding a number.
+_SCALE_DENOMINATOR = re.compile(r"(?:/|out\s+of|on\s+an?)\s*$", re.IGNORECASE)
+
+#: A one- or two-digit count standing on its own, for backlog limits. The word boundaries
+#: matter: without them a limit of ``1`` would be found inside ``15``.
+_SMALL_NUMBER = re.compile(r"\b\d{1,2}\b")
+
+
+def _grade_tokens(evidence: str) -> set[float]:
+    """Numbers in the evidence that could be the grade a proposal states.
+
+    Scale denominators are excluded. The ``10`` in *"CGPA 10.5/10"* is part of how the grade
+    is expressed, not a second grade, and counting it would let a proposal of ``10.0`` claim
+    support from a sentence that states ``10.5``.
+    """
+    tokens: set[float] = set()
+    for match in _NUMBER.finditer(evidence):
+        if _SCALE_DENOMINATOR.search(evidence[: match.start()]):
+            continue
+        tokens.add(float(match.group()))
+    return tokens
+
+
 def _value_is_stated_in(value: DerivedValue, evidence: str) -> bool:
     """Whether the evidence explicitly states this value, in digits or in words.
 
-    A cheap, mostly-literal check that the evidence is about this value at all; condition 5
-    is the semantic one. It is not purely literal because **a value can be stated without a
-    digit**: *"no active backlogs"* states a limit of zero as explicitly as *"maximum 0
-    backlogs"* does, and demanding the character ``0`` would refuse the commonest backlog
-    phrasing in real postings for a reason that has nothing to do with evidence.
+    A cheap check that the evidence is about this value at all; condition 5 is the semantic
+    one. Two properties make it worth having rather than skipping.
+
+    **It compares numeric tokens, never rendered substrings.** Formatting a value and
+    searching for it as text silently collapses it: ``7.0`` renders as ``"7"``, which occurs
+    inside ``"7.5"``, so a proposal of ``7.0`` passed condition 1 against evidence stating
+    ``7.5`` — and the same held for ``10`` inside ``"10.5"`` and a backlog limit of ``1``
+    inside ``"15"``. Condition 5 refused all of them, but a condition that cannot fail is not
+    an independent condition. Tokens are parsed and compared by value instead.
+
+    **A value can be stated without a digit.** *"no active backlogs"* states a limit of zero
+    as explicitly as *"maximum 0 backlogs"* does, and demanding the character ``0`` would
+    refuse the commonest backlog phrasing in real postings for a reason that has nothing to
+    do with evidence.
     """
     if isinstance(value, MinCgpaValue):
-        return f"{value.min_cgpa:g}" in evidence
+        return float(value.min_cgpa) in _grade_tokens(evidence)
     if isinstance(value, GradYearWindowValue):
         bounds = [b for b in (value.min_grad_year, value.max_grad_year) if b is not None]
-        return bool(bounds) and all(str(bound) in evidence for bound in bounds)
+        years = {int(match.group(1)) for match in _YEAR.finditer(evidence)}
+        return bool(bounds) and all(bound in years for bound in bounds)
     if value.max_backlogs == 0 and _BACKLOG_ZERO.search(evidence):
         return True
-    return str(value.max_backlogs) in evidence
+    counts = {int(match.group()) for match in _SMALL_NUMBER.finditer(evidence)}
+    return value.max_backlogs in counts
 
 
 # ---------------------------------------------------------------------------------------
