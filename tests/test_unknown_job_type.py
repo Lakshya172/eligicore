@@ -30,6 +30,7 @@ from app.models.job import Job, JobStatus
 from app.schemas.candidate import PREFERABLE_JOB_TYPES, CandidatePreferences, JobType
 from app.schemas.job import JobRead, NormalizedJob, RawJob
 from app.services.job_normalizer import normalize_job
+from tests.conftest import ALLOWED_OPERATIONAL_TABLES
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 MIGRATION = REPO / "alembic" / "versions" / "c4f1a8b92d63_widen_job_type_check_for_unknown.py"
@@ -526,6 +527,13 @@ def test_the_curated_catalogue_still_states_a_real_type_for_every_job() -> None:
 # ---------------------------------------------------------------------------------------
 
 
+#: The revision this module is about, and the one below it. Named explicitly because
+#: ``downgrade -1`` means "whatever is under head", which stopped being c4f1a8b92d63 as soon
+#: as a later migration existed.
+C4_REVISION = "c4f1a8b92d63"
+BELOW_C4_REVISION = "b3e8d2c61a47"
+
+
 def _alembic(db_path: pathlib.Path, *args: str) -> subprocess.CompletedProcess[str]:
     import os
 
@@ -601,7 +609,11 @@ def test_downgrade_refuses_while_unknown_rows_exist_and_changes_nothing(
     assert _insert(migrated_db, "UNKNOWN")[0]
     assert _insert(migrated_db, "INTERNSHIP")[0]
 
-    result = _alembic(migrated_db, "downgrade", "-1")
+    # Step off any later revision first, so the downgrade under test is c4f1a8b92d63's own
+    # and "changes nothing" stays a claim about that migration rather than about whatever
+    # happens to sit above it.
+    assert _alembic(migrated_db, "downgrade", C4_REVISION).returncode == 0
+    result = _alembic(migrated_db, "downgrade", BELOW_C4_REVISION)
     output = result.stdout + result.stderr
 
     assert result.returncode != 0, "the downgrade must fail, not report success"
@@ -637,7 +649,8 @@ def test_downgrade_succeeds_once_no_unknown_row_remains(
     with sqlite3.connect(migrated_db) as con:
         con.execute("DELETE FROM jobs WHERE job_type='UNKNOWN'")
 
-    assert _alembic(migrated_db, "downgrade", "-1").returncode == 0
+    assert _alembic(migrated_db, "downgrade", C4_REVISION).returncode == 0
+    assert _alembic(migrated_db, "downgrade", BELOW_C4_REVISION).returncode == 0
 
     rejected, _ = _insert(migrated_db, "UNKNOWN")
     assert not rejected, "the narrowed constraint must reject UNKNOWN again"
@@ -655,7 +668,7 @@ def test_downgrade_succeeds_once_no_unknown_row_remains(
 def test_the_chain_round_trips_and_alembic_check_is_clean(
     migrated_db: pathlib.Path,
 ) -> None:
-    assert _alembic(migrated_db, "downgrade", "-1").returncode == 0
+    assert _alembic(migrated_db, "downgrade", BELOW_C4_REVISION).returncode == 0
     assert _alembic(migrated_db, "upgrade", "head").returncode == 0
 
     result = _alembic(migrated_db, "check")
@@ -668,14 +681,14 @@ def test_the_migration_leaves_no_temporary_or_duplicate_tables(
 ) -> None:
     import sqlite3
 
-    _alembic(migrated_db, "downgrade", "-1")
+    _alembic(migrated_db, "downgrade", BELOW_C4_REVISION)
     _alembic(migrated_db, "upgrade", "head")
     with sqlite3.connect(migrated_db) as con:
         tables = {
             row[0]
             for row in con.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert tables == {"alembic_version", "jobs", "ingestion_state"}
+    assert tables == ALLOWED_OPERATIONAL_TABLES | {"alembic_version"}
 
 
 # ---------------------------------------------------------------------------------------
@@ -687,6 +700,8 @@ def test_the_unknown_type_change_added_no_table() -> None:
     """The server-side table set is still operational data only (INV-1).
 
     The adapter list is deliberately no longer asserted here: Greenhouse was added by its
-    own later gate, and `tests/test_greenhouse_adapter.py` pins the package contents.
+    own later gate, and `tests/test_greenhouse_adapter.py` pins the package contents. The
+    table set is read from the shared allowlist for the same reason: `extracted_requirements`
+    arrived with ADR-030, not with this change.
     """
-    assert set(Base.metadata.tables) == {"jobs", "ingestion_state"}
+    assert set(Base.metadata.tables) == ALLOWED_OPERATIONAL_TABLES

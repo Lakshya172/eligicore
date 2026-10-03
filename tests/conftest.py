@@ -26,7 +26,12 @@ from app.main import app
 #: Weeks 1–2 asserted this set was empty, which was true then but was never the invariant.
 #: Week 3 adds the first operational tables; the rule — operational data only, no personal
 #: data — is unchanged.
-ALLOWED_OPERATIONAL_TABLES = {"jobs", "ingestion_state"}
+#:
+#: ``extracted_requirements`` joins it for ADR-030 D16: verified requirements read out of a
+#: job's own description. It is job-derived operational data in the same sense as ``jobs``
+#: — no candidate identifier, no profile, no evaluation — and it is listed here rather than
+#: exempted anywhere, so the privacy tests cover it like everything else.
+ALLOWED_OPERATIONAL_TABLES = {"jobs", "ingestion_state", "extracted_requirements"}
 
 #: Names that must never appear, checked in addition to the allowlist so the intent stays
 #: legible at each call site.
