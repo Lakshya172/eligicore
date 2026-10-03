@@ -2,8 +2,9 @@
 
 ╔══════════════════════════════════════════════════════════════════════════════════════╗
 ║  Permitted here:                                                                     ║
-║      job.py              — the job catalogue                                         ║
-║      ingestion_state.py  — adapter state, one row per source (ADR-015)               ║
+║      job.py                    — the job catalogue                                   ║
+║      ingestion_state.py        — adapter state, one row per source (ADR-015)         ║
+║      extracted_requirement.py  — verified prose-derived requirements (ADR-030 D16)   ║
 ║                                                                                      ║
 ║  FORBIDDEN — do not create, and do not write migrations for:                          ║
 ║      candidate.py · application.py · evaluation.py                                   ║
@@ -18,7 +19,15 @@ Importing this package registers every model on ``Base.metadata`` so Alembic aut
 can see them. Add new operational models to the imports below.
 """
 
+from app.models.extracted_requirement import ExtractedRequirement, ExtractionStatus
 from app.models.ingestion_state import IngestionState, IngestionStatus
 from app.models.job import Job, JobStatus
 
-__all__ = ["IngestionState", "IngestionStatus", "Job", "JobStatus"]
+__all__ = [
+    "ExtractedRequirement",
+    "ExtractionStatus",
+    "IngestionState",
+    "IngestionStatus",
+    "Job",
+    "JobStatus",
+]
