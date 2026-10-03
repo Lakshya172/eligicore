@@ -241,8 +241,11 @@ _KEYWORD_LOOKBEHIND = 60
 _KEYWORD_LOOKAHEAD = 20
 
 
-def _cgpa_values(text: str) -> set[tuple[float, GradeScale]]:
-    """Every ``(grade, scale)`` pair the text actually states.
+def _cgpa_matches(text: str) -> list[tuple[tuple[float, GradeScale], int]]:
+    """Every ``(grade, scale)`` pair the text states, each with the offset of its number.
+
+    The offset is what lets condition 8 decide whether a competing value lies inside the
+    contradiction radius or merely inside the padded slice that was searched.
 
     A pair is produced only when the number carries **both** a grade keyword nearby and an
     explicit scale. A grade with no stated scale is not a usable requirement
@@ -257,7 +260,7 @@ def _cgpa_values(text: str) -> set[tuple[float, GradeScale]]:
     load-bearing and is not misleads the next reader into thinking the case is handled
     somewhere it is not.
     """
-    found: set[tuple[float, GradeScale]] = set()
+    found: list[tuple[tuple[float, GradeScale], int]] = []
     for match in _NUMBER.finditer(text):
         tail = text[match.end() : match.end() + _KEYWORD_LOOKBEHIND]
 
@@ -276,7 +279,7 @@ def _cgpa_values(text: str) -> set[tuple[float, GradeScale]]:
         ):
             continue
 
-        found.add((float(match.group()), scale))
+        found.append(((float(match.group()), scale), match.start()))
     return found
 
 
@@ -292,13 +295,13 @@ _YEAR_UPPER_BOUND = re.compile(r"\s*(?:or\s+earlier|and\s+(?:before|earlier)|or\
 _YEAR_RANGE = re.compile(r"\s*(?:-|–|—|to|and)\s*(\d{4})\b", re.IGNORECASE)
 
 
-def _grad_year_windows(text: str) -> set[tuple[int | None, int | None]]:
-    """Every ``(min_year, max_year)`` window the text actually states.
+def _grad_year_matches(text: str) -> list[tuple[tuple[int | None, int | None], int]]:
+    """Every ``(min_year, max_year)`` window the text states, with the offset of its year.
 
     A bare year in graduation context is an exact window — *"2026 batch"* means 2026 and
     nothing else. ``or later`` and ``or earlier`` open one end; an explicit range states both.
     """
-    found: set[tuple[int | None, int | None]] = set()
+    found: list[tuple[tuple[int | None, int | None], int]] = []
     #: Positions already consumed as the upper end of an explicit range. ``2025-2026`` states
     #: one window, not also an exact 2026 — and without this the range would look like two
     #: competing windows and condition 8 would refuse the very text it came from.
@@ -318,15 +321,15 @@ def _grad_year_windows(text: str) -> set[tuple[int | None, int | None]]:
         if span is not None:
             other = int(span.group(1))
             if MIN_YEAR <= other <= MAX_YEAR and other >= year:
-                found.add((year, other))
+                found.append(((year, other), match.start()))
                 consumed.add(match.end() + span.start(1))
                 continue
         if _YEAR_LOWER_BOUND.match(tail):
-            found.add((year, None))
+            found.append(((year, None), match.start()))
         elif _YEAR_UPPER_BOUND.match(tail):
-            found.add((None, year))
+            found.append(((None, year), match.start()))
         else:
-            found.add((year, year))
+            found.append(((year, year), match.start()))
     return found
 
 
@@ -349,23 +352,32 @@ _BACKLOG_TRAILING = re.compile(
 )
 
 
-def _backlog_counts(text: str) -> set[int]:
-    """Every backlog limit the text actually states, via a bounded stock frame only."""
-    found: set[int] = {0} if _BACKLOG_ZERO.search(text) else set()
+def _backlog_matches(text: str) -> list[tuple[int, int]]:
+    """Every backlog limit the text states, with its offset, via a bounded frame only."""
+    found: list[tuple[int, int]] = [
+        (0, match.start()) for match in _BACKLOG_ZERO.finditer(text)
+    ]
     for pattern in (_BACKLOG_BOUNDED, _BACKLOG_TRAILING):
-        found.update(int(match.group(1)) for match in pattern.finditer(text))
+        found.extend(
+            (int(match.group(1)), match.start(1)) for match in pattern.finditer(text)
+        )
     return found
 
 
-def _stated_values(requirement_type: RequirementType, text: str) -> set[object]:
-    """Dispatch to the scanner for one requirement type, as a comparable set."""
+def _stated_matches(requirement_type: RequirementType, text: str) -> list[tuple[object, int]]:
+    """Dispatch to the scanner for one requirement type, values paired with their offsets."""
     if requirement_type is RequirementType.MIN_CGPA:
-        return set(_cgpa_values(text))
+        return list(_cgpa_matches(text))
     if requirement_type is RequirementType.GRAD_YEAR_WINDOW:
-        return set(_grad_year_windows(text))
+        return list(_grad_year_matches(text))
     if requirement_type is RequirementType.MAX_BACKLOGS:
-        return set(_backlog_counts(text))
-    return set()
+        return list(_backlog_matches(text))
+    return []
+
+
+def _stated_values(requirement_type: RequirementType, text: str) -> set[object]:
+    """The values a text states, with offsets dropped. Condition 5 does not need them."""
+    return {value for value, _ in _stated_matches(requirement_type, text)}
 
 
 def _value_key(value: DerivedValue) -> object:
@@ -422,34 +434,80 @@ _CONTRADICTION_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
 def contradiction_window(
     pinned_text: str, start: int, end: int, window: int = CONTRADICTION_WINDOW
 ) -> str:
-    """The symmetric character window around an evidence span, clamped to the text bounds."""
+    """The symmetric character radius around an evidence span, clamped to the text bounds.
+
+    This is the **semantic** radius: a contradiction counts when it *begins* inside it. It is
+    not the slice that gets searched — see :func:`_scan_region`, which is wider so that a
+    phrase beginning inside the radius can still be matched whole.
+    """
     return pinned_text[max(0, start - window) : min(len(pinned_text), end + window)]
+
+
+#: Extra characters read either side of the radius so pattern matching is never truncated.
+#:
+#: Two things need it. A contradiction phrase beginning at the very edge of the radius
+#: extends past it — *"at the discretion"* is 17 characters — and would have gone unmatched
+#: if only the radius were searched. A competing value needs its surrounding context to be
+#: recognisable at all: :func:`_cgpa_matches` looks up to ``_KEYWORD_LOOKBEHIND`` characters
+#: either side of a number for its grade keyword and its scale.
+#:
+#: The pad widens **what is read**, never **what counts**: a match is accepted only when its
+#: anchor lies within the radius, so the semantic reach stays exactly ``CONTRADICTION_WINDOW``.
+_SCAN_PAD = _KEYWORD_LOOKBEHIND + 20
+
+
+def _scan_region(
+    pinned_text: str, start: int, end: int, window: int
+) -> tuple[str, int, int, int]:
+    """The padded text to search, its offset, and the absolute anchor bounds that count."""
+    low = max(0, start - window - _SCAN_PAD)
+    high = min(len(pinned_text), end + window + _SCAN_PAD)
+    return pinned_text[low:high], low, start - window, end + window
 
 
 def _window_invalidates(
     requirement_type: RequirementType,
     value: DerivedValue,
-    window_text: str,
+    pinned_text: str,
+    start: int,
+    end: int,
+    window: int,
 ) -> bool:
-    """True when something in the window qualifies the proposal or competes with it.
+    """True when something within the radius qualifies the proposal or competes with it.
 
-    Two independent ways a window invalidates a proposal:
+    Two independent ways a proposal is invalidated:
 
-    * **Qualifying language** — a waiver, relaxation or discretion clause anywhere in it.
+    * **Qualifying language** — a waiver, relaxation or discretion clause.
     * **A competing value of the same type** — *"CGPA 7.5 preferred, 7.0 required"* is
       ADR-030 D8's worked case, and the reason this check exists separately from the strength
       gate: condition 7 refuses the 7.5 proposal on its marker, and condition 8 refuses it
       again, independently, because *"7.0 required"* sits beside it.
 
+    **A match counts when it begins inside the radius**, even if it runs past the end of it.
+    Requiring the whole phrase to fit made the trailing reach shorter than the leading reach
+    by the length of whatever was being matched — 283 characters for *"at the discretion"*
+    against 300 for a leading clause — and it failed **open**, promoting a proposal the
+    posting had qualified. The radius is unchanged; only the truncation is gone.
+
     The competing-value test is deliberately symmetric and therefore conservative: a proposal
-    is refused whenever the window states a *different* value of its own type, in either
+    is refused whenever the radius holds a *different* value of its own type, in either
     direction. A job with no CGPA requirement is honest; a job with the wrong one tells a
     qualified candidate not to apply.
     """
-    if any(pattern.search(window_text) for pattern in _CONTRADICTION_PATTERNS):
-        return True
-    competing = _stated_values(requirement_type, window_text)
-    return any(other != _value_key(value) for other in competing)
+    region, offset, anchor_low, anchor_high = _scan_region(pinned_text, start, end, window)
+
+    def inside(position: int) -> bool:
+        return anchor_low <= offset + position <= anchor_high
+
+    for pattern in _CONTRADICTION_PATTERNS:
+        if any(inside(match.start()) for match in pattern.finditer(region)):
+            return True
+
+    key = _value_key(value)
+    return any(
+        other != key and inside(position)
+        for other, position in _stated_matches(requirement_type, region)
+    )
 
 
 # ---------------------------------------------------------------------------------------
@@ -587,8 +645,9 @@ def _check_contradiction_window(
     which copy the extractor happened to point at.
     """
     for start, end in spans:
-        text = contradiction_window(pinned_text, start, end, window)
-        if _window_invalidates(proposal.requirement_type, proposal.value, text):
+        if _window_invalidates(
+            proposal.requirement_type, proposal.value, pinned_text, start, end, window
+        ):
             return VerificationFailure.CONTRADICTED_IN_WINDOW
     return None
 
