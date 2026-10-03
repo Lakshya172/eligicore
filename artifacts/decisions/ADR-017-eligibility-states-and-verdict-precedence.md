@@ -50,6 +50,10 @@ No other state exists. Adding one requires a new ADR (QG-002 item 15).
 
 Implemented in `compose_verdict` (`app/services/eligibility_engine.py`).
 
+> **Amended 2026-10-03 by ADR-030 D4** — rules 2, 4 and 5 are narrowed or widened for
+> prose-derived requirements. The amended table is in § Requirement provenance and authority
+> below. The six rules above remain the implemented behaviour until that implementation PR lands.
+
 ### Evaluation after a hard failure (C-13)
 
 **Deterministic evaluation continues; AI evaluation stops.**
@@ -66,11 +70,115 @@ honestly in the breakdown, and routes the verdict to `NEEDS_REVIEW`. A probabili
 about whether two fields are related is not strong enough evidence to tell a person they may not
 apply.
 
+### Requirement provenance and authority
+
+> **Amendment, added 2026-10-03. Required by ADR-030 (D1–D4), which authorizes controlled
+> extraction of eligibility criteria from a job's free text under ADR-028 D9a.**
+
+Until ADR-030, every requirement in the catalogue came from a source that published it in a
+structured field, so "stated requirement" needed no qualification. It does now.
+
+**Two provenance classes, and only two** (ADR-030 D1):
+
+| Class | Meaning |
+|---|---|
+| `SOURCE_STATED` | The source published the value in a structured field the adapter read directly. Everything in the catalogue before ADR-030. |
+| `PROSE_DERIVED` | The value was produced by reading a job's free text, **by any means**. |
+
+**Verified deterministic `SOURCE_STATED` hard failures keep final authority, unchanged.** Rule 2
+above, ADR-003's deterministic-first rule and the C-13 continuation rule are untouched for them.
+
+**For a `PROSE_DERIVED` requirement:**
+
+- It **may never independently produce `NOT_ELIGIBLE`.** `NOT_ELIGIBLE` continues to require at
+  least one `SOURCE_STATED` deterministic `FAIL`. This is R-2's reasoning applied to a second kind
+  of uncertain input, and it makes this ADR's auditability guarantee **stronger**, not weaker: a
+  candidate told they may not apply is always being told so on the basis of something the employer
+  published structurally.
+- It **does not bypass the deterministic-first rule.** ADR-003's ordering is unchanged, and a job
+  with a verified hard failure is still closed to the AI stage.
+- It must **already have satisfied ADR-030's evidence contract (D6)** before it is retained or
+  treated as a verified extracted requirement. A proposal that fails any of those eight conditions
+  is discarded, and the criterion stays absent — which is the pre-existing behaviour and is never
+  a failure for the candidate.
+- **Confidence is never sufficient authority** (ADR-030 D7, consistent with ADR-019 §4). A
+  reported confidence may lower trust; it may never raise it, and it never substitutes for
+  evidence.
+
+**Authority follows provenance, never extraction technology** (ADR-030 D3). A value read by a
+regular expression and a value read by a model are both `PROSE_DERIVED` and carry identical,
+capped authority. Tying authority to the extractor would make this rule expire every time the
+extractor changed.
+
+**Precedence, amended minimally** (ADR-030 D4). Rules 1 and 3 are untouched; 2, 4 and 5 change:
+
+```
+1. Zero structured requirements                                  → ELIGIBLE
+2. Any SOURCE_STATED deterministic FAIL                          → NOT_ELIGIBLE      (narrowed)
+3. Every requirement UNKNOWN                                     → UNKNOWN
+4. Any UNKNOWN, any AI-reasoned FAIL, or any PROSE_DERIVED FAIL  → NEEDS_REVIEW      (widened)
+5. All PASS, at least one by AI reasoning or PROSE_DERIVED       → LIKELY_ELIGIBLE   (widened)
+6. All PASS, all deterministic and SOURCE_STATED                 → ELIGIBLE          (narrowed)
+```
+
+**Rule 5 is widened to close a specific failure.** Without it, an all-`PASS` evaluation built
+entirely from prose-derived requirements would return plain `ELIGIBLE` — the strongest verdict the
+system has, asserted on requirements no employer stated structurally. `LIKELY_ELIGIBLE`'s existing
+meaning, *every stated requirement passed, at least one by something other than a deterministic
+source-stated check*, already fits without alteration.
+
+**No sixth state.** The five states remain unchanged in number, name and meaning (ADR-030 D5);
+adding one would still require its own ADR.
+
+**Strength gating** (ADR-030 D5, D10, D10a): only a requirement whose strength is established as
+`REQUIRED` from an explicit marker in the evidence may participate in evaluation at all.
+`PREFERRED`, `CONDITIONAL` and `INFORMATIONAL` are disclosure only and never reach a verdict.
+
+**No mechanism is decided here.** Whether provenance travels as a new field on the breakdown
+entry, as a new `EvaluationMethod` value, or otherwise, is deliberately left to the implementing
+PR under ADR-030's open implementation notes. This amendment fixes the **rule**, not its
+representation — and until that PR lands, nothing in the engine changes.
+
 ### Zero structured requirements (R-4)
 
 `ELIGIBLE`, with a summary stating that the job lists no structured eligibility requirements.
 Whenever a job carries free-text requirement notes, the summary discloses that they were not
 evaluated — including when structured requirements also exist.
+
+> **Amendment, added 2026-10-03. The disclosure covers *any* unevaluated source text, not only
+> `requirements` notes.**
+>
+> As written, R-4 named one place free text lives. The curated catalogue states its criteria in
+> typed columns and uses `requirements` for prose beside them, so an empty structured object there
+> genuinely did mean the posting gates nothing, and saying so was honest. **A live posting states
+> everything in its description.** The first real Greenhouse fetch returned seven jobs with 3–6 KB
+> descriptions and not one structured criterion, and the summary read *"this job states no
+> structured eligibility requirements"* — true of the columns, and read by a person as *"this job
+> has no requirements"*.
+>
+> **An empty structured requirements object must not be reported as "there are no eligibility
+> requirements" while description prose exists.** The summary must distinguish two things:
+>
+> - **no structured requirements are currently available or evaluated** — which R-4's original
+>   sentence states correctly, and which is retained verbatim; and
+> - **the posting carries source text that was not evaluated**, so a requirement stated only
+>   there is not reflected in the result.
+>
+> The second disclosure **asserts nothing about what the text contains.** Claiming it holds
+> requirements would be the inference ADR-028 D9 forbids; claiming it holds none is the defect
+> this amendment fixes. What is disclosed is the only thing known: there is source text, and it
+> was not read.
+>
+> **This is already the shipped behaviour, and this amendment changes no code.** PR #54 added the
+> description disclosure on 2026-10-02; R-4's wording had simply not caught up. The neutral
+> phrasing, the whitespace-only rule and the source-agnostic behaviour of that fix are preserved
+> exactly as shipped.
+>
+> **Independent of ADR-030.** It describes disclosure, not extraction, and remains correct whether
+> or not any requirement is ever derived from prose. Once ADR-030's capability exists, a posting
+> whose criteria have been verified and promoted will have them evaluated as requirements; text
+> that was not promoted stays disclosed-only and is still never a requirement
+> (ADR-030 D6, D10, D10a).
 
 ### Confidence
 

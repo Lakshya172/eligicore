@@ -156,6 +156,48 @@ existence.** This is ADR-007's no-fabrication rule applied to the job side of th
 the single most important constraint in this ADR: a fabricated eligibility criterion is worse than
 an absent one, because it produces a confident wrong answer instead of an honest unknown.
 
+> **Amendment, added 2026-10-03 (D9a). Narrowed by ADR-030.** D9's blanket prohibition on
+> AI-extraction is **no longer absolute.** Controlled extraction of eligibility criteria from a
+> job's free text **is now authorized**, and only under the evidence contract ADR-030 defines.
+>
+> **What is unchanged, and stays unchanged.** *Invented*, *inferred* and *defaulted* remain
+> prohibited exactly as written above. An unverifiable reading is still an inference. Only the
+> fourth verb is narrowed: **AI-extracted** becomes *AI-extracted **without verified source
+> evidence***. D9's reasoning — that a fabricated criterion is worse than an absent one — is the
+> reason ADR-030 sets its bar where it does, and is retained in force rather than overturned.
+>
+> **The qualifying contract is ADR-030 D6**, whose eight conditions must all hold: the source text
+> explicitly contains the requirement · the extractor identifies it · supporting evidence text is
+> returned · that evidence exists in the pinned normalized source text · a **deterministic
+> verifier** confirms the value and type are supported by it · the semantic type is recognised ·
+> the strength is established as `REQUIRED` from an explicit marker, never inferred (D10a) · no
+> contradicting text in the contradiction window invalidates it. A failed condition discards the
+> proposal; the criterion stays absent, which is this D9's own outcome. **Model confidence is never
+> evidence** (ADR-030 D7) — it may lower trust and may never raise it.
+>
+> **Source authority is untouched.** A requirement a source published in a structured field remains
+> `SOURCE_STATED` and keeps the authority it has today. A requirement read out of prose is
+> `PROSE_DERIVED` and **may never independently produce `NOT_ELIGIBLE`** (ADR-030 D1–D4, and the
+> ADR-017 amendment that follows from it). Authority follows **provenance, not extraction
+> technology**: a value read by a regular expression and a value read by a model are both
+> `PROSE_DERIVED` and carry identical, capped authority (ADR-030 D3).
+>
+> **This is a controlled capability, not permission for arbitrary semantic parsing.** It does not
+> authorize a field or branch ontology, degree-level mapping from a degree name, required-skills
+> extraction into eligibility, deadline extraction, or general discourse inference (ADR-030 D11,
+> D12; ADR-018 A-2 is unamended). **D10 below is unaffected** — a deadline is still never inferred,
+> and deadlines are outside ADR-030 entirely (ADR-030 D23a).
+>
+> **No candidate information reaches the extraction operation.** Its input is the job description
+> and nothing else; the signature is the boundary, as it is for every other provider operation
+> (ADR-030 D13, D24; ADR-019 §7). Nothing here moves the system toward server-side candidate
+> persistence (ADR-011, INV-1).
+>
+> **Nothing is implemented by this amendment.** It records authorization; ADR-030 records the
+> architecture; the implementation PRs are separately gated.
+>
+> This resolves **OD-6** below.
+
 **D10 — A deadline is never inferred.** A source that publishes no deadline yields `deadline=None`.
 Not "30 days from posting", not "end of quarter", not any other convention. This confirms the
 existing normalizer behaviour, whose docstring already states *"an absent deadline stays absent"*.
@@ -228,6 +270,32 @@ left open and supersedes nothing: ADR-013's finding that `gemini-2.0-flash` was 
 default, not a verified one"* stands as the record of what was true then. **The configured default
 in `app/config.py` is still `gemini-2.0-flash` and is deliberately not changed by this
 documentation-only ADR** — updating it belongs to the live-enablement PR.
+
+> **Amendment, added 2026-10-03 (D19a). Superseded by ADR-030 D15.** **The approved target model
+> is now `gemini-3.8-flash`.**
+>
+> D19's selection of `gemini-2.5-flash` was correct when made and is superseded on the facts
+> rather than on the reasoning: Google's documentation has moved. `gemini-3.8-flash` is the
+> currently documented stable Flash model, with structured output support and no announced
+> shutdown date. **`gemini-2.0-flash`, still the value in `app/config.py`, was shut down on
+> 2026-06-01** — D19's observation that it was *"a configured default, not a verified one"* now
+> understates the position: it is not merely unverified, it is a dead identifier, and it **must
+> not be used when Gemini is enabled.**
+>
+> **Architecture decision — settled here.** The model identifier is `gemini-3.8-flash`.
+>
+> **Future implementation and configuration work — not performed here, and not authorized by this
+> amendment.** The live-enablement PR must still update `app/config.py`, and the provider migration
+> must account for the current API contract (ADR-030 D15): remove the deprecated sampling
+> parameters `temperature`, `top_p`, `top_k` and `candidate_count`, which this model generation
+> ignores; use the current documented thinking configuration (`thinking_level`) where applicable;
+> and preserve structured JSON output. That migration reaches the **two existing** provider calls
+> as well, since both currently send `temperature: 0.0` — their determinism control is inert until
+> it lands.
+>
+> **No configuration is changed, no dependency is touched and no Gemini request is made by this
+> amendment.** D20's mock-default guarantee is unaffected: an unconfigured checkout still cannot
+> make a paid call.
 
 **D20 — The provider abstraction and the mock default are preserved.** `AIProvider` stays the only
 thing the service layer knows about (INV-5). The mock provider **remains the default for tests and
@@ -307,6 +375,14 @@ the most tempting alternative because it would close the gap D9 leaves open. It 
 ADR-019 authorizes AI to answer exactly one eligibility question, and extracting a CGPA cutoff from
 prose is a second one — with the failure mode being a fabricated hard constraint applied as though
 it were verified. Reopening this needs its own ADR, not an implementation decision (OD-6).
+
+> **Superseded 2026-10-03 by ADR-030, via D9a.** Reopened through exactly the route this paragraph
+> required — its own ADR, not an implementation decision. **The reasoning above is retained, not
+> withdrawn:** the named failure mode, *a fabricated hard constraint applied as though it were
+> verified*, is precisely what ADR-030's eight-condition evidence contract and its
+> provenance-capped authority exist to prevent, and it is the record of why that bar sits where it
+> does. ADR-019 is also unamended — it still authorizes AI to answer exactly one eligibility
+> question, and reading a job posting is not an eligibility question about a candidate.
 
 **Change `JobSourceAdapter` pre-emptively to suit live sources.** Rejected (D12). The inspection
 found no required change, and widening an interface for a hypothetical need is how a boundary starts
@@ -441,7 +517,7 @@ Recorded as open. **None may be chosen implicitly by an implementation PR.**
 | **OD-3** | **Quota/rate-limit persistence design** — whether durable accounting is needed at all, and where it lives if so. Required only if a chosen source imposes a persistent quota. |
 | **OD-4** | **Live Gemini application generation and its cost accounting** — reopens ADR-026 D8's structural exclusion; needs its own privacy decision. |
 | **OD-5** | **Whether an authenticated or shared-instance ingestion endpoint is ever needed** — reopens ADR-024's C-25 deferral. |
-| **OD-6** | **Response to the structured-eligibility gap** — accept mostly-`None` live requirements, rely on the curated tier for structured evaluation, or authorize something new. AI extraction of criteria is **not** authorized (see Alternatives). |
+| **OD-6** | ~~**Response to the structured-eligibility gap** — accept mostly-`None` live requirements, rely on the curated tier for structured evaluation, or authorize something new. AI extraction of criteria is **not** authorized (see Alternatives).~~ **RESOLVED 2026-10-03 by ADR-030:** controlled, evidence-verified extraction is authorized under ADR-030's contract; see **D9a**. |
 | **OD-7** | **Adzuna's attribution and licensing terms** — a separate legal/ToS decision before it could ever be adopted (D7). |
 
 Week 9B's seven deployment decisions (ADR-027) remain separately open and are untouched by this ADR.
