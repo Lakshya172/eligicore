@@ -395,6 +395,22 @@ def test_value_disagreeing_with_its_evidence_is_refused() -> None:
     assert VerificationFailure.VALUE_NOT_SUPPORTED_BY_EVIDENCE in outcome.failures
 
 
+def test_a_number_in_a_grade_sentence_still_needs_a_scale() -> None:
+    """A grade keyword nearby is not enough — the scale carries the *"7.5 years"* refusal.
+
+    This is the harder half of that case: the earlier test has no grade keyword at all, so
+    two independent checks refuse it. Here ``CGPA`` really is in the sentence, and the only
+    thing standing between the number and promotion is the mandatory scale. Mutation testing
+    added this, after showing that the suite could not tell whether the scale requirement or
+    a now-deleted unit guard was doing the work.
+    """
+    evidence = "minimum CGPA requirements changed over 7.5 years"
+    outcome = verify_proposal(cgpa_proposal(evidence=evidence), sourced(evidence))
+
+    assert not outcome.verified
+    assert VerificationFailure.VALUE_NOT_SUPPORTED_BY_EVIDENCE in outcome.failures
+
+
 def test_cgpa_without_a_stated_scale_is_not_supported() -> None:
     """A grade with no scale is not a usable requirement, so no scale means no support.
 

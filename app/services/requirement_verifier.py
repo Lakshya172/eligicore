@@ -215,15 +215,6 @@ def recognise_strength(evidence_text: str) -> RecognisedStrength:
 _NUMBER = re.compile(r"\d{1,3}(?:\.\d{1,2})?")
 _YEAR = re.compile(r"\b(\d{4})\b")
 
-#: Words that, following a number, mean it is not a grade. *"7.5 years of experience"* is the
-#: canonical false positive ADR-030 D6 condition 5 exists to refuse, and the reason a
-#: deterministic extraction is not self-evidently correct (D12).
-_UNIT_AFTER_NUMBER = re.compile(
-    r"\s*\+?\s*(?:years?|yrs?|months?|mos?|weeks?|days?|hours?|hrs?|semesters?"
-    r"|lpa|lakhs?|crores?|cr|k\b|usd|inr|eur|gbp)\b",
-    re.IGNORECASE,
-)
-
 #: A number is only a grade when the text says so. ``score`` is deliberately absent: "score
 #: 80% on the assessment" is not an eligibility cutoff.
 _GRADE_KEYWORD = re.compile(
@@ -257,12 +248,18 @@ def _cgpa_values(text: str) -> set[tuple[float, GradeScale]]:
     explicit scale. A grade with no stated scale is not a usable requirement
     (``standards/eligibility.md`` §4, ADR-030 D11), so it is not produced at all rather than
     produced with a guessed one.
+
+    **The mandatory scale is what refuses *"7.5 years of experience"***, the canonical false
+    positive of D6 condition 5. An earlier draft also carried a unit guard rejecting numbers
+    followed by ``years``, ``lpa`` and so on; mutation testing showed it could never fire,
+    because it and the scale suffix are both anchored immediately after the number and their
+    patterns are disjoint. It was removed rather than left in place: a guard that looks
+    load-bearing and is not misleads the next reader into thinking the case is handled
+    somewhere it is not.
     """
     found: set[tuple[float, GradeScale]] = set()
     for match in _NUMBER.finditer(text):
         tail = text[match.end() : match.end() + _KEYWORD_LOOKBEHIND]
-        if _UNIT_AFTER_NUMBER.match(tail):
-            continue
 
         scale: GradeScale | None = None
         suffix = _SCALE_SUFFIX.match(tail)
