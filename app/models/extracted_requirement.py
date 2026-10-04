@@ -40,7 +40,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -53,12 +53,17 @@ from app.schemas.extraction import RequirementProvenance, RequirementStrength
 class ExtractionStatus(str, enum.Enum):
     """Whether a stored derivation still applies. Exactly two states, and no more.
 
-    ``SUPERSEDED`` is deliberately absent. The unique constraint keys a row to one exact
-    pinned text, so re-extracting the same text updates that row in place and a changed text
-    writes a new row under a new digest — there is never a second live row for one
-    ``(job, requirement type)`` pair to supersede. Adding the member would require widening
-    the unique key, which would in turn permit two ``ACTIVE`` rows for one requirement type:
-    exactly the ambiguity the key exists to prevent.
+    ``SUPERSEDED`` is deliberately absent, and the reason is that it would add a name without
+    adding a distinction. ``uq_extracted_requirements_one_active`` already guarantees a
+    single ``ACTIVE`` row per ``(job, requirement type)``, so a row that has been superseded
+    is a row that has been invalidated — the same fact, and the thing a reader needs in order
+    to know whether it applies is already in ``status``. *Why* it stopped applying is
+    recoverable from the row that replaced it: the digests differ, or the extractor version
+    does.
+
+    A third state would also have to answer what ``INVALIDATED`` means afterwards, and the
+    two-state rule is what makes :meth:`ExtractedRequirement.invalidate` the only transition
+    there is.
     """
 
     #: Current for the pinned description named by ``source_text_digest``.
@@ -101,19 +106,42 @@ _VALUE_COLUMNS_MATCH_TYPE = """
 """
 
 
+#: The partial index's predicate, built from the enum rather than written out, so the two
+#: cannot drift apart. A predicate naming a status value the enum no longer has would create
+#: an index that matches nothing — a unique constraint that silently enforces nothing.
+_ACTIVE_PREDICATE = f"status = '{ExtractionStatus.ACTIVE.value}'"
+
+
 class ExtractedRequirement(Base):
     """One verified derived requirement, for one job, derived from one exact description."""
 
     __tablename__ = "extracted_requirements"
     __table_args__ = (
-        # At most one derivation per requirement type per exact pinned text. Re-extracting
-        # the same text updates in place; a changed description produces a new digest and
-        # therefore a new row, so invalidation is a join rather than bookkeeping (D19).
-        UniqueConstraint(
+        # **At most one ACTIVE derivation per requirement type per job**, and no constraint
+        # at all on the rows that have been withdrawn.
+        #
+        # Partial rather than total, because the history has to survive. A description that
+        # changes away and later changes back leaves an ``INVALIDATED`` row at the returning
+        # digest; a total unique key over ``(job, digest, type)`` would have that row occupy
+        # the slot the new derivation needs, and the only ways out would be deleting history
+        # or reviving a withdrawn verification — neither of which this table permits.
+        #
+        # It is also **stricter than the key it replaces**, in the direction that matters.
+        # ``(job, digest, type)`` allowed two ``ACTIVE`` rows for one requirement type under
+        # two digests, and nothing but application code prevented it. Now the database does.
+        #
+        # The predicate is dialect-specific by necessity: SQLAlchemy has no neutral spelling,
+        # and a dialect matching neither of these silently receives a **total** unique index,
+        # which would reintroduce exactly the problem above. ADR-009 names SQLite and
+        # PostgreSQL and the repository pins drivers for those two only; a test compiles this
+        # index for both and asserts the predicate survives.
+        Index(
+            "uq_extracted_requirements_one_active",
             "job_id",
-            "source_text_digest",
             "requirement_type",
-            name="uq_extracted_requirements_job_digest_type",
+            unique=True,
+            sqlite_where=text(_ACTIVE_PREDICATE),
+            postgresql_where=text(_ACTIVE_PREDICATE),
         ),
         # A source-stated requirement lives in a ``jobs`` column by definition (D1) and has
         # no extraction path. Nothing here may claim one.
@@ -153,11 +181,18 @@ class ExtractedRequirement(Base):
     )
     #: SHA-256 of ``jobs.description`` **as stored** — the pinned normalized text (D9).
     #:
-    #: This is the staleness key, and it is deliberately not ``content_hash``.
-    #: ``compute_content_hash`` canonicalizes the description before hashing it, lowercasing
-    #: and stripping punctuation, so two descriptions differing only in punctuation or case
-    #: hash identically while storing differently. A row keyed on ``content_hash`` alone
-    #: could therefore look current while its evidence no longer occurs in the text.
+    #: **This pins which text a row was derived from; it is not a uniqueness key.** Active
+    #: uniqueness belongs to ``uq_extracted_requirements_one_active`` above, and several rows
+    #: may legitimately share a digest and a requirement type once the earlier ones have been
+    #: withdrawn. What the digest decides is staleness: a derivation applies only while its
+    #: digest still equals the digest of the job's current description, and a read filters on
+    #: that **and** on ``status`` (see :attr:`is_active`).
+    #:
+    #: It is deliberately not ``content_hash``. ``compute_content_hash`` canonicalizes the
+    #: description before hashing it, lowercasing and stripping punctuation, so two
+    #: descriptions differing only in punctuation or case hash identically while storing
+    #: differently — and a row compared on that could look current while the evidence it
+    #: quotes no longer occurs in the text at all.
     source_text_digest: Mapped[str] = mapped_column(String(64), nullable=False)
     #: The job's ``content_hash`` at derivation time. Correlation and churn only — it is
     #: never the staleness key, and this table is never an input to the hash itself (D17).
@@ -238,9 +273,12 @@ class ExtractedRequirement(Base):
         """Mark this derivation as no longer applying. **The only transition there is.**
 
         There is deliberately no counterpart. ``INVALIDATED`` is terminal: a description that
-        changes and then changes back produces a *new* row under the recomputed digest, with
-        its own evidence and its own extractor version, rather than resurrecting a record of
-        a verification that was performed against text the system no longer holds.
+        changes and then changes back produces a **new row**, with its own evidence, its own
+        extractor version and its own timestamp, rather than resurrecting a record of a
+        verification that was performed against text the system had since withdrawn. The two
+        rows share a digest and a requirement type, which the partial index permits precisely
+        so that this stays representable — the earlier one is history and the later one is
+        the derivation in force.
 
         A database CHECK cannot express a transition rule — it sees one row, not the row it
         replaced — and a trigger would be neither portable nor in scope. The guarantee here

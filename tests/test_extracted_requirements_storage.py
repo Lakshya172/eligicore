@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from typing import get_type_hints
 
 import pytest
-from sqlalchemy import create_engine, inspect as sa_inspect, select
+from sqlalchemy import UniqueConstraint, create_engine, inspect as sa_inspect, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -196,14 +196,26 @@ def test_enums_are_stored_as_varchar_with_a_check_not_a_native_type(
 
 
 def test_the_declared_indexes_exist(session: Session) -> None:
-    """The read path filters on job, digest and status, so all three are indexed."""
+    """Three ordinary indexes for the read path, plus the ACTIVE-only uniqueness index."""
     names = {ix["name"] for ix in sa_inspect(session.get_bind()).get_indexes(TABLE)}
 
     assert {
         "ix_extracted_requirements_job_id",
         "ix_extracted_requirements_source_text_digest",
         "ix_extracted_requirements_status",
+        "uq_extracted_requirements_one_active",
     } <= names
+
+
+def test_the_table_declares_no_total_unique_constraint() -> None:
+    """The old key is gone, not merely unused.
+
+    A total UNIQUE over (job_id, source_text_digest, requirement_type) is what made the
+    A -> B -> A history unrepresentable, and leaving it in place beside the partial index
+    would restore the problem while the new tests kept passing.
+    """
+    table = Base.metadata.tables[TABLE]
+    assert [c.name for c in table.constraints if isinstance(c, UniqueConstraint)] == []
 
 
 # ---------------------------------------------------------------------------------------
@@ -273,11 +285,16 @@ def test_the_deterministic_path_stores_no_provider_or_model(
 # ---------------------------------------------------------------------------------------
 
 
-def test_duplicate_job_digest_and_type_is_rejected(session: Session, job: Job) -> None:
-    """At most one derivation per requirement type per exact pinned text (D19).
+def test_a_second_active_row_for_the_same_job_and_type_is_rejected(
+    session: Session, job: Job
+) -> None:
+    """**At most one ACTIVE derivation per job and requirement type.**
 
-    This is what makes "verified is at most one value" a property of the database rather
-    than of whichever code path happens to be writing.
+    This is what makes "at most one requirement of this type is in force" a property of the
+    database rather than of whichever code path happens to be writing. It replaces the old
+    total key, and it is stricter in the direction that matters: the old key compared the
+    digest too, so two ACTIVE rows under two digests were permitted and only application
+    code prevented them.
     """
     store(session, derived(job))
 
@@ -285,13 +302,30 @@ def test_duplicate_job_digest_and_type_is_rejected(session: Session, job: Job) -
         store(session, derived(job, min_cgpa=8.0, evidence_text="minimum CGPA 8.0/10"))
 
 
+def test_a_second_active_row_under_a_different_digest_is_also_rejected(
+    session: Session, job: Job
+) -> None:
+    """The case the old key allowed. Changing the digest does not buy a second live row."""
+    store(session, derived(job))
+
+    with pytest.raises(IntegrityError):
+        store(
+            session,
+            derived(
+                job,
+                source_text_digest=digest("A different description."),
+                min_cgpa=8.0,
+            ),
+        )
+
+
 def test_the_same_type_is_accepted_under_a_different_digest(
     session: Session, job: Job
 ) -> None:
     """A changed description is a new derivation, not a duplicate.
 
-    The old row stays, invalidated; the new one is written under the recomputed digest. That
-    is why the key includes the digest rather than being ``(job_id, requirement_type)``.
+    The old row stays, invalidated; the new one is written under the recomputed digest.
+    Uniqueness applies to the live row, so the withdrawn one is no obstacle.
     """
     first = derived(job)
     store(session, first)
@@ -299,6 +333,102 @@ def test_the_same_type_is_accepted_under_a_different_digest(
     store(session, derived(job, source_text_digest=digest("A different description.")))
 
     assert len(session.execute(select(ExtractedRequirement)).scalars().all()) == 2
+
+
+def test_two_invalidated_rows_at_the_same_digest_and_type_are_allowed(
+    session: Session, job: Job
+) -> None:
+    """History may repeat. Nothing constrains rows that have been withdrawn."""
+    first = derived(job)
+    store(session, first)
+    first.invalidate(SEEDED_AT)
+
+    second = derived(job)
+    store(session, second)
+    second.invalidate(SEEDED_AT)
+
+    rows = session.execute(select(ExtractedRequirement)).scalars().all()
+    assert len(rows) == 2
+    assert {r.source_text_digest for r in rows} == {digest(job.description)}
+    assert all(r.status is ExtractionStatus.INVALIDATED for r in rows)
+
+
+def test_an_active_row_may_sit_beside_an_invalidated_one_at_the_same_digest(
+    session: Session, job: Job
+) -> None:
+    """The shape the correction exists for: the same text derived twice, once in force."""
+    old = derived(job)
+    store(session, old)
+    old.invalidate(SEEDED_AT)
+    store(session, derived(job, min_cgpa=8.0, evidence_text="minimum CGPA 8.0/10"))
+
+    rows = sorted(
+        session.execute(select(ExtractedRequirement)).scalars().all(),
+        key=lambda r: r.status.value,
+    )
+    assert [r.status for r in rows] == [
+        ExtractionStatus.ACTIVE,
+        ExtractionStatus.INVALIDATED,
+    ]
+    assert {r.source_text_digest for r in rows} == {digest(job.description)}
+
+
+def test_the_a_b_a_lifecycle_is_representable(session: Session, job: Job) -> None:
+    """The whole owner ruling, in one sequence.
+
+    A is derived and withdrawn, B is derived and withdrawn, and A returns as a **new** row.
+    No row is reactivated, no row is deleted, and exactly one derivation is in force at the
+    end — the new one, under A's digest.
+    """
+    digest_a = digest(job.description)
+    digest_b = digest("A materially different description.")
+
+    first_a = derived(job, source_text_digest=digest_a)
+    store(session, first_a)
+    assert first_a.is_active
+
+    # The description changes to B.
+    first_a.invalidate(SEEDED_AT)
+    b = derived(job, source_text_digest=digest_b, min_cgpa=8.0)
+    store(session, b)
+
+    # And changes back to A. The original A row is still there, still withdrawn.
+    b.invalidate(SEEDED_AT)
+    second_a = derived(job, source_text_digest=digest_a)
+    store(session, second_a)
+
+    rows = session.execute(select(ExtractedRequirement)).scalars().all()
+    assert len(rows) == 3, "no row was replaced or removed"
+    assert second_a.id != first_a.id, "the returning derivation is a new row"
+
+    active = [r for r in rows if r.is_active]
+    assert [r.id for r in active] == [second_a.id]
+    assert active[0].source_text_digest == digest_a
+
+    assert first_a.status is ExtractionStatus.INVALIDATED
+    assert first_a.invalidated_at is not None
+    assert b.status is ExtractionStatus.INVALIDATED
+
+
+def test_the_a_b_a_lifecycle_deletes_nothing(session: Session, job: Job) -> None:
+    """Row ids are recorded up front, so a silent replacement cannot pass as a survival."""
+    digest_a = digest(job.description)
+    digest_b = digest("A materially different description.")
+
+    first_a = derived(job, source_text_digest=digest_a)
+    store(session, first_a)
+    first_a.invalidate(SEEDED_AT)
+    b = derived(job, source_text_digest=digest_b, min_cgpa=8.0)
+    store(session, b)
+    b.invalidate(SEEDED_AT)
+
+    historical = {first_a.id, b.id}
+    second_a = derived(job, source_text_digest=digest_a)
+    store(session, second_a)
+
+    stored = {r.id for r in session.execute(select(ExtractedRequirement)).scalars()}
+    assert historical <= stored
+    assert stored == historical | {second_a.id}
 
 
 def test_source_stated_provenance_is_rejected(session: Session, job: Job) -> None:
@@ -700,6 +830,10 @@ def test_the_repr_carries_no_free_text() -> None:
 REVISION = "e7b4c0d21a95"
 DOWN_REVISION = "c4f1a8b92d63"
 
+#: The lifecycle correction that replaced the full derivation key with ACTIVE-only
+#: uniqueness. It chains directly from the revision that created the table.
+ACTIVE_UNIQUENESS_REVISION = "d5c2e9a1f7b4"
+
 
 def _alembic(db_path: pathlib.Path, *args: str):
     import os
@@ -725,15 +859,25 @@ def _tables(db_path: pathlib.Path) -> set[str]:
         }
 
 
-def test_the_revision_chains_from_the_previous_head() -> None:
-    """Exactly one new revision, on the head that existed before this PR."""
-    versions = sorted(p.stem for p in pathlib.Path("alembic/versions").glob("*.py"))
-    module = next(v for v in versions if v.startswith(REVISION))
-    source = (pathlib.Path("alembic/versions") / f"{module}.py").read_text(encoding="utf-8")
+def _revision_source(revision: str) -> str:
+    versions = pathlib.Path("alembic/versions")
+    module = next(p for p in versions.glob("*.py") if p.stem.startswith(revision))
+    return module.read_text(encoding="utf-8")
 
-    assert f'revision: str = "{REVISION}"' in source
-    assert f'down_revision: Union[str, None] = "{DOWN_REVISION}"' in source
-    assert len(versions) == 5
+
+def test_the_revisions_chain_in_order() -> None:
+    """Two revisions own this table, and each names the one before it."""
+    versions = sorted(p.stem for p in pathlib.Path("alembic/versions").glob("*.py"))
+
+    creation = _revision_source(REVISION)
+    assert f'revision: str = "{REVISION}"' in creation
+    assert f'down_revision: Union[str, None] = "{DOWN_REVISION}"' in creation
+
+    correction = _revision_source(ACTIVE_UNIQUENESS_REVISION)
+    assert f'revision: str = "{ACTIVE_UNIQUENESS_REVISION}"' in correction
+    assert f'down_revision: Union[str, None] = "{REVISION}"' in correction
+
+    assert len(versions) == 6
 
 
 def test_the_migration_round_trips_on_sqlite(tmp_path: pathlib.Path) -> None:
@@ -759,7 +903,6 @@ def test_the_migration_round_trips_on_sqlite(tmp_path: pathlib.Path) -> None:
 #: Every named constraint the contract requires, as it must appear in the DDL the migration
 #: actually produces.
 MIGRATED_CONSTRAINTS = (
-    "uq_extracted_requirements_job_digest_type",
     "ck_extracted_requirements_provenance_derived",
     "ck_extracted_requirements_strength_required",
     "ck_extracted_requirements_scale_known",
@@ -827,3 +970,264 @@ def test_alembic_check_reports_no_drift(tmp_path: pathlib.Path) -> None:
 
     assert result.returncode == 0
     assert "No new upgrade operations detected" in result.stdout + result.stderr
+
+
+# ---------------------------------------------------------------------------------------
+# The ACTIVE-only predicate, at DDL level and in both supported dialects
+# ---------------------------------------------------------------------------------------
+
+#: What the index's predicate must be, written out rather than imported from the model.
+#: A test that derives its expectation from the thing under test proves only that the thing
+#: equals itself — this is the one place the literal belongs.
+ACTIVE_PREDICATE_SQL = "WHERE status = 'ACTIVE'"
+ACTIVE_INDEX = "uq_extracted_requirements_one_active"
+
+
+def _compiled_index(dialect_name: str) -> str:
+    from sqlalchemy.dialects import postgresql, sqlite
+    from sqlalchemy.schema import CreateIndex
+
+    dialect = {"sqlite": sqlite, "postgresql": postgresql}[dialect_name].dialect()
+    index = next(
+        ix for ix in Base.metadata.tables[TABLE].indexes if ix.name == ACTIVE_INDEX
+    )
+    return str(CreateIndex(index).compile(dialect=dialect))
+
+
+@pytest.mark.parametrize("dialect", ["sqlite", "postgresql"])
+def test_the_model_emits_the_partial_predicate_for_both_dialects(dialect: str) -> None:
+    """ADR-009's two engines, each asserted separately.
+
+    SQLAlchemy has no dialect-neutral spelling for a partial index: the predicate must be
+    given once per dialect, and a dialect for which it is **not** given silently receives a
+    **total** unique index. That index would forbid the second row at a returning digest and
+    reintroduce exactly the lifecycle bug this correction removes — with no error anywhere,
+    because the index would still be created and still carry the right name.
+    """
+    statement = _compiled_index(dialect)
+
+    assert "CREATE UNIQUE INDEX" in statement
+    assert "(job_id, requirement_type)" in statement
+    assert ACTIVE_PREDICATE_SQL in statement
+
+
+def test_the_predicate_matches_the_stored_enum_value() -> None:
+    """A predicate naming a status that cannot occur is a constraint enforcing nothing."""
+    assert ExtractionStatus.ACTIVE.value == "ACTIVE"
+    assert f"status = '{ExtractionStatus.ACTIVE.value}'" in _compiled_index("sqlite")
+
+
+def test_the_migrated_index_carries_the_predicate(tmp_path: pathlib.Path) -> None:
+    """Read from the database a real ``alembic upgrade`` produced, not from the model.
+
+    ``alembic check`` cannot close this gap. A database holding a **total** unique index
+    where the model declares a partial one was compared against the metadata and
+    autogenerate reported no difference at all — the predicate is simply not part of what it
+    compares, exactly as CHECK constraints are not.
+    """
+    import sqlite3
+
+    db = tmp_path / "predicate.sqlite3"
+    assert _alembic(db, "upgrade", "head").returncode == 0
+
+    with sqlite3.connect(db) as con:
+        ddl = con.execute(
+            "SELECT sql FROM sqlite_master WHERE type='index' AND name=?", (ACTIVE_INDEX,)
+        ).fetchone()
+
+    assert ddl is not None, f"{ACTIVE_INDEX} is missing from the migrated schema"
+    assert "UNIQUE" in ddl[0]
+    assert ACTIVE_PREDICATE_SQL in ddl[0]
+
+
+def test_the_migrated_schema_has_no_total_unique_constraint(
+    tmp_path: pathlib.Path,
+) -> None:
+    """The old key must be absent from the migration's output, not only from the model."""
+    import sqlite3
+
+    db = tmp_path / "nokey.sqlite3"
+    assert _alembic(db, "upgrade", "head").returncode == 0
+
+    with sqlite3.connect(db) as con:
+        ddl = con.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (TABLE,)
+        ).fetchone()[0]
+
+    assert "uq_extracted_requirements_job_digest_type" not in ddl
+
+
+def test_the_migrated_schema_keeps_the_ordinary_indexes(tmp_path: pathlib.Path) -> None:
+    """The correction rebuilds the table on SQLite; the read-path indexes must survive it."""
+    import sqlite3
+
+    db = tmp_path / "indexes.sqlite3"
+    assert _alembic(db, "upgrade", "head").returncode == 0
+
+    with sqlite3.connect(db) as con:
+        names = {
+            row[0]
+            for row in con.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name=?", (TABLE,)
+            )
+        }
+
+    assert {
+        "ix_extracted_requirements_job_id",
+        "ix_extracted_requirements_source_text_digest",
+        "ix_extracted_requirements_status",
+        ACTIVE_INDEX,
+    } <= names
+
+
+# ---------------------------------------------------------------------------------------
+# Downgrade safety — the newer schema holds histories the older one cannot
+# ---------------------------------------------------------------------------------------
+
+
+def _seed_job(db: pathlib.Path) -> None:
+    import sqlite3
+
+    with sqlite3.connect(db) as con:
+        con.execute(
+            "INSERT INTO jobs (id, company_name, role_title, job_type, description,"
+            " requirements, allowed_fields, required_skills, source, content_hash, status,"
+            " last_verified_at, created_at, updated_at) VALUES"
+            " ('J1','Co','Eng','INTERNSHIP','A','{}','[]','[]','fake','h','ACTIVE',"
+            "datetime('now'),datetime('now'),datetime('now'))"
+        )
+
+
+def _seed_derived(db: pathlib.Path, row_id: str, text_digest: str, status: str) -> None:
+    import sqlite3
+
+    with sqlite3.connect(db) as con:
+        con.execute(
+            "INSERT INTO extracted_requirements (id, job_id, source_text_digest,"
+            " content_hash, requirement_type, provenance, strength, min_cgpa,"
+            " min_cgpa_scale, evidence_text, extractor, extractor_version, extracted_at,"
+            " status, invalidated_at) VALUES (?,?,?,'h','MIN_CGPA','PROSE_DERIVED',"
+            "'REQUIRED',7.5,'SCALE_10','minimum CGPA 7.5/10 required','deterministic.cgpa',"
+            "'1',datetime('now'),?,?)",
+            (
+                row_id,
+                "J1",
+                text_digest,
+                status,
+                None if status == "ACTIVE" else "2026-01-01",
+            ),
+        )
+
+
+def _derived_rows(db: pathlib.Path) -> list[tuple[str, str, str]]:
+    import sqlite3
+
+    with sqlite3.connect(db) as con:
+        return [
+            tuple(row)
+            for row in con.execute(
+                "SELECT id, source_text_digest, status FROM extracted_requirements"
+                " ORDER BY id"
+            )
+        ]
+
+
+def test_the_downgrade_succeeds_when_no_history_blocks_it(tmp_path: pathlib.Path) -> None:
+    """Clean data: the old key is restored and every other schema element survives."""
+    import sqlite3
+
+    db = tmp_path / "clean.sqlite3"
+    assert _alembic(db, "upgrade", "head").returncode == 0
+    _seed_job(db)
+    _seed_derived(db, "r1", "digestA", "ACTIVE")
+
+    result = _alembic(db, "downgrade", REVISION)
+    assert result.returncode == 0, result.stderr
+
+    with sqlite3.connect(db) as con:
+        ddl = con.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (TABLE,)
+        ).fetchone()[0]
+        index = con.execute(
+            "SELECT sql FROM sqlite_master WHERE type='index' AND name=?", (ACTIVE_INDEX,)
+        ).fetchone()
+        revision = con.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+
+    assert "uq_extracted_requirements_job_digest_type" in ddl
+    assert index is None
+    assert revision == REVISION
+    # The rebuild must not have cost the constraint reflection cannot round trip.
+    assert "ck_extracted_requirements_value_columns" in ddl
+    assert "REFERENCES jobs (id) ON DELETE CASCADE" in ddl
+    assert _derived_rows(db) == [("r1", "digestA", "ACTIVE")]
+
+
+def test_the_downgrade_refuses_when_a_b_a_history_exists(tmp_path: pathlib.Path) -> None:
+    """The case that must fail, and the reason the preflight exists.
+
+    Two rows share a job, a digest and a requirement type — valid now, impossible under the
+    old key. The downgrade must refuse rather than choose which one to destroy.
+    """
+    db = tmp_path / "history.sqlite3"
+    assert _alembic(db, "upgrade", "head").returncode == 0
+    _seed_job(db)
+    _seed_derived(db, "r1", "digestA", "INVALIDATED")
+    _seed_derived(db, "r2", "digestB", "INVALIDATED")
+    _seed_derived(db, "r3", "digestA", "ACTIVE")
+
+    result = _alembic(db, "downgrade", REVISION)
+
+    assert result.returncode != 0
+    assert "cannot represent" in (result.stdout + result.stderr)
+
+
+def test_a_refused_downgrade_changes_nothing(tmp_path: pathlib.Path) -> None:
+    """Aborting before the DDL is the whole point. Schema, revision and rows must be intact.
+
+    A preflight that ran *after* the index was dropped would leave a database on the new
+    revision, missing its uniqueness guarantee, reporting a clean failure.
+    """
+    import sqlite3
+
+    db = tmp_path / "unchanged.sqlite3"
+    assert _alembic(db, "upgrade", "head").returncode == 0
+    _seed_job(db)
+    _seed_derived(db, "r1", "digestA", "INVALIDATED")
+    _seed_derived(db, "r2", "digestB", "INVALIDATED")
+    _seed_derived(db, "r3", "digestA", "ACTIVE")
+    before = _derived_rows(db)
+
+    assert _alembic(db, "downgrade", REVISION).returncode != 0
+
+    with sqlite3.connect(db) as con:
+        revision = con.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+        index = con.execute(
+            "SELECT sql FROM sqlite_master WHERE type='index' AND name=?", (ACTIVE_INDEX,)
+        ).fetchone()
+        ddl = con.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (TABLE,)
+        ).fetchone()[0]
+
+    assert revision == ACTIVE_UNIQUENESS_REVISION
+    assert index is not None and ACTIVE_PREDICATE_SQL in index[0]
+    assert "uq_extracted_requirements_job_digest_type" not in ddl
+    assert "ck_extracted_requirements_value_columns" in ddl
+    assert _derived_rows(db) == before
+
+
+def test_a_refused_downgrade_deletes_and_reactivates_nothing(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Deduplicating would be the tempting fix, and is explicitly forbidden."""
+    db = tmp_path / "nodedupe.sqlite3"
+    assert _alembic(db, "upgrade", "head").returncode == 0
+    _seed_job(db)
+    _seed_derived(db, "r1", "digestA", "INVALIDATED")
+    _seed_derived(db, "r2", "digestA", "ACTIVE")
+
+    assert _alembic(db, "downgrade", REVISION).returncode != 0
+
+    assert _derived_rows(db) == [
+        ("r1", "digestA", "INVALIDATED"),
+        ("r2", "digestA", "ACTIVE"),
+    ]
