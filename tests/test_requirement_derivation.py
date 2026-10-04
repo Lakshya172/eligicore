@@ -116,6 +116,26 @@ def the_job(session: Session) -> Job:
     return session.execute(select(Job)).scalars().first()  # type: ignore[return-value]
 
 
+def count_derivations(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Record every job derivation is called for, and still run it.
+
+    **Counting, never raising.** ``_derive_requirements`` catches ``Exception`` so that one
+    bad posting cannot fail an ingestion run, and ``AssertionError`` is an ``Exception`` — a
+    spy that raised would be swallowed by the very fail-closed handler these tests also
+    cover, and would pass while the thing it guards was broken. Mutation testing found
+    exactly that, in three tests below.
+    """
+    calls: list[str] = []
+    real = job_ingestion.derive_for_job
+
+    def spy(db: Session, job: Job) -> object:
+        calls.append(job.id)
+        return real(db, job)
+
+    monkeypatch.setattr(job_ingestion, "derive_for_job", spy)
+    return calls
+
+
 def seed_job(session: Session, description: str) -> Job:
     """A stored job, created without ingestion, for testing the service directly."""
     normalized = normalize_job(make_raw(description=description), "fake")
@@ -299,11 +319,10 @@ def test_unchanged_text_does_not_re_derive_at_all(
     """
     ingest(session, FULL)
 
-    def explode(*_args: object, **_kwargs: object) -> object:
-        raise AssertionError("re-derived an unchanged job")
-
-    monkeypatch.setattr(job_ingestion, "derive_for_job", explode)
+    calls = count_derivations(monkeypatch)
     ingest(session, FULL)
+
+    assert calls == []
     assert len(active(session)) == 3
 
 
@@ -317,12 +336,10 @@ def test_an_update_that_leaves_the_text_alone_does_not_re_derive(
     """
     ingest(session, FULL)
 
-    def explode(*_args: object, **_kwargs: object) -> object:
-        raise AssertionError("re-derived for a non-text change")
-
-    monkeypatch.setattr(job_ingestion, "derive_for_job", explode)
+    calls = count_derivations(monkeypatch)
     ingest(session, FULL, role_title="Backend Engineer II")
 
+    assert calls == []
     job = the_job(session)
     assert job.role_title == "Backend Engineer II"
     assert len(active(session)) == 3
@@ -510,6 +527,101 @@ def test_replacement_clears_any_invalidation_timestamp(session: Session) -> None
     assert rows(session)[0].invalidated_at is None
 
 
+def seed_row(
+    session: Session,
+    job: Job,
+    requirement_type: RequirementType,
+    *,
+    version: str = "0",
+    status: ExtractionStatus = ExtractionStatus.ACTIVE,
+    **columns: object,
+) -> ExtractedRequirement:
+    """A derived row placed directly, for states ordinary ingestion reaches only slowly."""
+    row = ExtractedRequirement(
+        id=str(uuid.uuid4()),
+        job_id=job.id,
+        source_text_digest=source_text_digest(job.description),
+        content_hash=job.content_hash,
+        requirement_type=requirement_type,
+        provenance=RequirementProvenance.PROSE_DERIVED,
+        strength=RequirementStrength.REQUIRED,
+        evidence_text="seeded",
+        extractor="deterministic.seed",
+        extractor_version=version,
+        status=status,
+        invalidated_at=(
+            None if status is ExtractionStatus.ACTIVE else requirement_derivation._utcnow()
+        ),
+        **columns,
+    )
+    session.add(row)
+    session.commit()
+    return row
+
+
+def test_a_type_no_longer_verified_at_the_same_digest_is_invalidated(
+    session: Session,
+) -> None:
+    """The half of the invalidation rule a digest change cannot exercise.
+
+    When the text changes, every old row is stale by digest alone. The ``requirement_type
+    not in verified`` clause only earns its place when the digest is **unchanged** and a new
+    extractor version reads fewer requirements out of the same sentence — exactly D22's
+    replacement case. Without it that requirement would stay active forever, asserted
+    against text that no longer supports it.
+    """
+    ingest(session, CGPA_ONLY)
+    job = the_job(session)
+
+    # Force a re-derivation, and give it a row for a type this text does not state.
+    active(session)[0].extractor_version = "0"
+    session.commit()
+    orphan = seed_row(session, job, RequirementType.MAX_BACKLOGS, max_backlogs=2)
+
+    derive_for_job(session, job)
+    session.commit()
+
+    assert by_type(session).keys() == {RequirementType.MIN_CGPA}
+    session.refresh(orphan)
+    assert orphan.status is ExtractionStatus.INVALIDATED
+    assert orphan.invalidated_at is not None
+
+
+def test_an_invalidated_row_at_the_current_digest_is_not_resurrected(
+    session: Session,
+) -> None:
+    """``INVALIDATED`` is terminal even when the current text would verify it again.
+
+    Reachable through a re-derivation at an unchanged digest: one type is already withdrawn,
+    another is stale, so the loop runs and meets the withdrawn row. Refreshing it would
+    re-assert a verification that had been withdrawn, which is the one transition the model
+    says does not exist.
+    """
+    ingest(session, FULL)
+    stored = by_type(session)
+    withdrawn = stored[RequirementType.MIN_CGPA]
+    withdrawn.invalidate()
+    for requirement_type in (
+        RequirementType.GRAD_YEAR_WINDOW,
+        RequirementType.MAX_BACKLOGS,
+    ):
+        stored[requirement_type].extractor_version = "0"
+    session.commit()
+
+    outcome = derive_for_job(session, the_job(session))
+    session.commit()
+
+    session.refresh(withdrawn)
+    assert withdrawn.status is ExtractionStatus.INVALIDATED
+    assert outcome.rows_updated == 2
+    assert outcome.rows_created == 0
+    assert by_type(session).keys() == {
+        RequirementType.GRAD_YEAR_WINDOW,
+        RequirementType.MAX_BACKLOGS,
+    }
+    assert len(rows(session)) == 3, "no second row was invented for the withdrawn type"
+
+
 def test_ordinary_ingestion_does_not_re_extract_on_a_version_change(
     session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -524,11 +636,10 @@ def test_ordinary_ingestion_does_not_re_extract_on_a_version_change(
     row.extractor_version = "0"
     session.commit()
 
-    def explode(*_args: object, **_kwargs: object) -> object:
-        raise AssertionError("ingestion re-extracted on a version change")
-
-    monkeypatch.setattr(job_ingestion, "derive_for_job", explode)
+    calls = count_derivations(monkeypatch)
     ingest(session, CGPA_ONLY)
+
+    assert calls == []
     assert rows(session)[0].extractor_version == "0"
 
 
