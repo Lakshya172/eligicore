@@ -25,6 +25,7 @@ from typing import Any
 
 import pytest
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import Settings
@@ -40,6 +41,7 @@ from app.services.job_normalizer import compute_content_hash, normalize_job
 from app.services.requirement_derivation import (
     DerivationStatus,
     derive_for_job,
+    effective_requirements,
     source_text_digest,
 )
 from app.services.requirement_extractors import EXTRACTOR_VERSION
@@ -586,13 +588,14 @@ def seed_row(
     *,
     version: str = "0",
     status: ExtractionStatus = ExtractionStatus.ACTIVE,
+    digest: str | None = None,
     **columns: object,
 ) -> ExtractedRequirement:
     """A derived row placed directly, for states ordinary ingestion reaches only slowly."""
     row = ExtractedRequirement(
         id=str(uuid.uuid4()),
         job_id=job.id,
-        source_text_digest=source_text_digest(job.description),
+        source_text_digest=digest or source_text_digest(job.description),
         content_hash=job.content_hash,
         requirement_type=requirement_type,
         provenance=RequirementProvenance.PROSE_DERIVED,
@@ -1303,3 +1306,227 @@ def test_an_eligibility_request_derives_nothing(monkeypatch: pytest.MonkeyPatch)
     finally:
         app.dependency_overrides.pop(get_db, None)
         Base.metadata.drop_all(engine)
+
+
+# ---------------------------------------------------------------------------------------
+# The lifecycle contract, against a real database
+# ---------------------------------------------------------------------------------------
+
+
+def test_only_active_rows_at_the_current_digest_are_in_force(session: Session) -> None:
+    """``effective_requirements`` applies both filters, and a mock would not prove it.
+
+    Three kinds of row are present: in force, withdrawn at the current digest, and active
+    under a digest the job no longer has. Only the first may be returned.
+    """
+    ingest(session, CGPA_ONLY)
+    job = the_job(session)
+    digest_now = source_text_digest(job.description)
+
+    # ACTIVE, but derived from a description the job no longer holds.
+    stale = seed_row(
+        session,
+        job,
+        RequirementType.MAX_BACKLOGS,
+        digest="a-digest-the-job-no-longer-has",
+        version="1",
+        max_backlogs=0,
+    )
+    # Withdrawn, at the current digest.
+    withdrawn = by_type(session)[RequirementType.MIN_CGPA]
+    withdrawn.invalidate()
+    session.commit()
+
+    effective = effective_requirements(session, job)
+
+    assert all(row.is_active for row in effective)
+    assert all(row.source_text_digest == digest_now for row in effective)
+    assert effective == (), "neither a stale digest nor a withdrawn row is in force"
+    assert {stale.id, withdrawn.id} <= {row.id for row in rows(session)}, "both are kept"
+
+
+def test_no_invalidated_row_ever_leaks_into_the_effective_set(session: Session) -> None:
+    """Across a whole lifecycle, every row returned is ACTIVE and at the current digest."""
+    job = None
+    for description in (FULL, CGPA_ONLY, FULL, NO_CRITERIA, FULL):
+        ingest(session, description)
+        job = the_job(session)
+        effective = effective_requirements(session, job)
+        assert all(row.is_active for row in effective), description
+        assert all(
+            row.source_text_digest == source_text_digest(job.description)
+            for row in effective
+        ), description
+
+    assert job is not None
+    assert [row.status for row in rows(session)].count(ExtractionStatus.INVALIDATED) > 0
+    assert len(effective_requirements(session, job)) == 3
+
+
+def test_every_stored_row_is_prose_derived_and_required(session: Session) -> None:
+    """The effective set cannot contain anything the verifier did not promote."""
+    for description in (FULL, CGPA_ONLY, FULL):
+        ingest(session, description)
+
+    for row in rows(session):
+        assert row.provenance is RequirementProvenance.PROSE_DERIVED
+        assert row.strength is RequirementStrength.REQUIRED
+
+
+def test_re_deriving_the_same_in_force_digest_is_idempotent(session: Session) -> None:
+    """CASE A. Same text, a row already in force: rewritten in place, no new history."""
+    ingest(session, FULL)
+    job = the_job(session)
+    before = {row.id for row in rows(session)}
+
+    # Force the work to run rather than short-circuit, then run it twice more.
+    for _ in range(2):
+        for row in active(session):
+            row.extractor_version = "0"
+        session.commit()
+        outcome = derive_for_job(session, job)
+        session.commit()
+        assert outcome.rows_created == 0
+        assert outcome.rows_updated == 3
+        assert outcome.rows_invalidated == 0
+
+    assert {row.id for row in rows(session)} == before, "no duplicate history was created"
+    assert len(active(session)) == 3
+
+
+def test_a_changed_description_invalidates_the_previous_digest_and_creates_the_new(
+    session: Session,
+) -> None:
+    """CASE B. A → B: B becomes the derivation in force, A's rows are withdrawn."""
+    ingest(session, FULL)
+    first = {row.id for row in active(session)}
+
+    ingest(session, CGPA_ONLY)
+
+    assert all(
+        row.status is ExtractionStatus.INVALIDATED
+        for row in rows(session)
+        if row.id in first
+    )
+    live = active(session)
+    assert len(live) == 1
+    assert {row.id for row in live}.isdisjoint(first)
+    assert live[0].source_text_digest == source_text_digest(pinned(CGPA_ONLY))
+
+
+def test_a_type_active_under_another_digest_is_withdrawn_before_the_new_row(
+    session: Session,
+) -> None:
+    """CASE E, and the reason withdrawals flush first.
+
+    Both descriptions state a CGPA requirement, so the same ``(job, type)`` slot changes
+    hands. The old row must be withdrawn before the new one is written, or the partial
+    unique index refuses the insert.
+    """
+    ingest(session, FULL)
+    old_cgpa = by_type(session)[RequirementType.MIN_CGPA]
+
+    ingest(session, CGPA_ONLY)
+
+    session.refresh(old_cgpa)
+    assert old_cgpa.status is ExtractionStatus.INVALIDATED
+    new_cgpa = by_type(session)[RequirementType.MIN_CGPA]
+    assert new_cgpa.id != old_cgpa.id
+    assert new_cgpa.min_cgpa == 8.0
+
+
+def test_at_most_one_active_row_per_job_and_requirement_type(session: Session) -> None:
+    """Asserted after every step of a long lifecycle, not only at the end."""
+    for description in (FULL, CGPA_ONLY, FULL, NO_CRITERIA, CGPA_ONLY, FULL):
+        ingest(session, description)
+        live = [row.requirement_type for row in active(session)]
+        assert len(live) == len(set(live)), description
+
+
+def test_a_second_active_row_is_refused_by_the_database(session: Session) -> None:
+    """The invariant is the database's, not the orchestration's.
+
+    Inserting a second ACTIVE row for a type that already has one must raise, whatever the
+    service does — otherwise a future caller could reintroduce the ambiguity by hand.
+    """
+    ingest(session, FULL)
+    job = the_job(session)
+
+    with pytest.raises(IntegrityError):
+        seed_row(
+            session,
+            job,
+            RequirementType.MIN_CGPA,
+            digest="another-digest",
+            min_cgpa=9.0,
+            min_cgpa_scale=GradeScale.SCALE_10,
+        )
+    session.rollback()
+
+
+def test_no_row_is_ever_reactivated_across_a_long_lifecycle(session: Session) -> None:
+    """Once a row has been withdrawn it stays withdrawn, whatever happens afterwards."""
+    withdrawn: dict[str, object] = {}
+
+    for description in (FULL, CGPA_ONLY, FULL, NO_CRITERIA, FULL, CGPA_ONLY):
+        ingest(session, description)
+        for row in rows(session):
+            if row.id in withdrawn:
+                assert row.status is ExtractionStatus.INVALIDATED, (
+                    f"{row.id} was reactivated after {description!r}"
+                )
+            elif not row.is_active:
+                withdrawn[row.id] = row.invalidated_at
+
+    assert withdrawn, "the fixture must actually withdraw something"
+
+
+def test_a_withdrawn_row_keeps_its_own_evidence_and_timestamp(session: Session) -> None:
+    """History is a record of what was verified, not a slot to be overwritten."""
+    ingest(session, FULL)
+    original = by_type(session)[RequirementType.MIN_CGPA]
+    original_evidence, original_id = original.evidence_text, original.id
+
+    ingest(session, CGPA_ONLY)
+    ingest(session, FULL)
+
+    stored = {row.id: row for row in rows(session)}
+    assert stored[original_id].status is ExtractionStatus.INVALIDATED
+    assert stored[original_id].evidence_text == original_evidence
+    assert stored[original_id].invalidated_at is not None
+
+
+def test_a_changed_digest_with_no_verified_requirements_does_not_restore_the_previous(
+    session: Session,
+) -> None:
+    """A posting that stops stating anything leaves no requirement in force.
+
+    The previous digest's rows are withdrawn and **stay** withdrawn; nothing falls back to
+    them, and ``_is_current`` must not report the old digest as current afterwards.
+    """
+    ingest(session, FULL)
+    first = {row.id for row in active(session)}
+
+    ingest(session, NO_CRITERIA)
+
+    assert active(session) == []
+    assert all(
+        row.status is ExtractionStatus.INVALIDATED
+        for row in rows(session)
+        if row.id in first
+    )
+    assert effective_requirements(session, the_job(session)) == ()
+    assert (
+        requirement_derivation._is_current(rows(session), source_text_digest(pinned(FULL)))
+        is False
+    )
+
+
+def test_repeated_ingestion_never_accumulates_active_history(session: Session) -> None:
+    """Running the same description many times leaves one row per type and no churn."""
+    for _ in range(5):
+        ingest(session, FULL)
+
+    assert len(rows(session)) == 3
+    assert len(active(session)) == 3
+    assert all(row.invalidated_at is None for row in active(session))
