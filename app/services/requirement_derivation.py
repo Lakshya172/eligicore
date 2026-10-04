@@ -383,13 +383,15 @@ def derive_for_job(session: Session, job: Job) -> DerivationOutcome:
     for row in superseded:
         row.invalidate(at)
 
-    if superseded:
-        # **Ordering, not optimisation.** A requirement type whose active row sits under a
-        # superseded digest is about to gain a new active row under this one, and only one
-        # of the two may be active at a time. Flushing the withdrawals before the inserts
-        # makes that ordering explicit rather than leaving it to the unit of work, which
-        # happens to emit updates first today and promises nothing about tomorrow.
-        session.flush()
+    # **No flush here, and that is deliberate.** A requirement type whose active row sits
+    # under a superseded digest gains a new active row under this one, and only one of the
+    # two may be active at a time — so the withdrawal has to reach the database before the
+    # insert does. SQLAlchemy's unit of work already emits the updates first, measured in
+    # both statement orders, so an explicit flush changes nothing and no test can tell
+    # whether it is here. It was written and then removed rather than left as insurance a
+    # reader would mistake for a working guard. If that ordering ever changed, the insert
+    # would be refused by the partial unique index, the per-job rollback would discard that
+    # derivation, and the lifecycle tests below would go red immediately.
 
     # --- then record what is in force now -------------------------------------------------
     created = updated = 0
