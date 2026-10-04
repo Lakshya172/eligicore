@@ -29,10 +29,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.adapters.base_adapter import AdapterError, JobSourceAdapter
+from app.config import Settings, get_settings
 from app.models.ingestion_state import IngestionState, IngestionStatus
 from app.models.job import Job, JobStatus
 from app.schemas.job import IngestionOutcome, NormalizedJob
 from app.services.job_normalizer import normalize_job
+from app.services.requirement_derivation import DerivationStatus, derive_for_job
 
 logger = logging.getLogger("eligicore.ingestion")
 
@@ -125,8 +127,14 @@ def _create_job(normalized: NormalizedJob) -> Job:
     )
 
 
-def ingest_source(session: Session, adapter: JobSourceAdapter) -> IngestionOutcome:
+def ingest_source(
+    session: Session, adapter: JobSourceAdapter, *, settings: Settings | None = None
+) -> IngestionOutcome:
     """Run one adapter and reconcile its jobs into the catalogue.
+
+    ``settings`` is read only to decide whether requirement derivation runs, and follows the
+    repository's existing optional-settings pattern (:func:`app.ai.ai_service.build_provider`).
+    It is off by default, so the behaviour below is unchanged from before it existed.
 
     Raises:
         AdapterError: The adapter could not fetch. State is recorded as FAILED before the
@@ -156,6 +164,10 @@ def ingest_source(session: Session, adapter: JobSourceAdapter) -> IngestionOutco
 
     created = updated = unchanged = duplicates = 0
     seen_job_ids: set[str] = set()
+    #: Jobs whose pinned description is new or materially different in this run. Only these
+    #: are eligible for derivation (ADR-030 D21, D22) — an update that changed only a
+    #: deadline or an apply link leaves the text a derivation was read from untouched.
+    retextualized: list[Job] = []
 
     for raw in raw_jobs:
         normalized = normalize_job(raw, source)
@@ -168,6 +180,7 @@ def ingest_source(session: Session, adapter: JobSourceAdapter) -> IngestionOutco
             # and collapses, rather than creating a second row and tripping the constraint.
             session.flush()
             seen_job_ids.add(job.id)
+            retextualized.append(job)
             created += 1
             continue
 
@@ -180,8 +193,11 @@ def ingest_source(session: Session, adapter: JobSourceAdapter) -> IngestionOutco
 
         seen_job_ids.add(existing.id)
         existing.last_verified_at = _utcnow()
+        previous_description = existing.description
         if _apply_updates(existing, normalized):
             updated += 1
+            if existing.description != previous_description:
+                retextualized.append(existing)
         else:
             unchanged += 1
 
@@ -207,6 +223,10 @@ def ingest_source(session: Session, adapter: JobSourceAdapter) -> IngestionOutco
     )
     session.commit()
 
+    # After the catalogue is committed, never before. A derivation failure then has nothing
+    # to roll back but itself (ADR-030 D26).
+    _derive_requirements(session, source, retextualized, settings or get_settings())
+
     # Counts only. Job postings are public, but keeping ingestion logging to numbers means
     # the habit holds when a future source carries something less public.
     logger.info(
@@ -215,6 +235,61 @@ def ingest_source(session: Session, adapter: JobSourceAdapter) -> IngestionOutco
         source, outcome.jobs_seen, created, updated, unchanged, deactivated, duplicates,
     )
     return outcome
+
+
+def _derive_requirements(
+    session: Session, source: str, jobs: list[Job], settings: Settings
+) -> None:
+    """Derive prose requirements for the jobs whose text changed. Guarded, and off by default.
+
+    **The guard is the first statement for a reason.** When extraction is disabled nothing is
+    imported into the run, no extractor executes, no verifier executes, no row is written and
+    no line is logged — ingestion behaves exactly as it did before this function existed.
+
+    Each job is its own unit of work: one ``derive_for_job`` call, one commit. The jobs are
+    already committed above, so a failure here discards that job's derivation and nothing
+    else. There is no batch call and no multi-job extraction — D21 scopes extraction to
+    ingestion time, per job.
+
+    Nothing propagates. A posting the system could not read must not fail an ingestion run
+    that otherwise succeeded (D26), and ``jobs_created`` has already been reported as true.
+    """
+    if not settings.extraction_enabled:
+        return
+
+    derived = skipped = unavailable = failed = 0
+    rows_created = rows_updated = rows_invalidated = 0
+    for job in jobs:
+        try:
+            outcome = derive_for_job(session, job)
+            session.commit()
+        except Exception:
+            # A persistence failure for one job. Rolled back so the session is usable for
+            # the next, and deliberately not re-raised. No exception text is logged: it
+            # could quote a description, which is untrusted third-party input (D25).
+            session.rollback()
+            failed += 1
+            continue
+
+        if outcome.status is DerivationStatus.SKIPPED:
+            skipped += 1
+        elif outcome.status is DerivationStatus.UNAVAILABLE:
+            unavailable += 1
+        else:
+            derived += 1
+        rows_created += outcome.rows_created
+        rows_updated += outcome.rows_updated
+        rows_invalidated += outcome.rows_invalidated
+
+    # Counts and the source name. Never an evidence string, never a description, never a
+    # job identifier — the numbers are what an operator needs and the text is what D24
+    # keeps out of logs.
+    logger.info(
+        "derivation source=%s jobs=%d derived=%d skipped=%d unavailable=%d failed=%d "
+        "rows_created=%d rows_updated=%d rows_invalidated=%d",
+        source, len(jobs), derived, skipped, unavailable, failed,
+        rows_created, rows_updated, rows_invalidated,
+    )
 
 
 def _fetch_sync(adapter: JobSourceAdapter) -> list:
@@ -286,7 +361,10 @@ def _write_state(
 
 
 def ingest_all(
-    session: Session, adapters: list[JobSourceAdapter]
+    session: Session,
+    adapters: list[JobSourceAdapter],
+    *,
+    settings: Settings | None = None,
 ) -> list[IngestionOutcome]:
     """Run every adapter, isolating failures.
 
@@ -297,7 +375,7 @@ def ingest_all(
     outcomes: list[IngestionOutcome] = []
     for adapter in adapters:
         try:
-            outcomes.append(ingest_source(session, adapter))
+            outcomes.append(ingest_source(session, adapter, settings=settings))
         except AdapterError:
             # Already recorded as FAILED with a sanitized message by ingest_source.
             continue
