@@ -45,12 +45,29 @@ function called for it again it would re-extract. Distinguishing "derived, found
 from "never derived" needs somewhere to record the attempt, which means a schema change, and
 the ingestion trigger above avoids the cost in practice by only calling for a job whose text
 actually changed.
+
+Lifecycle (ADR-030 D19, and the owner ruling the storage correction implements)
+-------------------------------------------------------------------------------
+
+``INVALIDATED`` is terminal and no derived row is ever deleted, so a job accumulates a
+history and exactly one derivation per requirement type is **in force** at a time. "In
+force" means two things at once — ``ACTIVE``, and derived from the digest of the description
+the job currently holds — and :func:`_active_at` is the single place that decides it.
+
+The case that drives the design is a description changing from A to B and back to A. The
+returning text is derived afresh into a **new** row; the original A row stays invalidated
+beside it, with the evidence and timestamp of the verification it actually recorded. Nothing
+is revived, because a verification performed against text the system had since replaced is
+not evidence about the text it holds now. The database enforces the single-active rule
+directly, through a partial unique index on ``(job_id, requirement_type)`` restricted to
+``ACTIVE`` rows.
 """
 
 from __future__ import annotations
 
 import hashlib
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -218,13 +235,16 @@ def _refresh(
 ) -> None:
     """Rewrite an **active** row in place for the same job, text and requirement type.
 
-    This is the extractor-version path: the same sentence re-read by a newer extractor
-    produces the same key, so the row is replaced rather than duplicated. ``invalidated_at``
-    is cleared explicitly — an active row carrying an invalidation timestamp is incoherent,
-    and leaving a stale one would misreport when the derivation stopped applying.
+    This is the idempotent path: the same text re-read, by the same extractor or a newer
+    one, produces the same ``(job, type)`` slot, so the row in force is rewritten rather
+    than duplicated. ``invalidated_at`` is cleared explicitly — an active row carrying an
+    invalidation timestamp is incoherent, and leaving a stale one would misreport when the
+    derivation stopped applying.
 
-    **Only ever called for a row that is already ``ACTIVE``.** ``INVALIDATED`` is terminal
-    (see :meth:`ExtractedRequirement.invalidate`), and nothing here moves a row back.
+    **Only ever reached for a row already in force**, because the caller selects its
+    candidates with :func:`_active_at`. ``INVALIDATED`` is terminal (see
+    :meth:`ExtractedRequirement.invalidate`) and nothing here moves a row back; a withdrawn
+    row at this digest is passed over and a new row is written beside it.
     """
     row.content_hash = job.content_hash
     row.evidence_text = requirement.evidence_text
@@ -239,19 +259,74 @@ def _refresh(
         setattr(row, column, value)
 
 
-def _is_current(rows: list[ExtractedRequirement], digest: str) -> bool:
-    """Whether this job's derivation at this exact text is already up to date.
+def _active_at(
+    rows: Sequence[ExtractedRequirement], digest: str
+) -> dict[RequirementType, ExtractedRequirement]:
+    """The derivations **in force** for this exact text, by requirement type.
 
-    True when rows exist for the digest and no active one was written by an older extractor.
-    An all-invalidated digest counts as current: those rows are terminal, re-running would
-    write nothing, and re-extracting to discover that on every ingestion is pure cost.
+    Two filters, and both are load-bearing. ``status`` decides whether a row still applies
+    at all, and the digest decides whether it applies to the text the job holds *now*. A row
+    failing either is history: it is kept, it is auditable, and it is never an input to a
+    lifecycle decision (ADR-030 D19; the storage model's ``is_active``).
+
+    The partial unique index guarantees at most one ``ACTIVE`` row per ``(job, type)``, so
+    this mapping cannot silently drop a second live row — there cannot be one.
     """
-    at_digest = [row for row in rows if row.source_text_digest == digest]
-    if not at_digest:
+    return {
+        row.requirement_type: row
+        for row in rows
+        if row.is_active and row.source_text_digest == digest
+    }
+
+
+def _is_current(rows: Sequence[ExtractedRequirement], digest: str) -> bool:
+    """Whether a derivation is **in force** for this exact text at this extractor version.
+
+    True only when at least one ``ACTIVE`` row carries exactly this digest, and every such
+    row was written by the current extractor.
+
+    **A digest that exists only in invalidated history is not current.** That is the whole
+    correction: under the previous storage key a returning description found its own
+    withdrawn rows, concluded it had already been derived, and skipped — leaving the job
+    without a requirement its text plainly states. Invalidated rows are terminal, and
+    terminal means "no longer in force", not "already handled".
+
+    Nothing here reactivates a row to make this true. When it is false the answer is to
+    derive again and write something new.
+    """
+    active = [
+        row for row in rows if row.is_active and row.source_text_digest == digest
+    ]
+    if not active:
         return False
-    return all(
-        row.extractor_version == EXTRACTOR_VERSION for row in at_digest if row.is_active
-    )
+    return all(row.extractor_version == EXTRACTOR_VERSION for row in active)
+
+
+def effective_requirements(
+    session: Session, job: Job
+) -> tuple[ExtractedRequirement, ...]:
+    """The derived requirements in force for a job's **current** description.
+
+    The read counterpart of :func:`derive_for_job`, and the only sanctioned way to ask what
+    this table says about a job today. Both filters apply: ``ACTIVE``, and derived from the
+    digest of the description the job currently holds. A row that fails either is history.
+
+    Every row returned is, by the table's own CHECK constraints, ``PROSE_DERIVED`` and
+    ``REQUIRED`` — nothing else can be stored.
+
+    **Nothing consumes this yet.** Supplying derived requirements to evaluation is ADR-030
+    D20's engine boundary and its own decision; this function exists so that "what is in
+    force" has one definition rather than being re-derived by each future caller.
+    """
+    digest = source_text_digest(job.description)
+    rows = session.execute(
+        select(ExtractedRequirement).where(
+            ExtractedRequirement.job_id == job.id,
+            ExtractedRequirement.source_text_digest == digest,
+            ExtractedRequirement.status == ExtractionStatus.ACTIVE,
+        )
+    ).scalars()
+    return tuple(sorted(rows, key=lambda row: row.requirement_type.value))
 
 
 def derive_for_job(session: Session, job: Job) -> DerivationOutcome:
@@ -292,34 +367,50 @@ def derive_for_job(session: Session, job: Job) -> DerivationOutcome:
         )
 
     at = _utcnow()
-    at_digest = {
-        row.requirement_type: row for row in rows if row.source_text_digest == digest
-    }
+    in_force = _active_at(rows, digest)
 
+    # --- withdraw first ------------------------------------------------------------------
+    # Anything still active that this derivation did not just confirm no longer describes
+    # the job: it belongs to a superseded description, or its requirement type is no longer
+    # verified from the current one. Invalidated, never deleted — a withdrawn requirement is
+    # as much a fact about the posting as a current one (ADR-006).
+    superseded = [
+        row
+        for row in rows
+        if row.is_active
+        and (row.source_text_digest != digest or row.requirement_type not in verified)
+    ]
+    for row in superseded:
+        row.invalidate(at)
+
+    if superseded:
+        # **Ordering, not optimisation.** A requirement type whose active row sits under a
+        # superseded digest is about to gain a new active row under this one, and only one
+        # of the two may be active at a time. Flushing the withdrawals before the inserts
+        # makes that ordering explicit rather than leaving it to the unit of work, which
+        # happens to emit updates first today and promises nothing about tomorrow.
+        session.flush()
+
+    # --- then record what is in force now -------------------------------------------------
     created = updated = 0
     for requirement_type, requirement in verified.items():
-        row = at_digest.get(requirement_type)
+        row = in_force.get(requirement_type)
         if row is None:
+            # Nothing is in force for this type at this text — because the job is new,
+            # because the description changed, or because this exact text was derived
+            # before and later withdrawn. All three write a **new** row. The withdrawn one
+            # keeps its own evidence and its own timestamp and is never revived: the
+            # verification it records was performed against text the system had since
+            # replaced, and asserting it again would be a claim nothing re-checked.
             session.add(_new_row(job, digest, requirement, at))
             created += 1
-        elif row.is_active:
+        else:
+            # Already in force for this exact text: the same statement, re-read. Rewritten
+            # in place so a repeated run is idempotent and leaves no duplicate history.
             _refresh(row, job, requirement, at)
             updated += 1
-        # A row already invalidated for this exact text and type stays invalidated. The
-        # description changed away and back, and resurrecting a verification performed
-        # against text that was withdrawn is precisely what the terminal state forbids.
 
-    # Anything still active that this derivation did not just confirm no longer describes the
-    # job: either it belongs to a superseded description, or its requirement type is no
-    # longer verified from the current one. Invalidated, never deleted — a withdrawn
-    # requirement is as much a fact about the posting as a current one (ADR-006).
-    invalidated = 0
-    for row in rows:
-        if not row.is_active:
-            continue
-        if row.source_text_digest != digest or row.requirement_type not in verified:
-            row.invalidate(at)
-            invalidated += 1
+    invalidated = len(superseded)
 
     return DerivationOutcome(
         status=DerivationStatus.COMPLETED,
@@ -336,5 +427,6 @@ __all__ = [
     "DerivationOutcome",
     "DerivationStatus",
     "derive_for_job",
+    "effective_requirements",
     "source_text_digest",
 ]

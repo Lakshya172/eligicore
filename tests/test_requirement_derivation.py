@@ -112,6 +112,11 @@ def by_type(session: Session) -> dict[RequirementType, ExtractedRequirement]:
     return {row.requirement_type: row for row in active(session)}
 
 
+def pinned(description: str) -> str:
+    """The description exactly as ingestion would store it."""
+    return normalize_job(make_raw(description=description), "fake").description
+
+
 def the_job(session: Session) -> Job:
     return session.execute(select(Job)).scalars().first()  # type: ignore[return-value]
 
@@ -442,22 +447,69 @@ def test_a_type_no_longer_verified_from_the_current_text_is_invalidated(
     assert {row.requirement_type for row in active(session)} == {RequirementType.MIN_CGPA}
 
 
-def test_an_invalidated_row_is_never_reactivated(session: Session) -> None:
-    """``INVALIDATED`` is terminal, including when the description changes back.
+def test_a_returning_description_derives_a_new_row(session: Session) -> None:
+    """A → B → A, end to end through real ingestion. **The case this PR was blocked on.**
 
-    The unique key ties a row to one exact pinned text, so returning to that text finds the
-    row it already invalidated. Resurrecting it would re-assert a verification that was
-    withdrawn; the conservative outcome is that the requirement simply stays absent.
+    The returning text is derived afresh. The original rows stay invalidated beside the new
+    ones, keeping the evidence and timestamps of the verification they actually recorded —
+    a verification performed against text the system had since replaced is not evidence
+    about the text it holds now.
     """
+    digest_a = source_text_digest(pinned(FULL))
+
     ingest(session, FULL)
+    original_a = {row.id for row in active(session)}
+    assert len(original_a) == 3
+
     ingest(session, CGPA_ONLY)
     ingest(session, FULL)
 
-    returned = [r for r in rows(session) if r.source_text_digest == source_text_digest(
-        normalize_job(make_raw(description=FULL), "fake").description
-    )]
-    assert returned, "the original digest's rows should still exist"
-    assert all(row.status is ExtractionStatus.INVALIDATED for row in returned)
+    returning = active(session)
+    assert len(returning) == 3, "the returning description is derived again, not skipped"
+    assert {row.source_text_digest for row in returning} == {digest_a}
+    assert {row.id for row in returning}.isdisjoint(original_a), "new rows, not revived ones"
+
+    withdrawn = [row for row in rows(session) if row.id in original_a]
+    assert len(withdrawn) == 3
+    assert all(row.status is ExtractionStatus.INVALIDATED for row in withdrawn)
+    assert all(row.invalidated_at is not None for row in withdrawn)
+
+
+def test_the_original_rows_survive_a_returning_description(session: Session) -> None:
+    """Nothing is deleted, and the history is still queryable for audit."""
+    ingest(session, FULL)
+    first = {row.id for row in rows(session)}
+    ingest(session, CGPA_ONLY)
+    second = {row.id for row in rows(session)} - first
+    ingest(session, FULL)
+
+    stored = {row.id for row in rows(session)}
+    assert first <= stored and second <= stored
+    assert len(stored) == len(first) + len(second) + 3
+
+
+def test_an_invalidated_only_digest_is_never_current(session: Session) -> None:
+    """The precise defect the correction removes, asserted on the predicate itself.
+
+    Before the fix this returned ``SKIPPED`` and wrote nothing, because rows existed for
+    the digest and the predicate never looked at their status.
+    """
+    ingest(session, FULL)
+    ingest(session, CGPA_ONLY)
+
+    job = the_job(session)
+    stored = rows(session)
+    digest_a = source_text_digest(pinned(FULL))
+    at_a = [row for row in stored if row.source_text_digest == digest_a]
+    assert at_a and all(not row.is_active for row in at_a), "the fixture must be history-only"
+
+    assert requirement_derivation._is_current(stored, digest_a) is False
+
+    job.description = pinned(FULL)
+    session.commit()
+    outcome = derive_for_job(session, job)
+    assert outcome.status is DerivationStatus.COMPLETED
+    assert outcome.rows_created == 3
 
 
 def test_a_punctuation_only_change_still_triggers_re_derivation(session: Session) -> None:
@@ -593,9 +645,9 @@ def test_an_invalidated_row_at_the_current_digest_is_not_resurrected(
     """``INVALIDATED`` is terminal even when the current text would verify it again.
 
     Reachable through a re-derivation at an unchanged digest: one type is already withdrawn,
-    another is stale, so the loop runs and meets the withdrawn row. Refreshing it would
-    re-assert a verification that had been withdrawn, which is the one transition the model
-    says does not exist.
+    another is stale, so the loop runs and meets the withdrawn row. It is passed over and a
+    **new** row is written beside it. Refreshing it would re-assert a verification that had
+    been withdrawn, which is the one transition the model says does not exist.
     """
     ingest(session, FULL)
     stored = by_type(session)
@@ -613,13 +665,15 @@ def test_an_invalidated_row_at_the_current_digest_is_not_resurrected(
 
     session.refresh(withdrawn)
     assert withdrawn.status is ExtractionStatus.INVALIDATED
-    assert outcome.rows_updated == 2
-    assert outcome.rows_created == 0
+    assert withdrawn.id not in {row.id for row in active(session)}
+    assert outcome.rows_updated == 2, "the two in-force rows are rewritten in place"
+    assert outcome.rows_created == 1, "the withdrawn type gets a NEW row, not its old one"
     assert by_type(session).keys() == {
+        RequirementType.MIN_CGPA,
         RequirementType.GRAD_YEAR_WINDOW,
         RequirementType.MAX_BACKLOGS,
     }
-    assert len(rows(session)) == 3, "no second row was invented for the withdrawn type"
+    assert len(rows(session)) == 4, "the withdrawn row is kept beside the new one"
 
 
 def test_ordinary_ingestion_does_not_re_extract_on_a_version_change(
