@@ -49,6 +49,7 @@ from app.schemas.eligibility import (
     EvaluationMethod,
     JobEligibility,
     ReasonCode,
+    RequirementProvenance,
     RequirementResult,
     RequirementStatus,
     RequirementType,
@@ -482,13 +483,30 @@ def evaluate_allowed_fields(
 
 
 def has_verified_hard_failure(results: Iterable[RequirementResult]) -> bool:
-    """True when any deterministic requirement FAILED on present, valid data.
+    """True when a requirement the **source published** failed a deterministic check.
 
-    An AI-reasoned FAIL never counts. Only this is a *verified* hard failure (ADR-003).
+    Three conditions, and each excludes a different kind of weaker evidence:
+
+    * ``FAIL`` — an ``UNKNOWN`` is an absence of evidence, never evidence of a state
+      (INV-3);
+    * ``DETERMINISTIC`` — an AI-reasoned ``FAIL`` is a probabilistic judgement and is
+      reported honestly without being allowed to exclude anyone (ADR-017 R-2);
+    * ``SOURCE_STATED`` — a requirement read out of a job's prose is capped by provenance
+      and may never independently produce ``NOT_ELIGIBLE`` (ADR-030 D2, D4).
+
+    **The provenance condition has a control-flow consequence, and it is intended**
+    (ADR-030 D4a, OD-13). This predicate also guards the AI field-relatedness stage
+    through :func:`ambiguous_requirements`, so a prose-derived ``FAIL`` leaves that stage
+    **reachable**. The verdict cannot move: rule 4 fires on the derived failure whatever
+    the AI answers, so ``NEEDS_REVIEW`` holds either way and INV-2 is untouched. Closing
+    the job instead would treat a derived failure as hard in control flow while refusing
+    to treat it as hard in the verdict — two authorities for one entry, which is the
+    inconsistency D3 exists to prevent.
     """
     return any(
         result.status is RequirementStatus.FAIL
         and result.method is EvaluationMethod.DETERMINISTIC
+        and result.provenance is RequirementProvenance.SOURCE_STATED
         for result in results
     )
 
@@ -538,16 +556,26 @@ def _skip_ambiguity_after_hard_failure(
 
 
 def compose_verdict(results: list[RequirementResult]) -> EligibilityState:
-    """Compose the final state. Precedence is exact and ordered (ADR-017):
+    """Compose the final state. Precedence is exact and ordered (ADR-017, amended by
+    ADR-030 D4 — rules 1 and 3 are untouched; 2, 4 and 5 changed):
 
-    1. Zero structured requirements → ``ELIGIBLE``
-    2. Any deterministic FAIL → ``NOT_ELIGIBLE``
-    3. Every requirement UNKNOWN → ``UNKNOWN``
-    4. Any UNKNOWN, or any AI FAIL → ``NEEDS_REVIEW``
-    5. All PASS, at least one by AI → ``LIKELY_ELIGIBLE``
-    6. All PASS deterministically → ``ELIGIBLE``
+    1. Zero structured requirements                              → ``ELIGIBLE``
+    2. Any SOURCE_STATED deterministic FAIL                      → ``NOT_ELIGIBLE``
+    3. Every requirement UNKNOWN                                 → ``UNKNOWN``
+    4. Any UNKNOWN, AI-reasoned FAIL, or PROSE_DERIVED FAIL      → ``NEEDS_REVIEW``
+    5. All PASS, at least one by AI reasoning or PROSE_DERIVED   → ``LIKELY_ELIGIBLE``
+    6. All PASS, all deterministic and SOURCE_STATED             → ``ELIGIBLE``
 
-    An AI result alone can never produce ``NOT_ELIGIBLE`` (ruling R-2).
+    Neither an AI result nor a prose-derived one can produce ``NOT_ELIGIBLE`` (ruling R-2,
+    ADR-030 D2). A candidate told they may not apply is always being told so on the basis
+    of something the employer published structurally.
+
+    **Rule 5 is widened to close a specific failure.** Without it, an all-``PASS``
+    evaluation built entirely from prose-derived requirements would return plain
+    ``ELIGIBLE`` — the strongest verdict the system has, asserted on requirements no
+    employer stated structurally. ``LIKELY_ELIGIBLE``'s existing meaning, *every stated
+    requirement passed, at least one by something other than a deterministic source-stated
+    check*, already fits without alteration.
     """
     if not results:
         return EligibilityState.ELIGIBLE
@@ -556,9 +584,14 @@ def compose_verdict(results: list[RequirementResult]) -> EligibilityState:
     if all(result.status is RequirementStatus.UNKNOWN for result in results):
         return EligibilityState.UNKNOWN
     if any(result.status is not RequirementStatus.PASS for result in results):
-        # What remains here is UNKNOWN or an AI-reasoned FAIL.
+        # UNKNOWN, an AI-reasoned FAIL, or a prose-derived FAIL. The last reaches this
+        # line rather than rule 2 because the guard above requires SOURCE_STATED.
         return EligibilityState.NEEDS_REVIEW
-    if any(result.method is EvaluationMethod.AI_REASONING for result in results):
+    if any(
+        result.method is EvaluationMethod.AI_REASONING
+        or result.provenance is RequirementProvenance.PROSE_DERIVED
+        for result in results
+    ):
         return EligibilityState.LIKELY_ELIGIBLE
     return EligibilityState.ELIGIBLE
 
@@ -593,6 +626,31 @@ def _has_unevaluated_description(job: JobRead) -> bool:
     return bool(job.description.strip())
 
 
+def _is_derived_failure(result: RequirementResult) -> bool:
+    """A prose-derived requirement that failed: real, reported, and never disqualifying."""
+    return (
+        result.status is RequirementStatus.FAIL
+        and result.provenance is RequirementProvenance.PROSE_DERIVED
+    )
+
+
+def _derived_failure_disclosure(results: Iterable[RequirementResult]) -> str:
+    """Name prose-derived failures and say plainly why they did not decide the verdict.
+
+    Empty when there are none, which is every evaluation the catalogue can currently
+    produce. ADR-006 treats an unexplained entry in the breakdown as a defect, and a
+    failure the reader can see but cannot account for is exactly that.
+    """
+    derived_failed = [r for r in results if _is_derived_failure(r)]
+    if not derived_failed:
+        return ""
+    return (
+        f" {len(derived_failed)} requirement(s) read from the job description were not met "
+        f"({_labels(derived_failed)}); a requirement read from prose is never on its own "
+        "enough to rule a candidate out."
+    )
+
+
 def build_summary(
     state: EligibilityState, results: list[RequirementResult], job: JobRead
 ) -> str:
@@ -606,10 +664,14 @@ def build_summary(
     if not results:
         summary = "Eligible: this job states no structured eligibility requirements."
     elif state is EligibilityState.NOT_ELIGIBLE:
+        # Only a SOURCE_STATED deterministic FAIL belongs in this count. Including a
+        # derived one would attribute the verdict to a requirement that could not have
+        # caused it (ADR-030 D2).
         failed = [
             r for r in results
             if r.status is RequirementStatus.FAIL
             and r.method is EvaluationMethod.DETERMINISTIC
+            and r.provenance is RequirementProvenance.SOURCE_STATED
         ]
         unverified = [r for r in results if r.status is RequirementStatus.UNKNOWN]
         summary = (
@@ -621,23 +683,48 @@ def build_summary(
                 f" {len(unverified)} other requirement(s) could not be verified "
                 f"({_labels(unverified)})."
             )
+        summary += _derived_failure_disclosure(results)
     elif state is EligibilityState.UNKNOWN:
         summary = (
             f"Unknown: none of the {total} stated requirement(s) could be verified from the "
             f"supplied profile ({_labels(results)})."
         )
     elif state is EligibilityState.NEEDS_REVIEW:
-        unresolved = [r for r in results if r.status is not RequirementStatus.PASS]
-        passed = total - len(unresolved)
-        summary = (
-            f"Needs review: {passed} of {total} stated requirement(s) met; "
-            f"{_labels(unresolved)} could not be confirmed."
-        )
+        # A derived FAIL is separated out: it *was* confirmed, and reporting it as
+        # "could not be confirmed" would misdescribe the only thing that is true about
+        # it — that it failed, on authority too weak to exclude anyone (ADR-006).
+        unconfirmed = [
+            r for r in results
+            if r.status is not RequirementStatus.PASS and not _is_derived_failure(r)
+        ]
+        derived_failed = [r for r in results if _is_derived_failure(r)]
+        passed = total - len(unconfirmed) - len(derived_failed)
+        summary = f"Needs review: {passed} of {total} stated requirement(s) met"
+        if unconfirmed:
+            summary += f"; {_labels(unconfirmed)} could not be confirmed"
+        summary += "."
+        summary += _derived_failure_disclosure(results)
     elif state is EligibilityState.LIKELY_ELIGIBLE:
         by_ai = sum(1 for r in results if r.method is EvaluationMethod.AI_REASONING)
+        derived = sum(
+            1 for r in results
+            if r.provenance is RequirementProvenance.PROSE_DERIVED
+        )
+        # Rule 5 is now reachable with no AI entry at all, so the old sentence could
+        # report "0 of them by AI reasoning" (ADR-030 D4).
+        reasons = []
+        if by_ai:
+            reasons.append(f"{by_ai} by AI reasoning")
+        if derived:
+            reasons.append(f"{derived} read from the job description")
+        detail = (
+            " and ".join(reasons)
+            if reasons
+            else "not all by a deterministic check against a published requirement"
+        )
         summary = (
-            f"Likely eligible: meets all {total} stated requirement(s), {by_ai} of them by "
-            "AI reasoning rather than a deterministic check."
+            f"Likely eligible: meets all {total} stated requirement(s), {detail} rather "
+            "than by a deterministic check against a requirement the source published."
         )
     else:
         summary = f"Eligible: meets all {total} stated eligibility requirement(s)."
@@ -651,10 +738,24 @@ def build_summary(
         # not read it, so claiming it holds requirements would be exactly the inference
         # ADR-028 D9 forbids; claiming it holds none is the bug this sentence fixes. What
         # is disclosed is the only thing known: there is source text, and it was not read.
-        summary += (
-            " The job description was not evaluated, so any requirement stated only in"
-            " its text is not reflected here."
-        )
+        #
+        # Once a requirement has been promoted out of that text the first clause becomes
+        # false, so the wording changes while the disclosure stays: text that was not
+        # promoted remains disclosed-only and is still never a requirement (ADR-017 R-4
+        # amendment, ADR-030 D6, D10).
+        if any(
+            r.provenance is RequirementProvenance.PROSE_DERIVED for r in results
+        ):
+            summary += (
+                " Requirements read from the job description are included above; the rest"
+                " of its text was not evaluated, so any further requirement stated only"
+                " there is not reflected here."
+            )
+        else:
+            summary += (
+                " The job description was not evaluated, so any requirement stated only in"
+                " its text is not reflected here."
+            )
     return summary
 
 
