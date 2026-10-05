@@ -393,12 +393,14 @@ def test_every_engine_result_is_source_stated_with_no_evidence() -> None:
     assert all(r.evidence is None for r in results)
 
 
-def test_provenance_does_not_yet_affect_the_verdict() -> None:
-    """PR A carries provenance; it does not consult it.
+def test_provenance_now_decides_authority() -> None:
+    """Provenance is consulted by the amended D4 precedence.
 
-    The amended D4 precedence is a separate PR. Until it lands a prose-derived FAIL still
-    composes ``NOT_ELIGIBLE``, and asserting that here means the precedence PR must change
-    this test rather than inherit it already passing.
+    This test previously asserted that a prose-derived FAIL still composed
+    ``NOT_ELIGIBLE`` — the pre-amendment rule — precisely so that the precedence change
+    had to come here and update it. It did. The rules themselves are covered in
+    ``tests/test_amended_precedence.py``; what is pinned here is that the field this
+    module adds is the one the verdict turns on.
     """
     failed_source = make_result(
         status=RequirementStatus.FAIL, reason_code=ReasonCode.BELOW_MINIMUM
@@ -407,7 +409,7 @@ def test_provenance_does_not_yet_affect_the_verdict() -> None:
         update={"provenance": RequirementProvenance.PROSE_DERIVED, "evidence": EVIDENCE}
     )
     assert compose_verdict([failed_source]) is EligibilityState.NOT_ELIGIBLE
-    assert compose_verdict([failed_derived]) is EligibilityState.NOT_ELIGIBLE
+    assert compose_verdict([failed_derived]) is EligibilityState.NEEDS_REVIEW
 
 
 def test_evidence_does_not_affect_the_verdict() -> None:
