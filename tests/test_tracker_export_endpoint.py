@@ -356,13 +356,14 @@ def test_openapi_structure_is_unchanged_by_the_status_text() -> None:
         "JobType", "MatchScoreBasis", "MatchTermKind", "NormalizedGrade", "PackageStatus",
         "PreparedAnswer", "ProjectEntry", "ReasonCode", "RecommendationItem",
         "RecommendationMatch", "RecommendationRequest", "RecommendationResponse",
-        "RemovalReason", "RemovalScope", "RemovedClaim", "RequirementResult",
-        "RequirementStatus", "RequirementType", "ResumeParseResponse", "ResumeParseStatus",
+        "RemovalReason", "RemovalScope", "RemovedClaim", "RequirementProvenance",
+        "RequirementResult", "RequirementStatus", "RequirementType", "ResumeParseResponse",
+        "ResumeParseStatus",
         "SharedTerm", "SourceFormat", "TrackerExportRequest", "TrackerRecord",
         "ValidationError", "ValidationIssue", "WorkMode",
     )
     assert set(spec["components"]["schemas"]) == set(schemas)
-    assert len(spec["components"]["schemas"]) == 58
+    assert len(spec["components"]["schemas"]) == 59
 
 
 def test_openapi_status_text_is_current() -> None:
