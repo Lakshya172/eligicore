@@ -40,24 +40,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.candidate import Confidence, GradeScale
-from app.schemas.eligibility import RequirementType
-
-
-class RequirementProvenance(str, Enum):
-    """Where a requirement came from. Two classes, and only two (ADR-030 D1).
-
-    **This is the authority boundary**, and it is a function of provenance rather than of
-    extraction technology (ADR-030 D3). A value read by a regular expression and a value read
-    by a model are both ``PROSE_DERIVED`` and carry identical, capped authority. Tying
-    authority to the extractor would make the rule expire every time the extractor changed.
-    """
-
-    #: The source published the value in a structured field the adapter read directly.
-    #: Everything in the ``jobs`` table today. Never produced by extraction.
-    SOURCE_STATED = "SOURCE_STATED"
-
-    #: The value was produced by reading a job's free text, **by any means**.
-    PROSE_DERIVED = "PROSE_DERIVED"
+from app.schemas.eligibility import RequirementProvenance, RequirementType
 
 
 class RequirementStrength(str, Enum):

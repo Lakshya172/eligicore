@@ -217,11 +217,15 @@ def test_check_returns_explained_verdicts(catalogue: Catalogue) -> None:
     for entry in result["requirement_breakdown"]:
         assert set(entry) == {
             "requirement_type", "requirement", "candidate_value", "status",
-            "confidence", "method", "reason_code", "note",
+            "confidence", "method", "provenance", "reason_code", "note", "evidence",
         }
         assert entry["status"] == "PASS"
         assert entry["method"] == "deterministic"
         assert entry["confidence"] == "HIGH"
+        # Every catalogue requirement is published in a jobs column, so it is source-stated
+        # and rests on no sentence (ADR-030 D1, D20).
+        assert entry["provenance"] == "SOURCE_STATED"
+        assert entry["evidence"] is None
 
 
 def test_evaluated_at_is_utc(catalogue: Catalogue) -> None:
