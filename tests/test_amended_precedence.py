@@ -378,6 +378,22 @@ def test_needs_review_summary_still_reports_unconfirmed_entries() -> None:
     assert "could not be confirmed" in summary
 
 
+def test_a_derived_pass_is_never_reported_as_a_derived_failure() -> None:
+    """Only a FAIL is disclosed. A derived requirement the candidate *met* must not be
+    counted against them, nor subtracted from the met total."""
+    results = [PASS_DERIVED, UNKNOWN_SOURCE]
+    summary = build_summary(EligibilityState.NEEDS_REVIEW, results, make_job())
+    assert "1 of 2 stated requirement(s) met" in summary
+    assert "read from the job description were not met" not in summary
+
+
+def test_a_derived_pass_beside_a_hard_failure_is_not_disclosed_as_failing() -> None:
+    results = [FAIL_SOURCE, PASS_DERIVED]
+    summary = build_summary(EligibilityState.NOT_ELIGIBLE, results, make_job())
+    assert "1 of 2 stated requirement(s) failed a verified check" in summary
+    assert "read from the job description were not met" not in summary
+
+
 def test_needs_review_summary_reports_both_kinds_together() -> None:
     results = [PASS_SOURCE, UNKNOWN_SOURCE, FAIL_DERIVED]
     summary = build_summary(EligibilityState.NEEDS_REVIEW, results, make_job())
