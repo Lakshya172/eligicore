@@ -81,6 +81,34 @@ class EvaluationMethod(str, Enum):
     AI_REASONING = "ai_reasoning"
 
 
+class RequirementProvenance(str, Enum):
+    """Where a requirement came from. Two classes, and only two (ADR-030 D1).
+
+    **This is the authority boundary**, and it is a function of provenance rather than of
+    extraction technology (ADR-030 D3). A value read by a regular expression and a value read
+    by a model are both ``PROSE_DERIVED`` and carry identical, capped authority. Tying
+    authority to the extractor would make the rule expire every time the extractor changed.
+
+    **It sits beside :class:`EvaluationMethod` because the two are orthogonal and are
+    routinely confused.** ``method`` says which stage computed a result; ``provenance``
+    says how authoritative the requirement behind it is. A field-of-study entry resolved
+    by the AI stage is ``AI_REASONING`` by method and ``SOURCE_STATED`` by provenance,
+    because the employer published the permitted fields in a column. Only provenance
+    decides authority (ADR-030 D3, D4a).
+
+    It lives in this module rather than in :mod:`app.schemas.extraction` because
+    :class:`RequirementResult` carries it and that module already imports this one — the
+    reverse import would be a cycle, and extraction is only one of the two provenances.
+    """
+
+    #: The source published the value in a structured field the adapter read directly.
+    #: Everything in the ``jobs`` table today. Never produced by extraction.
+    SOURCE_STATED = "SOURCE_STATED"
+
+    #: The value was produced by reading a job's free text, **by any means**.
+    PROSE_DERIVED = "PROSE_DERIVED"
+
+
 class ReasonCode(str, Enum):
     """Stable, machine-readable reason for a breakdown entry.
 
