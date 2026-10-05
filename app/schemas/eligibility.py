@@ -188,7 +188,23 @@ class FieldRelatednessAssessment(BaseModel):
 
 
 class RequirementResult(BaseModel):
-    """One requirement's evaluation."""
+    """One requirement's evaluation.
+
+    **Two axes, deliberately separate** (ADR-030 D3, D4a). ``method`` names the stage that
+    computed the result; ``provenance`` names how authoritative the requirement behind it
+    is. Only provenance decides authority, which is why a prose-derived failure can never
+    produce ``NOT_ELIGIBLE`` while an AI-reasoned entry about a source-stated requirement
+    still can be part of one. Collapsing the two into a third ``EvaluationMethod`` value is
+    forbidden (ADR-030 D4a).
+
+    ``provenance`` **defaults to** ``SOURCE_STATED`` because that is what every entry the
+    engine produces today is: the value came from a ``jobs`` column the adapter read. The
+    default keeps this an additive schema change with no engine edit, which is the whole of
+    ADR-030 Step 6 PR A. **The derived path must set it explicitly**, and the PR that
+    introduces that path (D20's engine boundary) is where a derived entry silently
+    inheriting ``SOURCE_STATED`` would be an authority escalation — so that PR owns the
+    test which proves it does not.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -212,8 +228,29 @@ class RequirementResult(BaseModel):
         )
     )
     method: EvaluationMethod
+    provenance: RequirementProvenance = Field(
+        default=RequirementProvenance.SOURCE_STATED,
+        description=(
+            "Whether the employer published this requirement in a structured field or it "
+            "was read out of the job's prose. **This is the authority boundary** "
+            "(ADR-030 D2, D3): `NOT_ELIGIBLE` requires a `SOURCE_STATED` deterministic "
+            "FAIL, and a `PROSE_DERIVED` one routes to `NEEDS_REVIEW` instead. Defaults "
+            "to `SOURCE_STATED`, which every requirement read from a catalogue column is."
+        ),
+    )
     reason_code: ReasonCode
     note: str = Field(min_length=1, description="Human-readable explanation of the result.")
+    evidence: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "The sentence a `PROSE_DERIVED` requirement rests on, verbatim from the job's "
+            "pinned normalized description, so a reader can see what the requirement was "
+            "read from (ADR-030 D20, ADR-006). Null for a `SOURCE_STATED` requirement, "
+            "which has no supporting sentence because it came from a structured field. "
+            "**Job text only** — never candidate text, and never logged (INV-4)."
+        ),
+    )
 
 
 class JobEligibility(BaseModel):
