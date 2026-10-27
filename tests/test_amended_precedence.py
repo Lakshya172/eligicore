@@ -40,6 +40,7 @@ from app.schemas.eligibility import (
 )
 from app.schemas.job import JobRead, JobStatusSchema
 from app.services.eligibility_engine import (
+    _skip_ambiguity_after_hard_failure,
     ambiguous_requirements,
     build_summary,
     compose_verdict,
@@ -290,6 +291,21 @@ def test_a_source_stated_failure_still_closes_the_ai_stage() -> None:
 def test_a_prose_derived_failure_leaves_the_ai_stage_reachable() -> None:
     """ADR-030 D4a, OD-13: not a verified hard failure, so the guard does not fire."""
     assert ambiguous_requirements([FAIL_DERIVED, _ambiguous_entry()]) == [1]
+
+
+def test_a_source_stated_failure_marks_the_ambiguous_entry_skipped() -> None:
+    """The other half of closing the stage: the entry is reported as skipped, not left
+    ambiguous. Unchanged by the amendment."""
+    _, field = _skip_ambiguity_after_hard_failure([FAIL_SOURCE, _ambiguous_entry()])
+    assert field.reason_code is ReasonCode.SKIPPED_AFTER_HARD_FAILURE
+
+
+def test_a_prose_derived_failure_does_not_mark_the_ambiguous_entry_skipped() -> None:
+    """ADR-030 D4a: the skip step must follow the same provenance-aware guard as
+    :func:`ambiguous_requirements`, or the entry released to the AI stage would already
+    read as skipped."""
+    _, field = _skip_ambiguity_after_hard_failure([FAIL_DERIVED, _ambiguous_entry()])
+    assert field.reason_code is ReasonCode.FIELD_NOT_EXACT_MATCH
 
 
 @pytest.mark.parametrize(
