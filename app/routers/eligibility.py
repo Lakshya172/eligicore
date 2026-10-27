@@ -28,6 +28,7 @@ from app.schemas.eligibility import (
     EligibilityCheckResponse,
 )
 from app.schemas.job import JobRead
+from app.services.derived_requirements import load_derived_requirements
 from app.services.eligibility_ai import check_eligibility_with_ai
 
 router = APIRouter(prefix="/eligibility", tags=["eligibility"])
@@ -52,9 +53,20 @@ router = APIRouter(prefix="/eligibility", tags=["eligibility"])
         "fields are sent. Such entries carry `method: ai_reasoning` and at most MEDIUM "
         "confidence. An AI judgement can make a verdict `LIKELY_ELIGIBLE` or `NEEDS_REVIEW`, "
         "never `NOT_ELIGIBLE`; if the AI is unavailable the entry is `UNKNOWN`.\n\n"
-        "Verdicts, in precedence order: any verified deterministic failure → `NOT_ELIGIBLE`; "
-        "nothing verifiable → `UNKNOWN`; anything unresolved → `NEEDS_REVIEW`; all passed → "
-        "`ELIGIBLE` (or `LIKELY_ELIGIBLE` once AI reasoning contributed).\n\n"
+        "**Requirements read from the job description.** When requirement extraction is "
+        "enabled, a requirement verified out of the description's text at ingestion is "
+        "evaluated too, by the same comparison. Its entry carries `provenance: "
+        "PROSE_DERIVED`, the sentence it was read from in `evidence`, and at most MEDIUM "
+        "confidence. If the job also states that requirement in a structured field, only the "
+        "structured one is evaluated. A requirement read from prose can make a verdict "
+        "`LIKELY_ELIGIBLE` or `NEEDS_REVIEW`, never `NOT_ELIGIBLE`. Nothing is extracted "
+        "during a request, and `POST /recommendations` evaluates exactly the same "
+        "requirements.\n\n"
+        "Verdicts, in precedence order: a failed deterministic check of a requirement the "
+        "job **states in a structured field** → `NOT_ELIGIBLE`; nothing verifiable → "
+        "`UNKNOWN`; anything unresolved, or a failed requirement read from the description → "
+        "`NEEDS_REVIEW`; all passed → `ELIGIBLE` (or `LIKELY_ELIGIBLE` once AI reasoning or a "
+        "requirement read from the description contributed).\n\n"
         f"Up to {MAX_JOB_IDS} job ids per request; duplicates are removed. Unknown ids are "
         "listed in `not_found_job_ids` rather than failing the request. Closed jobs are "
         "still evaluated and report their status.\n\n"
@@ -71,5 +83,9 @@ async def check(
     jobs = db.execute(select(Job).where(Job.id.in_(request.job_ids))).scalars().all()
     jobs_by_id = {job.id: JobRead.model_validate(job) for job in jobs}
     return await check_eligibility_with_ai(
-        request.profile, request.job_ids, jobs_by_id, ai_service
+        request.profile,
+        request.job_ids,
+        jobs_by_id,
+        ai_service,
+        derived_by_job=load_derived_requirements(db, jobs),
     )

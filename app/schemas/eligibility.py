@@ -224,7 +224,10 @@ class RequirementResult(BaseModel):
     confidence: Confidence = Field(
         description=(
             "How much the system trusts this determination — not how good the news is. "
-            "Deterministic PASS and FAIL are HIGH; UNKNOWN is LOW."
+            "A deterministic PASS or FAIL of a `SOURCE_STATED` requirement is HIGH; of a "
+            "`PROSE_DERIVED` one, MEDIUM, because the requirement was read from prose; an "
+            "AI-reasoned entry is at most MEDIUM; UNKNOWN is LOW. Confidence never decides "
+            "authority — provenance does."
         )
     )
     method: EvaluationMethod

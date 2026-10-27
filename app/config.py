@@ -112,11 +112,15 @@ class Settings(BaseSettings):
     # An unbounded retry loop against a paid API is a financial bug (standards/ai.md §7).
     ai_max_retries: int = Field(default=2, ge=0, le=5)
 
-    # --- Job requirement extraction (ADR-030 D11, D21) -----------------------------------
-    # Whether ingestion derives requirements from job-description prose. **False by
-    # default, and that default is the safety property**: ADR-030 sequences each step to be
-    # mergeable with the capability off, so an unconfigured checkout and CI ingest exactly
-    # as they did before this setting existed.
+    # --- Job requirement extraction (ADR-030 D11, D21, D20b) ------------------------------
+    # One switch for the whole capability, gating two things:
+    #   * ingestion — whether requirements are derived from job-description prose and stored;
+    #   * evaluation — whether stored derived requirements are read into eligibility, for
+    #     `/eligibility/check` and `/recommendations` alike (owner ruling Q1).
+    # **False by default, and that default is the safety property**: ADR-030 sequences each
+    # step to be mergeable with the capability off, so an unconfigured checkout and CI ingest
+    # and evaluate exactly as they did before this setting existed. Turning it off later
+    # leaves stored rows untouched (D22) and evaluation back at pre-ADR-030 behaviour (D27).
     #
     # Enabling it turns on the *deterministic* path only — regular expressions over public
     # job text, behind the same verifier. It authorizes no AI call of any kind: Phase 2 is a

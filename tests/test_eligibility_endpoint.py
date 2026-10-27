@@ -201,7 +201,7 @@ def test_check_returns_explained_verdicts(catalogue: Catalogue) -> None:
         "candidate_id", "engine_version", "evaluated_at", "results", "not_found_job_ids",
     }
     assert body["candidate_id"] == CANDIDATE_ID
-    assert body["engine_version"] == ENGINE_VERSION == "2"
+    assert body["engine_version"] == ENGINE_VERSION == "3"
     assert body["not_found_job_ids"] == []
 
     (result,) = body["results"]

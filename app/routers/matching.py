@@ -28,6 +28,7 @@ from app.schemas.matching import (
     RecommendationRequest,
     RecommendationResponse,
 )
+from app.services.derived_requirements import load_derived_requirements
 from app.services.recommendations import recommend
 
 router = APIRouter(tags=["recommendations"])
@@ -75,4 +76,10 @@ async def recommendations(
     # jobs were last verified.
     jobs = db.execute(select(Job).order_by(Job.id.asc())).scalars().all()
     catalogue = [JobRead.model_validate(job) for job in jobs]
-    return await recommend(request.profile, request.job_ids, catalogue, ai_service)
+    return await recommend(
+        request.profile,
+        request.job_ids,
+        catalogue,
+        ai_service,
+        derived_by_job=load_derived_requirements(db, jobs),
+    )

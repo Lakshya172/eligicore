@@ -71,7 +71,10 @@ logger = logging.getLogger("eligicore.eligibility")
 #: precedence changes, so clients holding stored verdicts know to re-evaluate.
 #: 2 — the AI field-relatedness stage (ADR-019) can resolve a non-exact field of study, so a
 #: verdict computed under version 1 may now differ.
-ENGINE_VERSION = "2"
+#: 3 — ADR-030: precedence keys on provenance (D4), and requirements verified out of a job's
+#: description are evaluated when extraction is enabled (D20, D20a, D20b), so a verdict
+#: computed under version 2 may now differ.
+ENGINE_VERSION = "3"
 
 #: Orderable qualification levels (ADR-018). ``OTHER`` and ``UNKNOWN`` are deliberately
 #: absent: neither can be placed on this ladder, so neither can pass or fail a comparison.
