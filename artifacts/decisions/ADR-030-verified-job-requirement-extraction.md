@@ -659,6 +659,54 @@ which is why D12 excludes skills and why this ADR changes no matching behaviour 
 > **promoted but suppressed** (passed D6, outranked here) · **effective**. Nothing moves between
 > those tiers by any route other than D6 and this rule.
 
+> **Amendment, added 2026-10-27 (D20b). Owner ruling OD-14, resolving OPEN-4.**
+> **`/api/v1/recommendations` receives the same effective derived requirements as
+> `/api/v1/eligibility/check`, through the eligibility path the two endpoints share.**
+>
+> D20 fixes *how* derived requirements reach the engine but not *which endpoints* supply them.
+> Two accepted rulings already bound the answer. ADR-022 §1 makes the recommendation orchestrator
+> call the Week 4 eligibility path — *"Week 4 unchanged … No eligibility rule is re-implemented"*
+> — and §5 guarantees: *"The recommendation layer never rewrites a verdict. Each item embeds
+> the `JobEligibility` object Week 4 returned; tests compare it field for field with
+> `/eligibility/check`."*
+>
+> **The rule.** For the same profile and the same catalogue state, both endpoints evaluate a job
+> with the **same effective derived requirements** — the same records, selected by the same rule,
+> put through the same R-COLLISION (D20a) — so ADR-022's identical-verdict guarantee holds without
+> exception. Derived requirements are supplied **in the eligibility path both endpoints share**,
+> not separately per endpoint, so neither can receive them without the other.
+>
+> **Why not one endpoint.** Supplying them to `/eligibility/check` alone would let one profile, one
+> job and one moment receive two contradictory answers. For a live job with no structured criteria
+> and a verified derived requirement the candidate fails, `/eligibility/check` would return
+> `NEEDS_REVIEW` with the derived failure in its breakdown, while `/recommendations` embedded
+> `ELIGIBLE` (*"this job states no structured eligibility requirements"*) and ranked the job. That
+> breaks ADR-022 §5, and it withholds D2's provenance cap from the endpoint a candidate is most
+> likely to act on.
+>
+> **What changes in recommendations, and what does not.**
+>
+> | Unchanged | Changes |
+> |---|---|
+> | The grouping rule (ADR-022 §5), ranking (§6), scores (§7, ADR-020) and explanations (§9) | The eligibility verdict those rules consume, which may now reflect derived requirements exactly as `/eligibility/check`'s does |
+> | The matching job document — `required_skills + role_title + description` — and every score (D12, D20) | Which group a job lands in, **by the existing grouping rule applied to that verdict** |
+>
+> No recommendation algorithm is modified, and nothing in recommendation code reads, filters or
+> re-evaluates a derived requirement: it receives a verdict and groups it, as today.
+>
+> **This narrows one sentence, stated rather than implied.** § Relationship to earlier ADRs
+> reaffirms *"ADR-020 / ADR-022 — matching and recommendation behaviour unchanged (D20)"*. After
+> this ruling, matching behaviour and every recommendation **rule** remain unchanged; a job's
+> recommendation **outcome** follows its eligibility verdict, which derived requirements may now
+> inform. The Non-goals bullet *"Any change to matching, recommendation ranking or application
+> preparation"* is unaffected: no ranking rule changes, and application preparation invokes no
+> eligibility evaluation (ADR-025 D7). **ADR-022 is not amended** — its §1 and §5 are the guarantee this
+> ruling preserves.
+>
+> **Not decided here, and left to the wiring PR:** how derived records are loaded, the
+> request-time handling of input the engine refuses, the engine version, and the API description
+> changes the wiring makes necessary. None of them may weaken the rule above.
+
 ### Ingestion and re-extraction
 
 **D21 — Extraction runs at ingestion time only.** Never during an eligibility request, never per
@@ -1023,6 +1071,11 @@ question. **ADR-020 / ADR-022** — matching and recommendation behaviour unchan
 candidate-free caching rule is satisfied, since nothing here derives from a candidate.
 **ADR-029** — employment type is never inferred, including by this capability.
 
+> **Amendment, added 2026-10-27.** The ADR-020 / ADR-022 reaffirmation above is **narrowed by
+> D20b** (OD-14): matching behaviour and every recommendation rule remain unchanged, and a job's
+> recommendation outcome follows its eligibility verdict, which derived requirements may inform.
+> The sentence is kept as written; D20b states the narrowing.
+
 ---
 
 ## Open implementation notes
@@ -1095,6 +1148,17 @@ seven remain open and untouched.
 > three arose from the Phase 1 design gate and were decided by the project owner on 2026-10-03.
 > ADR-028's remaining open decisions and Week 9B's seven are still open and untouched.
 
+> **Amendment, added 2026-10-27.** One further owner decision, taken before the Step 6 wiring, on
+> a question D20 left open. It was tracked in review as **OPEN-4** and is recorded here as
+> **OD-14**, normative.
+>
+> | # | Decision | Resolution |
+> |---|---|---|
+> | **OD-14** | Must `/api/v1/recommendations` receive the same derived requirements as `/api/v1/eligibility/check`? | **YES.** The same effective derived requirements, supplied through the eligibility path both share, so ADR-022 §5's identical-verdict guarantee holds. Recommendation rules are unchanged; only the verdict they consume may differ (D20b). |
+>
+> Decided by the project owner on 2026-10-27. ADR-028's remaining open decisions and Week 9B's
+> seven are still open and untouched.
+
 > **Numbering note.** These OD numbers belong to the ADR-030 gates and are **not** ADR-028's
 > OD-1 … OD-7. ADR-028's own **OD-6** — the structured-eligibility gap — is resolved by this ADR as
 > OD-1 above. ADR-030's OD-6 is the Gemini model.
@@ -1120,3 +1184,9 @@ own right: a `PROSE_DERIVED` deterministic result reporting anything other than 
 (D20a) · a suppressed derived requirement appearing in a breakdown, or being mutated by suppression
 (D20a) · a prose-derived failure closing the AI field-relatedness stage (D4a) · any third
 `EvaluationMethod` value (D4a).
+
+**Added 2026-10-27 by OD-14.** Each of the following is a review failure in its own right: derived
+requirements reaching one endpoint's evaluation but not the other's, or the two receiving
+different sets for the same catalogue state (D20b) · recommendation code reading, filtering or
+re-evaluating a derived requirement instead of consuming the shared path's verdict (D20b) · a
+grouping, ranking, scoring or explanation rule changed on the strength of this ruling (D20b).
