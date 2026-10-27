@@ -11,12 +11,134 @@ ADR-011).
 
 from __future__ import annotations
 
+import atexit
+import os
+import shutil
+import sys
+import tempfile
+from pathlib import Path
 from typing import Any
 
 import pytest
-from fastapi.testclient import TestClient
 
-from app.main import app
+# ---------------------------------------------------------------------------------------
+# Test database isolation — must run before anything imports ``app``
+# ---------------------------------------------------------------------------------------
+#
+# ``Settings.database_url`` defaults to ``sqlite:///./eligicore.db``, relative to wherever
+# pytest is started, and ``app.database`` builds its engine from it at import time. Run from
+# a checkout that holds a developer database, that path *is* the developer database. The
+# suite is therefore pointed at a database it owns before ``app`` is first imported.
+#
+# A file, not ``sqlite://``: an in-memory SQLite database belongs to one connection, and
+# the TestClient serves requests from another thread, so a privacy check would inspect a
+# different, always-empty database from the one the request used.
+#
+# Forced rather than defaulted, so neither a shell variable nor a ``.env`` file can point
+# the suite back at a real database: pydantic-settings ranks the environment above the
+# dotenv file. Child processes inherit it, and tests that need their own database still
+# pass one explicitly.
+#
+# This module is imported twice in one run — once by pytest as a conftest, once as
+# ``tests.conftest`` by tests importing its constants — so the directory is created once
+# and handed to the second import through the environment.
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+_TEST_DATABASE_DIR_VARIABLE = "_ELIGICORE_TEST_DATABASE_DIR"
+_first_import = _TEST_DATABASE_DIR_VARIABLE not in os.environ
+if _first_import:
+    os.environ[_TEST_DATABASE_DIR_VARIABLE] = tempfile.mkdtemp(prefix="eligicore-test-db-")
+_TEST_DATABASE_DIR = Path(os.environ[_TEST_DATABASE_DIR_VARIABLE])
+
+
+def _remove_test_database() -> None:
+    # Registered before the guard below, so a refused run does not leak the directory.
+    database = sys.modules.get("app.database")
+    if database is not None:
+        database.engine.dispose()
+    shutil.rmtree(_TEST_DATABASE_DIR, ignore_errors=True)
+
+
+if _first_import:
+    atexit.register(_remove_test_database)
+
+TEST_DATABASE_PATH = (_TEST_DATABASE_DIR / "eligicore-test.db").resolve()
+TEST_DATABASE_URL = f"sqlite:///{TEST_DATABASE_PATH.as_posix()}"
+os.environ["ELIGICORE_DATABASE_URL"] = TEST_DATABASE_URL
+
+#: The database files a developer may have beside the repository, plus SQLite's sidecars.
+#: The suite must never create or change any of them.
+_DEVELOPER_DATABASE_FILES = tuple(
+    root / f"eligicore.db{suffix}"
+    for root in {REPO_ROOT, Path.cwd().resolve()}
+    for suffix in ("", "-journal", "-wal", "-shm")
+)
+
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import inspect  # noqa: E402
+
+from app.database import engine as _application_engine  # noqa: E402
+from app.database import get_db  # noqa: E402
+from app.main import app  # noqa: E402
+
+_resolved = Path(_application_engine.url.database or "").resolve()
+if _resolved != TEST_DATABASE_PATH:
+    raise RuntimeError(
+        "Refusing to run: the application engine resolves to "
+        f"{_resolved}, not the test-owned database {TEST_DATABASE_PATH}. "
+        "app.database was imported before tests/conftest.py could isolate it."
+    )
+
+
+def _stat_developer_database_files() -> dict[Path, tuple[int, int] | None]:
+    """Size and mtime of each file, or ``None`` if absent. Never opens a database."""
+    snapshot: dict[Path, tuple[int, int] | None] = {}
+    for path in _DEVELOPER_DATABASE_FILES:
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
+            snapshot[path] = None
+        else:
+            snapshot[path] = (stat.st_size, stat.st_mtime_ns)
+    return snapshot
+
+
+_developer_files_at_start = _stat_developer_database_files()
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Fail the run if any developer database file was created or changed.
+
+    The guard that does not depend on settings: it also catches a test that builds its own
+    engine on the default path.
+    """
+    now = _stat_developer_database_files()
+    changed = [
+        str(path) for path, before in _developer_files_at_start.items() if now[path] != before
+    ]
+    if changed:
+        session.config.get_terminal_writer().line(
+            "\nERROR: the test suite created or modified a developer database file: "
+            + ", ".join(changed),
+            red=True,
+        )
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
+def application_database_tables() -> set[str]:
+    """Table names in the database the application hands a request.
+
+    Resolved through ``get_db`` — the override when a test installs one — so a privacy
+    check inspects the database the request under test actually used.
+    """
+    sessions = app.dependency_overrides.get(get_db, get_db)()
+    db = next(sessions)
+    try:
+        return set(inspect(db.get_bind()).get_table_names())
+    finally:
+        sessions.close()
+
 
 #: Tables the server is permitted to have. An **allowlist**, deliberately: naming only the
 #: forbidden tables would let a fourth personal-data table through under a name nobody

@@ -11,7 +11,7 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -21,7 +21,11 @@ from app.models.job import Job, JobStatus
 from app.schemas.candidate import JobType
 from app.schemas.job import JobStatusSchema, RawJob
 from app.services.job_ingestion import ingest_source
-from tests.conftest import ALLOWED_OPERATIONAL_TABLES, FORBIDDEN_TABLES
+from tests.conftest import (
+    ALLOWED_OPERATIONAL_TABLES,
+    FORBIDDEN_TABLES,
+    application_database_tables,
+)
 from tests.test_job_ingestion import FakeAdapter, make_raw
 
 JOBS_URL = "/api/v1/jobs"
@@ -303,10 +307,12 @@ def test_response_contains_no_evaluation_verdict(jobs_client: TestClient) -> Non
 
 
 def test_database_holds_only_operational_tables(jobs_client: TestClient) -> None:
-    jobs_client.get(JOBS_URL)
-    from app.database import engine
+    assert jobs_client.get(JOBS_URL).status_code == 200
 
-    existing = set(inspect(engine).get_table_names())
+    # The catalogue the request was served from, not the module-level default engine.
+    existing = application_database_tables()
+    assert "jobs" in existing, "inspected a database other than the one that served the request"
+    assert existing <= ALLOWED_OPERATIONAL_TABLES, existing
     assert not (existing & FORBIDDEN_TABLES)
 
 
