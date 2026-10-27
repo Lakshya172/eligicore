@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 
 from app.ai.ai_service import AIService
 from app.ai.errors import AIError
@@ -41,6 +41,7 @@ from app.schemas.eligibility import (
     RequirementStatus,
     RequirementType,
 )
+from app.schemas.extraction import VerifiedDerivedRequirement
 from app.schemas.job import JobRead
 from app.services.eligibility_engine import (
     ambiguous_requirements,
@@ -204,10 +205,19 @@ async def check_eligibility_with_ai(
     job_ids: list[str],
     jobs_by_id: Mapping[str, JobRead],
     ai_service: AIService,
+    *,
+    derived_by_job: Mapping[str, Sequence[VerifiedDerivedRequirement]],
 ) -> EligibilityCheckResponse:
     """Evaluate a profile against the requested jobs, resolving field ambiguity with AI.
 
-    1. Every found job is evaluated deterministically — all checks run (ADR-017).
+    **The one eligibility path both endpoints share**, so it is where derived requirements
+    enter (ADR-030 D20b, OD-14). ``derived_by_job`` is keyword-only and has **no default** on
+    purpose: a caller cannot evaluate without stating what it supplies, so neither endpoint can
+    be wired without the other. ``{}`` is a legitimate value — it is what the loader returns
+    while extraction is disabled — but it has to be passed.
+
+    1. Every found job is evaluated deterministically — all checks run (ADR-017) — with the
+       derived requirements supplied for it, through R-COLLISION (ADR-030 D20, D20a).
     2. AI input is collected only from :func:`ai_inputs`, de-duplicated across jobs.
     3. Each distinct question is asked once; failures fail closed.
     4. Assessments are applied, and every verdict is composed by the engine's unchanged
@@ -222,7 +232,9 @@ async def check_eligibility_with_ai(
         if job is None:
             not_found.append(job_id)
         else:
-            evaluated.append((job, evaluate_requirements(profile, job)))
+            evaluated.append(
+                (job, evaluate_requirements(profile, job, derived_by_job.get(job_id, ())))
+            )
 
     pending: dict[AssessmentKey, tuple[str, list[str]]] = {}
     for job, breakdown in evaluated:

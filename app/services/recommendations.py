@@ -30,7 +30,8 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING
 
 from app.ai.ai_service import AIService
 from app.schemas.candidate import CandidateProfile
@@ -53,6 +54,9 @@ from app.services.matching_engine import (
     order_matches,
     score_jobs,
 )
+
+if TYPE_CHECKING:  # annotation only: recommendation code never reads a derived requirement
+    from app.schemas.extraction import VerifiedDerivedRequirement
 
 logger = logging.getLogger("eligicore.recommendations")
 
@@ -191,11 +195,18 @@ async def recommend(
     job_ids: Sequence[str] | None,
     catalogue: Sequence[JobRead],
     ai_service: AIService,
+    *,
+    derived_by_job: Mapping[str, Sequence[VerifiedDerivedRequirement]],
 ) -> RecommendationResponse:
     """Build grouped, explained recommendations for one profile.
 
     ``catalogue`` is the whole job catalogue, in the order the corpus fingerprint is taken
     over. It is both the TF-IDF corpus and the pool the scope is drawn from.
+
+    ``derived_by_job`` is passed to the shared eligibility path **unchanged**: recommendation
+    code never reads, filters or re-evaluates a derived requirement; it groups the verdict it
+    is given (ADR-030 D20b). Required, with no default, for the same reason it is on
+    :func:`~app.services.eligibility_ai.check_eligibility_with_ai`.
     """
     started = time.perf_counter()
     jobs_by_id = {job.id: job for job in catalogue}
@@ -208,7 +219,11 @@ async def recommend(
         not_considered = 0
 
     eligibility = await check_eligibility_with_ai(
-        profile, selected, {job_id: jobs_by_id[job_id] for job_id in selected}, ai_service
+        profile,
+        selected,
+        {job_id: jobs_by_id[job_id] for job_id in selected},
+        ai_service,
+        derived_by_job=derived_by_job,
     )
     matching = score_jobs(
         candidate_match_input(profile),

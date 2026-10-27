@@ -133,7 +133,9 @@ async def run(
     profile: CandidateProfile, jobs: list[JobRead], provider: AIProvider
 ) -> dict[str, JobEligibility]:
     by_id = {job.id: job for job in jobs}
-    response = await check_eligibility_with_ai(profile, list(by_id), by_id, AIService(provider))
+    response = await check_eligibility_with_ai(
+        profile, list(by_id), by_id, AIService(provider), derived_by_job={}
+    )
     return {result.job_id: result for result in response.results}
 
 
@@ -194,7 +196,9 @@ async def test_hard_failure_never_constructs_a_provider() -> None:
 
     job = make_job(id="hard", allowed_fields=CS_FIELDS, min_cgpa=9.5, min_cgpa_scale="SCALE_10")
     service = AIService(builder=builder)
-    response = await check_eligibility_with_ai(private_profile(), ["hard"], {"hard": job}, service)
+    response = await check_eligibility_with_ai(
+        private_profile(), ["hard"], {"hard": job}, service, derived_by_job={}
+    )
 
     assert response.results[0].eligibility_state is E.NOT_ELIGIBLE
     assert built == [] and service.provider_built is False
@@ -289,13 +293,15 @@ async def test_requests_needing_no_ai_never_construct_a_provider() -> None:
     }
     service = AIService(builder=builder)
     response = await check_eligibility_with_ai(
-        make_profile([edu(field_of_study=IT)], backlogs=2), list(jobs), jobs, service
+        make_profile([edu(field_of_study=IT)], backlogs=2), list(jobs), jobs, service,
+        derived_by_job={},
     )
     assert [r.eligibility_state for r in response.results] == [E.NOT_ELIGIBLE, E.ELIGIBLE, E.ELIGIBLE]
     assert built == []
 
     missing = await check_eligibility_with_ai(
-        make_profile([edu(field_of_study=None)]), ["amb"], {"amb": make_job(id="amb", allowed_fields=CS_FIELDS)}, service
+        make_profile([edu(field_of_study=None)]), ["amb"], {"amb": make_job(id="amb", allowed_fields=CS_FIELDS)}, service,
+        derived_by_job={},
     )
     assert missing.results[0].eligibility_state is E.UNKNOWN
     assert built == []
@@ -414,7 +420,10 @@ async def test_provider_construction_failure_fails_closed_to_unknown() -> None:
 
     service = AIService(builder=builder)
     job = make_job(**AMBIGUOUS)
-    response = await check_eligibility_with_ai(make_profile([edu(field_of_study=IT)]), [job.id], {job.id: job}, service)
+    response = await check_eligibility_with_ai(
+        make_profile([edu(field_of_study=IT)]), [job.id], {job.id: job}, service,
+        derived_by_job={},
+    )
 
     entry = field_entry(response.results[0])
     assert entry.reason_code is ReasonCode.AI_ASSESSMENT_UNAVAILABLE

@@ -166,7 +166,7 @@ def test_default_request_returns_the_full_contract(catalogue: Catalogue) -> None
 
     assert set(body) == RESPONSE_FIELDS
     assert body["candidate_id"] == CANDIDATE_ID
-    assert body["engine_version"] == "2"
+    assert body["engine_version"] == "3"
     assert body["matching_version"] == "1"
     assert body["corpus_size"] == 6
     assert len(body["corpus_fingerprint"]) == 64

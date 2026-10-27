@@ -33,9 +33,21 @@ from app.services.matching_engine import (
     job_match_input,
     score_jobs,
 )
-from app.services.recommendations import recommend
+from app.services.recommendations import recommend as _recommend
 
 pytestmark = pytest.mark.anyio
+
+
+async def recommend(*args: Any, **kwargs: Any) -> Any:
+    """``recommend`` with no derived requirements, which is what every test here exercises.
+
+    The argument is required on the real function (ADR-030 D20b), and none of these
+    catalogues has a derived requirement, so it is supplied once, explicitly empty, rather
+    than at every call site. The derived path is tested in
+    ``tests/test_derived_requirement_wiring.py``.
+    """
+    kwargs.setdefault("derived_by_job", {})
+    return await _recommend(*args, **kwargs)
 
 SERVICE_PATH = pathlib.Path(service.__file__)
 BASE_TIME = datetime(2026, 9, 1, tzinfo=timezone.utc)
@@ -202,13 +214,14 @@ async def test_embedded_eligibility_is_exactly_the_week_4_result() -> None:
     requested = [job.id for job in catalogue]
     response = await recommend(profile(), requested, catalogue, related())
     week4 = await check_eligibility_with_ai(
-        profile(), requested, {job.id: job for job in catalogue}, related()
+        profile(), requested, {job.id: job for job in catalogue}, related(),
+        derived_by_job={},
     )
 
     expected = {result.job_id: result.model_dump() for result in week4.results}
     for item in all_items(response):
         assert item.eligibility.model_dump() == expected[item.eligibility.job_id]
-    assert response.engine_version == week4.engine_version == "2"
+    assert response.engine_version == week4.engine_version == "3"
 
 
 # ---------------------------------------------------------------------------------------
@@ -550,9 +563,11 @@ async def test_eligibility_is_called_once_with_each_found_job_once(
 ) -> None:
     calls: list[list[str]] = []
 
-    async def spy(profile_, job_ids, jobs_by_id, ai_service):
+    async def spy(profile_, job_ids, jobs_by_id, ai_service, *, derived_by_job):
         calls.append(list(job_ids))
-        return await check_eligibility_with_ai(profile_, job_ids, jobs_by_id, ai_service)
+        return await check_eligibility_with_ai(
+            profile_, job_ids, jobs_by_id, ai_service, derived_by_job=derived_by_job
+        )
 
     monkeypatch.setattr(service, "check_eligibility_with_ai", spy)
     await recommend(profile(), ["review", "eligible", "review", "ghost"], STATE_CATALOGUE, ai())
@@ -632,7 +647,7 @@ async def test_hard_failure_stays_not_eligible_even_with_an_ambiguous_field() ->
 async def test_response_metadata() -> None:
     response = await recommend(profile(), None, STATE_CATALOGUE, related())
     assert response.candidate_id == "client-correlation-id"
-    assert response.engine_version == "2" and response.matching_version == "1"
+    assert response.engine_version == "3" and response.matching_version == "1"
     assert response.evaluated_at.tzinfo is not None
     assert re.fullmatch(r"[0-9a-f]{64}", response.corpus_fingerprint)
 
