@@ -20,9 +20,10 @@ time from job text alone, exactly as D21 and D24 require.
 What this module is **not**
 ---------------------------
 
-It does not supply derived requirements to the eligibility engine, apply R-COLLISION, touch
-``RequirementResult`` or change any response. Those are D20's engine boundary and belong to
-their own decision and their own change. A row written here is stored and inert.
+It does not apply R-COLLISION, touch ``RequirementResult`` or change any response. Those are
+D20's engine boundary. It reads what is in force (:func:`effective_derived_requirements_by_job`)
+and hands it back as typed values, but whether evaluation consults them at all is decided by
+the caller, which holds the configuration flag (ADR-030 D20b; ``app.services.derived_requirements``).
 
 Trigger rule (D21, D22)
 -----------------------
@@ -67,8 +68,8 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 
@@ -77,6 +78,7 @@ from sqlalchemy.orm import Session
 
 from app.models.extracted_requirement import ExtractedRequirement, ExtractionStatus
 from app.models.job import Job
+from app.schemas.candidate import GradeScale
 from app.schemas.eligibility import RequirementType
 from app.schemas.extraction import (
     DerivedValue,
@@ -314,19 +316,122 @@ def effective_requirements(
     Every row returned is, by the table's own CHECK constraints, ``PROSE_DERIVED`` and
     ``REQUIRED`` — nothing else can be stored.
 
-    **Nothing consumes this yet.** Supplying derived requirements to evaluation is ADR-030
-    D20's engine boundary and its own decision; this function exists so that "what is in
-    force" has one definition rather than being re-derived by each future caller.
+    One job's view of :func:`_rows_in_force`, which is the single definition of "in force";
+    evaluation reads the same rule in bulk through :func:`effective_derived_requirements_by_job`.
     """
-    digest = source_text_digest(job.description)
-    rows = session.execute(
-        select(ExtractedRequirement).where(
-            ExtractedRequirement.job_id == job.id,
-            ExtractedRequirement.source_text_digest == digest,
-            ExtractedRequirement.status == ExtractionStatus.ACTIVE,
+    return tuple(_rows_in_force(session, [job])[job.id])
+
+
+#: Bound on the ``IN`` list of one query. SQLite builds before 3.32 cap a statement at 999
+#: parameters, and the recommendation endpoint reads the whole catalogue.
+_JOB_ID_CHUNK = 500
+
+
+def _rows_in_force(
+    session: Session, jobs: Sequence[Job]
+) -> dict[str, list[ExtractedRequirement]]:
+    """``ACTIVE`` rows derived from each job's **current** description, by job id.
+
+    The one place "in force" is decided for a read: ``ACTIVE`` in the query, and the digest of
+    the description the job holds now compared per job. A row failing either is history —
+    invalidated, or derived from text the job no longer carries. Every job asked about has an
+    entry, empty when nothing is in force.
+    """
+    digests = {job.id: source_text_digest(job.description) for job in jobs}
+    in_force: dict[str, list[ExtractedRequirement]] = {job_id: [] for job_id in digests}
+    job_ids = list(digests)
+    for start in range(0, len(job_ids), _JOB_ID_CHUNK):
+        rows = session.execute(
+            select(ExtractedRequirement).where(
+                ExtractedRequirement.job_id.in_(job_ids[start : start + _JOB_ID_CHUNK]),
+                ExtractedRequirement.status == ExtractionStatus.ACTIVE,
+            )
+        ).scalars()
+        for row in rows:
+            if row.source_text_digest == digests[row.job_id]:
+                in_force[row.job_id].append(row)
+    for rows_for_job in in_force.values():
+        rows_for_job.sort(key=lambda row: row.requirement_type.value)
+    return in_force
+
+
+def _to_verified(row: ExtractedRequirement) -> VerifiedDerivedRequirement:
+    """Rebuild the verified requirement a stored row records — the inverse of :func:`_new_row`.
+
+    Raises ``ValueError`` (pydantic's ``ValidationError`` is one) when the row cannot be read
+    back as a requirement the verifier could have produced: a value column missing for its
+    type, a window with no bound, a grade with no known scale, empty evidence, or a provenance
+    or strength other than the only ones a verified requirement may carry. The table's CHECK
+    constraints make every one of these unreachable through this module; the check here is
+    for a row written by any other path.
+    """
+    kind = row.requirement_type
+    value: DerivedValue
+    if kind is RequirementType.MIN_CGPA:
+        if row.min_cgpa_scale is GradeScale.UNKNOWN:
+            raise ValueError("a stored minimum CGPA must name a known scale")
+        value = MinCgpaValue(min_cgpa=row.min_cgpa, min_cgpa_scale=row.min_cgpa_scale)
+    elif kind is RequirementType.GRAD_YEAR_WINDOW:
+        if row.min_grad_year is None and row.max_grad_year is None:
+            raise ValueError("a stored graduation window must state at least one bound")
+        value = GradYearWindowValue(
+            min_grad_year=row.min_grad_year, max_grad_year=row.max_grad_year
         )
-    ).scalars()
-    return tuple(sorted(rows, key=lambda row: row.requirement_type.value))
+    elif kind is RequirementType.MAX_BACKLOGS:
+        value = MaxBacklogsValue(max_backlogs=row.max_backlogs)
+    else:
+        raise ValueError(f"{kind.value} is not a Phase 1 derived requirement type")
+    return VerifiedDerivedRequirement(
+        requirement_type=kind,
+        value=value,
+        provenance=row.provenance,
+        strength=row.strength,
+        evidence_text=row.evidence_text,
+        extractor=row.extractor,
+        extractor_version=row.extractor_version,
+        provider=row.provider,
+        model=row.model,
+    )
+
+
+@dataclass(frozen=True)
+class DerivedRequirementLoad:
+    """What is in force for a set of jobs, as typed requirements, and what had to be skipped.
+
+    ``unusable`` is a count and nothing more. The caller logs it; this module logs nothing.
+    """
+
+    by_job: dict[str, tuple[VerifiedDerivedRequirement, ...]] = field(default_factory=dict)
+    unusable: int = 0
+
+
+def effective_derived_requirements_by_job(
+    session: Session, jobs: Iterable[Job]
+) -> DerivedRequirementLoad:
+    """The verified derived requirements in force for each job, ready for the engine.
+
+    Same rule as :func:`effective_requirements` — ``ACTIVE`` and derived from the job's current
+    description — applied to many jobs in a bounded number of queries, each row rebuilt as a
+    :class:`VerifiedDerivedRequirement`. A job with nothing in force is absent from ``by_job``.
+
+    **A row that cannot be rebuilt is skipped, alone, and counted** (owner ruling Q2): the
+    criterion stays absent, exactly as for a proposal that fails verification (ADR-030 D6,
+    D26), and the job's other requirements are unaffected. **A database error is not caught**:
+    it propagates, so the request fails through the application's sanitized error handling
+    rather than quietly evaluating without a requirement that may exist (owner ruling Q3).
+    """
+    by_job: dict[str, tuple[VerifiedDerivedRequirement, ...]] = {}
+    unusable = 0
+    for job_id, rows in _rows_in_force(session, list(jobs)).items():
+        usable: list[VerifiedDerivedRequirement] = []
+        for row in rows:
+            try:
+                usable.append(_to_verified(row))
+            except ValueError:
+                unusable += 1
+        if usable:
+            by_job[job_id] = tuple(usable)
+    return DerivedRequirementLoad(by_job=by_job, unusable=unusable)
 
 
 def derive_for_job(session: Session, job: Job) -> DerivationOutcome:
@@ -428,7 +533,9 @@ def derive_for_job(session: Session, job: Job) -> DerivationOutcome:
 __all__ = [
     "DerivationOutcome",
     "DerivationStatus",
+    "DerivedRequirementLoad",
     "derive_for_job",
+    "effective_derived_requirements_by_job",
     "effective_requirements",
     "source_text_digest",
 ]

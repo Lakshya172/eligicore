@@ -1237,16 +1237,27 @@ def test_no_router_references_derivation_or_extraction() -> None:
 
 
 def test_only_ingestion_imports_the_orchestration_service() -> None:
-    """One caller in the application, so the trigger rule has exactly one place to live."""
-    callers = []
+    """One caller of the trigger, so the trigger rule has exactly one place to live.
+
+    Step 6 wiring adds exactly one reader: the evaluation-time loader imports the read
+    function and nothing else, so a request can read what is in force but has no route to
+    ``derive_for_job`` (ADR-030 D21).
+    """
+    imported: dict[str, set[str]] = {}
     for path in sorted(pathlib.Path("app").rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module == (
                 "app.services.requirement_derivation"
             ):
-                callers.append(path.as_posix())
-    assert callers == ["app/services/job_ingestion.py"]
+                imported.setdefault(path.as_posix(), set()).update(
+                    alias.name for alias in node.names
+                )
+    assert imported == {
+        "app/services/job_ingestion.py": imported["app/services/job_ingestion.py"],
+        "app/services/derived_requirements.py": {"effective_derived_requirements_by_job"},
+    }
+    assert "derive_for_job" in imported["app/services/job_ingestion.py"]
 
 
 def test_an_eligibility_request_derives_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
