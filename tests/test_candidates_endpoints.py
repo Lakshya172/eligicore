@@ -11,10 +11,13 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import inspect
 
-from app.database import Base, engine
-from tests.conftest import ALLOWED_OPERATIONAL_TABLES, FORBIDDEN_TABLES
+from app.database import Base
+from tests.conftest import (
+    ALLOWED_OPERATIONAL_TABLES,
+    FORBIDDEN_TABLES,
+    application_database_tables,
+)
 
 VALIDATE_URL = "/api/v1/candidates/validate"
 NORMALIZE_URL = "/api/v1/candidates/normalize"
@@ -283,7 +286,8 @@ def test_no_candidate_tables_exist_in_the_database(
     client.post(VALIDATE_URL, json=complete_profile)
     client.post(NORMALIZE_URL, json=complete_profile)
 
-    existing = set(inspect(engine).get_table_names())
+    existing = application_database_tables()
+    assert existing <= ALLOWED_OPERATIONAL_TABLES, f"unexpected tables present: {existing}"
     assert not (existing & FORBIDDEN_TABLES), f"forbidden tables present: {existing}"
 
 

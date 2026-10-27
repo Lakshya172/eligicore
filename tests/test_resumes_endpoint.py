@@ -13,14 +13,17 @@ from typing import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import inspect
 
 from app.ai.ai_service import AIService, get_ai_service
 from app.ai.errors import AIProviderUnavailableError
 from app.ai.providers.mock import MockAIProvider
-from app.database import Base, engine
+from app.database import Base
 from app.main import app
-from tests.conftest import ALLOWED_OPERATIONAL_TABLES, FORBIDDEN_TABLES
+from tests.conftest import (
+    ALLOWED_OPERATIONAL_TABLES,
+    FORBIDDEN_TABLES,
+    application_database_tables,
+)
 from app.schemas.resume import ResumeExtraction
 from tests.fixtures_documents import (
     SAMPLE_RESUME_LINES,
@@ -239,7 +242,9 @@ def test_parsing_creates_no_personal_data_table(resume_client: TestClient) -> No
     resume_client.post(PARSE_URL, files=_pdf_upload())
 
     assert not (set(Base.metadata.tables) - ALLOWED_OPERATIONAL_TABLES)
-    assert not (set(inspect(engine).get_table_names()) & FORBIDDEN_TABLES)
+    existing = application_database_tables()
+    assert existing <= ALLOWED_OPERATIONAL_TABLES, existing
+    assert not (existing & FORBIDDEN_TABLES)
 
 
 def test_repeated_parses_accumulate_no_server_state(resume_client: TestClient) -> None:
