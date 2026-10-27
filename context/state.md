@@ -11,16 +11,17 @@
 
 | Field | Value |
 |---|---|
-| **Date** | 2026-09-26 |
-| **Phase** | **Week 9A — Local production readiness · COMPLETE.** All seven slices (9A-1 OpenAPI · 9A-2 PostgreSQL · 9A-3 production configuration · 9A-4 secret handling · 9A-5 privacy and logging · 9A-6 local end-to-end · 9A-7 documentation) are merged or verified and recorded as **Checkpoint 9A**. **Local execution is the normal operating mode; nothing is deployed.** **Week 9B — Deployment and Sharing — is OPTIONAL, owner-triggered and NOT started** (ADR-027). Previously: **Week 8 · COMPLETE.** Slice 8A (cost/usage accounting), Slice 8B (candidate-free corpus vectorizer cache) and Slice 8C (operational-log completeness) are all **complete and merged**, recorded as **Checkpoint 8**. Week 6 remains the dossier's declared safe stopping point (§15); Weeks 7 and 8 are enhancement on top of it. |
-| **Roadmap position** | **Weeks 1–8 complete and merged; Week 9A complete.** Week 9 is two stages under **ADR-027** — 9A local production readiness (done, Checkpoint 9A) and 9B deployment and sharing (optional, not started). **Weeks 9B and 10 NOT started.** Earlier:  Week 7 delivered as Slice 7A (PR #24, no checkpoint) + Slice 7B (PR #28, **Checkpoint 7**) on **ADR-025**. Week 8 delivered as Slice 8A (PR #34), Slice 8B (PR #35) and Slice 8C (PR #36, **Checkpoint 8**) on the design gate ruled in **ADR-026** (PR #32, with ADR-020 §5's partial supersession recorded in PR #33) — **none of the three slices recorded a checkpoint of its own**. `/matching/score` and HTTP `/jobs/ingest` remain explicitly deferred (C-25, ADR-023 §11, ADR-024); **live Gemini application generation remains deferred** and was not implemented in Week 8. |
-| **Health** | 🟢 GREEN — 1567 tests passing on `main`; PostgreSQL 18.6 migration compatibility verified by execution; production configuration, secret handling, privacy and logging re-verified; local end-to-end run and two fresh-clone quickstarts passed; mutations **230/230** re-verified from a clean tree — 32/32 (8C), 34/34 (8B), 68/68 (8A), 54/54 (7B), 42/42 (7A) — plus 23/23 (6B), 30/30 (6A), 40/40 (5B), 36/36 (5A), 27/27 (Week 4); CI green on `e5d6d36`, `f3fbf35` and `9aba1f2`; live privacy sweep clean; no open blockers |
+| **Date** | 2026-10-27 |
+| **Phase** | **Post-Checkpoint 9A early-activation work · IN PROGRESS, no checkpoint recorded.** Owner-approved work on **ADR-028** (early activation of live job sources and live Gemini), **ADR-029** (explicit `UNKNOWN` employment type) and **ADR-030** (verified job-requirement extraction) has merged on top of Checkpoint 9A as PRs #48–#65 — see § Post-Checkpoint 9A below. **Verified job-requirement extraction is built only up to the engine boundary and is DISABLED** (`extraction_enabled = False` in `app/config.py`); ADR-030 Step 6 is PR A #63 and PR B #64 **merged** and PR C #66 **open**; Step 6 wiring is **blocked on owner decision OPEN-4**; Steps 7–10 are **not started**. The Greenhouse adapter exists but **no live source is wired into any ingestion entry point**, and the default AI provider is still `mock`. Previously: **Week 9A — Local production readiness · COMPLETE.** All seven slices (9A-1 OpenAPI · 9A-2 PostgreSQL · 9A-3 production configuration · 9A-4 secret handling · 9A-5 privacy and logging · 9A-6 local end-to-end · 9A-7 documentation) are merged or verified and recorded as **Checkpoint 9A**. **Local execution is the normal operating mode; nothing is deployed.** **Week 9B — Deployment and Sharing — is OPTIONAL, owner-triggered and NOT started** (ADR-027). Previously: **Week 8 · COMPLETE.** Slice 8A (cost/usage accounting), Slice 8B (candidate-free corpus vectorizer cache) and Slice 8C (operational-log completeness) are all **complete and merged**, recorded as **Checkpoint 8**. Week 6 remains the dossier's declared safe stopping point (§15); Weeks 7 and 8 are enhancement on top of it. |
+| **Roadmap position** | **Weeks 1–8 complete and merged; Week 9A complete; post-9A early activation in progress.** ADR-028 deliberately moves live job sources forward from dossier §18 Phase 3 — a recorded roadmap-sequencing deviation, not a reinterpretation. Merged since Checkpoint 9A: ADR-028 record (#48) · live HTTP adapter infrastructure (#49) · ADR-029 (#50) and `JobType.UNKNOWN` (#51) · Greenhouse adapter (#52) · privacy-marker flake fix (#53) · live-job description disclosure fix (#54) · ADR-030 (#55) and its amendments (#56 ADR-028 D9a/D19a and ADR-017; #57 owner rulings OD-11..OD-13, D7a, D20a, D4a) · ADR-030 Steps 3–5 (#58 verifier · #59 `extracted_requirements` storage · #60 deterministic extractors · #61 derivation orchestration · #62 ACTIVE-only uniqueness) · Step 6 PR A (#63 provenance/evidence contract) and PR B (#64 amended D4 precedence, D4a test added) · test database isolation (#65). **Open:** Step 6 PR C (#66, D20 engine boundary + D20a R-COLLISION). Earlier: **Weeks 1–8 complete and merged; Week 9A complete.** Week 9 is two stages under **ADR-027** — 9A local production readiness (done, Checkpoint 9A) and 9B deployment and sharing (optional, not started). **Weeks 9B and 10 NOT started.** Earlier:  Week 7 delivered as Slice 7A (PR #24, no checkpoint) + Slice 7B (PR #28, **Checkpoint 7**) on **ADR-025**. Week 8 delivered as Slice 8A (PR #34), Slice 8B (PR #35) and Slice 8C (PR #36, **Checkpoint 8**) on the design gate ruled in **ADR-026** (PR #32, with ADR-020 §5's partial supersession recorded in PR #33) — **none of the three slices recorded a checkpoint of its own**. `/matching/score` and HTTP `/jobs/ingest` remain explicitly deferred (C-25, ADR-023 §11, ADR-024); **live Gemini application generation remains deferred** and was not implemented in Week 8. |
+| **Health** | 🟢 GREEN — **2427 tests passing on `main` at `319245a`** (re-run 2026-10-27 from an isolated worktree under PR #65's guards: 2427 passed, no `eligicore.db` created); **CI green on `319245a`**; Alembic head `d5c2e9a1f7b4`; no open blocker for merged work, but **ADR-030 Step 6 wiring is blocked on OPEN-4** (§ Blockers). Per-PR mutation results since 9A are recorded in the PR descriptions (e.g. 13/13 #63, 15/15 #64, 15/15 #66). As at Checkpoint 9A: 1567 tests passing on `main`; PostgreSQL 18.6 migration compatibility verified by execution; production configuration, secret handling, privacy and logging re-verified; local end-to-end run and two fresh-clone quickstarts passed; mutations **230/230** re-verified from a clean tree — 32/32 (8C), 34/34 (8B), 68/68 (8A), 54/54 (7B), 42/42 (7A) — plus 23/23 (6B), 30/30 (6A), 40/40 (5B), 36/36 (5A), 27/27 (Week 4); CI green on `e5d6d36`, `f3fbf35` and `9aba1f2`; live privacy sweep clean; no open blockers |
 | **Stable branch** | `main` |
-| **Current checkpoint** | **Checkpoint 9A** — Week 9A Local Production Readiness. **Checkpoint 9A is anchored to product state `95a1187715851ee7a67fa8cdbc7c6e87f3fa7ec3`. The `main` branch may advance beyond that anchor through documentation-only checkpoint/state corrections without changing the certified application state.** For the literal current head, read `git rev-parse main` — this record deliberately does not mirror it, because a checkpoint certifies a product state, not a branch tip. **It records a verified local product, not a deployment: there is no hosted instance and no public URL.** Checkpoint 9 is reserved for the final Week 9 state and exists only if the owner deploys. Checkpoint 8 (`9aba1f2`) is now historical. Checkpoint 7 (`6c269a0`) is now historical; Checkpoint 6 (`13eb832`) remains recorded as the final Week 6 checkpoint and the declared safe stopping point. **Week 8 has no intermediate checkpoint: there is no Checkpoint 8A, 8B or 8C**, because none of the three slices recorded one. **There is no Checkpoint 9.** |
+| **Current checkpoint** | **Checkpoint 9A** — still the latest recorded checkpoint. **Correction (2026-10-27): `main` is no longer documentation-only beyond the 9A anchor.** PRs #49, #51–#54 and #58–#65 changed application code, tests and the schema (three new migrations), so `main` now carries product state that **no checkpoint certifies**. The post-9A work is deliberately un-checkpointed while ADR-030 is mid-sequence. Week 9A Local Production Readiness record follows unchanged. **Checkpoint 9A is anchored to product state `95a1187715851ee7a67fa8cdbc7c6e87f3fa7ec3`. The `main` branch may advance beyond that anchor through documentation-only checkpoint/state corrections without changing the certified application state.** For the literal current head, read `git rev-parse main` — this record deliberately does not mirror it, because a checkpoint certifies a product state, not a branch tip. **It records a verified local product, not a deployment: there is no hosted instance and no public URL.** Checkpoint 9 is reserved for the final Week 9 state and exists only if the owner deploys. Checkpoint 8 (`9aba1f2`) is now historical. Checkpoint 7 (`6c269a0`) is now historical; Checkpoint 6 (`13eb832`) remains recorded as the final Week 6 checkpoint and the declared safe stopping point. **Week 8 has no intermediate checkpoint: there is no Checkpoint 8A, 8B or 8C**, because none of the three slices recorded one. **There is no Checkpoint 9.** |
 | **Produced by** | PR #39 (`65b15bb`, 9A-1) + PR #40 (`89b616a`, 9A-2 prerequisite) + PR #41 (`229acc1`, 9A-3) + PR #42 (`88c884b`, 9A-4) + PR #43 (`8cd6ad8`, 9A-5) + PR #44 (`95a1187`, 9A-7), all **MERGED**, on ADR-027 (PR #38, `1afd4e5`). 9A-2's migration validation and 9A-6's end-to-end run were **verification-only and produced no commit**. Checkpoint 7 (`6c269a0`) remains the final Week 7 checkpoint and Checkpoint 6 (`13eb832`) the final Week 6 one. |
-| **Rollback target** | Checkpoint 9A first; Checkpoint 8 by reverting the Week 9A merges (PR #44, #43, #42, #41, #40, #39 and the ADR-027 record PR #38) — no database step, though reverting PR #40 removes the PostgreSQL driver; then Checkpoint 7 by also reverting the Week 8 merges as appropriate — PR #36, then PR #35, then PR #34 (no database step: Week 8 added no migration and no dependency); Checkpoint 6 by also reverting PR #28 (no database step); Checkpoint 6A by also reverting PR #19 (no database step); Checkpoint 5 by also reverting PR #17 (no database step); Checkpoint 5A by also reverting PR #15 (no database step); Checkpoint 4 by also reverting PR #13; Checkpoint 4A by also reverting PR #11; Checkpoint 3 also needs `alembic downgrade 7c2f1a9b4d30`; below Checkpoint 3 also needs `alembic downgrade base`. |
-| **Next milestone** | **Week 9B — Deployment and Sharing. OPTIONAL, owner-triggered and NOT started.** It is not required for ordinary use and may never be performed; it begins only when the owner decides to share EligiCore, and seven owner decisions are open before it can (ADR-027). Live Gemini application generation remains deferred and is not scheduled by any merged decision. Week 10 remains buffer. |
-| **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. |
+| **Rollback target** | **Back to Checkpoint 9A from current `main`** means reverting the post-9A merges (#65 down to #48, newest first) **and a database step**: `alembic downgrade b3e8d2c61a47` from head `d5c2e9a1f7b4`, through `e7b4c0d21a95` (drops `extracted_requirements`) and `c4f1a8b92d63` (narrows `job_type`). Two of those downgrades **refuse** rather than lose data — `d5c2e9a1f7b4` when the old uniqueness key would reject existing rows, `c4f1a8b92d63` when any job holds `job_type = 'UNKNOWN'` — and either refusal leaves the database unchanged. Never without human approval. Then, from Checkpoint 9A: Checkpoint 8 by reverting the Week 9A merges (PR #44, #43, #42, #41, #40, #39 and the ADR-027 record PR #38) — no database step, though reverting PR #40 removes the PostgreSQL driver; then Checkpoint 7 by also reverting the Week 8 merges as appropriate — PR #36, then PR #35, then PR #34 (no database step: Week 8 added no migration and no dependency); Checkpoint 6 by also reverting PR #28 (no database step); Checkpoint 6A by also reverting PR #19 (no database step); Checkpoint 5 by also reverting PR #17 (no database step); Checkpoint 5A by also reverting PR #15 (no database step); Checkpoint 4 by also reverting PR #13; Checkpoint 4A by also reverting PR #11; Checkpoint 3 also needs `alembic downgrade 7c2f1a9b4d30`; below Checkpoint 3 also needs `alembic downgrade base`. |
+| **Next milestone** | **ADR-030 Step 6 completion:** PR C #66 (open) to merge, then the wiring PR — **blocked on owner decision OPEN-4**. Steps 7–10 not started; extraction stays disabled until Step 10. Independently: **Week 9B — Deployment and Sharing. OPTIONAL, owner-triggered and NOT started.** It is not required for ordinary use and may never be performed; it begins only when the owner decides to share EligiCore, and seven owner decisions are open before it can (ADR-027). Live Gemini application generation remains deferred and is not scheduled by any merged decision. Week 10 remains buffer. |
+| **AI provider** | Phase 1 default: **Google Gemini Flash** (ADR-013). Runtime default is `mock`. **The configured `gemini_model` is still `gemini-2.0-flash`**, which ADR-028 D19a records as shut down on 2026-06-01 and not to be used when Gemini is enabled; ADR-030 OD-6 selects `gemini-3.8-flash`, and the migration is ADR-030 Step 8 (not started). |
+| **Alembic head** | `d5c2e9a1f7b4` (verified with `alembic heads`, 2026-10-27). Chain: `54a85d64881e` → `7c2f1a9b4d30` → `b3e8d2c61a47` (Checkpoint 9A head) → `c4f1a8b92d63` (#51) → `e7b4c0d21a95` (#59) → `d5c2e9a1f7b4` (#62). |
 | **Repository** | `Lakshya172/eligicore` (public). Default branch `main`, protected. CI on push and PR. |
 | **Python** | 3.12.10 local, 3.12 in CI (dossier requires 3.11+ — satisfied) |
 
@@ -102,13 +103,26 @@
 | **Week 9A-7 — documentation** *(merged, PR #44)* | README made current against the live application in both directions; local-first documented as normal; optional deployment path documented and **not executed**, with the seven 9B decisions left open. **Two fresh clones from GitHub reached a running API in 3 min 7 s and 2 min 46 s**, no undocumented step. |
 | **Week 8 Slice 8C — tests** *(merged, PR #36)* | 44 new in `tests/test_operational_logs.py` (1549 total) — request-count completeness across seven paths, error-record content, the Slice 8A regression, the generation boundary verified on the syntax tree, and a fourteen-marker privacy sweep. 32/32 mutations caught. |
 | **Week 7 Slice 7B — tests** *(merged, PR #28)* | 98 new (1358 total); five merged assertions re-aimed and strengthened after the provider interface grew, none weakened. 54/54 mutations caught; Slice 7A's 42/42 preserved. ADR-025's failure-semantics wording was corrected by docs-only PR #29 (`234dabf`) before the merge, not during implementation. |
+| **Post-9A — ADR-028 recorded** *(merged, PR #48, `780139d`)* | Early activation of live job sources and live Gemini, D1–D22. Hybrid catalogue: the 40 curated jobs stay as the structured tier beside live sources; Greenhouse, Lever and Ashby public boards as the direction; Adzuna deferred pending a legal/ToS decision; no scraping. **Leaves open OD-1..OD-7** (OD-6 since resolved by ADR-030). |
+| **Post-9A — live HTTP adapter infrastructure** *(merged, PR #49, `f5ade5f`)* | `LiveHTTPAdapter` — retries, timeouts, pagination hooks, in-process rate limiting, sanitized errors; no concrete subclass at merge. Fixed a real leak path: httpx logs full request URLs at INFO on its own logger. |
+| **Post-9A — ADR-029 and `JobType.UNKNOWN`** *(merged, PR #50 `492b646`, PR #51 `e9f34e9`)* | `UNKNOWN` means only "the source did not state the employment type"; never inferred, never a wildcard, rejected as a candidate preference. Exact known-type filters preserved. Migration `c4f1a8b92d63` widens the CHECK; its downgrade refuses while any `UNKNOWN` row exists. |
+| **Post-9A — Greenhouse adapter** *(merged, PR #52, `3c2becd`)* | First concrete `LiveHTTPAdapter`; board-scoped identity `"{board_token}:{job_post_id}"`; non-authoritative; zero tokens means zero requests. **Not wired into any CLI or ingestion entry point.** |
+| **Post-9A — privacy-marker flake** *(merged, PR #53, `80bf05f`)* | Numeric privacy markers now match only as whole numbers, so timestamps and unrounded floats no longer produce false leaks (~1 in 1500 runs). The fixed sweep is in `tests/test_production_configuration.py`, the same file as the test that failed unexplained in 9A-6 — a plausible cause, **not an established one**; PR #53 does not claim it. See Next actions item 3. |
+| **Post-9A — live-job disclosure fix** *(merged, PR #54, `85d574d`)* | A job with empty structured requirements and a non-empty **description** no longer reads as having no requirements: the summary discloses that the description was not evaluated (ADR-017 R-4, ADR-030 OD-9). |
+| **Post-9A — ADR-030 and its amendments** *(merged, PR #55 `3d2adf2`, #56 `ab60346`, #57 `9290bd6`)* | Verified job-requirement extraction, D1–D27: provenance (`SOURCE_STATED` vs `PROSE_DERIVED`), not technology, decides authority; a prose-derived requirement can never produce `NOT_ELIGIBLE`; eight-condition evidence contract; separate storage; ingestion-time only. #56 adds ADR-028 D9a/D19a and the ADR-017 amendment; #57 records owner rulings OD-11..OD-13 (D7a `MEDIUM` confidence, D20a R-COLLISION, D4a derived failure does not close the AI stage). |
+| **Post-9A — ADR-030 Steps 3–5** *(merged, PRs #58–#62)* | #58 (`cfce34d`) extraction contract types + pure evidence verifier · #59 (`7639959`) `extracted_requirements` model, migration `e7b4c0d21a95` · #60 (`546f5f3`) deterministic extractors for CGPA+scale, graduation window, backlogs · #61 (`010e6bb`) derivation orchestration from ingestion, **guarded by `extraction_enabled` (default `False`)** · #62 (`13c7760`, merged before #61) ACTIVE-only uniqueness, migration `d5c2e9a1f7b4`. |
+| **Post-9A — ADR-030 Step 6 PR A** *(merged, PR #63, `bedda25`)* | `RequirementResult` gains `provenance` (default `SOURCE_STATED`) and `evidence`; `RequirementProvenance` moved into `app/schemas/eligibility.py` to break an import cycle. OpenAPI components 58 → 59. 13/13 mutations. |
+| **Post-9A — ADR-030 Step 6 PR B** *(merged, PR #64, `3f318a6`)* | Amended D4 precedence in `app/services/eligibility_engine.py`: only a `SOURCE_STATED` deterministic `FAIL` reaches `NOT_ELIGIBLE`; a `PROSE_DERIVED` `FAIL` is `NEEDS_REVIEW`; an all-`PASS` with any derived entry is `LIKELY_ELIGIBLE`. D4a pinned by test (commit `c8acf43`): a derived failure leaves the AI stage reachable. One reachable `LIKELY_ELIGIBLE` summary reworded; verdicts unchanged in production. 15/15 mutations. |
+| **Post-9A — test database isolation** *(merged, PR #65, `319245a`)* | See § Test database isolation below. 2427 tests on merge. |
 
 ## Partial
 
 | Item | State |
 |---|---|
 | Skill alias map (`app/services/candidate_normalizer.py`) | A deliberate **seed** of ~60 common variants, not an ontology. Extend it as real resumes reveal real variants. Unknown skills pass through with their casing intact. |
-| Operational database | Foundation only — engine, session factory, `Base`. No models, no migrations. First table is the job catalogue in Week 3. |
+| Operational database | *(Corrected 2026-10-27 — the original Week 1 entry said "foundation only, no models, no migrations".)* Three operational tables — `jobs`, `ingestion_state`, `extracted_requirements` — over six migrations, head `d5c2e9a1f7b4`. Still no candidate, application or evaluation table (INV-1). |
+| **Verified job-requirement extraction** (ADR-030) | Steps 1–5 merged and Step 6 PR A/B merged; PR C #66 open. Rows are derived only when `extraction_enabled` is true (default `False`), and **nothing reads them into eligibility yet**: the engine boundary is PR C, and the router/service wiring is blocked on OPEN-4. Steps 7–10 (provider operation + mock, Gemini migration, fixture corpus, live enablement) not started. |
+| **Live job sources** (ADR-028) | `LiveHTTPAdapter` and `GreenhouseAdapter` exist and are tested offline; no source is wired into ingestion, no refresh cadence or stale-job closure exists (ADR-028 OD-1, OD-2 open). Lever, Ashby not built. |
 | `get_db()` dependency | Written and exercised by no endpoint. Week 1 and 2 endpoints are stateless by design; it exists so Week 3 has a session source. |
 | **Jobs API trigger for ingestion** | `POST /api/v1/jobs/ingest` is in dossier §11 but **not** in the approved API scope: an unauthenticated route that writes the catalogue is an abuse surface. Deferred, not dropped (C-25, ADR-023 §11, ADR-024 §1). **PR 6B supplies the local trigger instead:** `python -m app.cli seed-catalogue`. |
 | **Gemini provider** | Implemented and fully tested through `httpx.MockTransport`, but **never executed against the live Gemini service** — no API key exists in this environment and the suite must run without one. The default model identifier is a configured default, not a verified one (ADR-013 § Unverified). First live use is an outstanding integration step. |
@@ -133,6 +147,9 @@
 | Caching, AI cost logging | 8 | **COMPLETE** — PR #34 (8A cost/usage accounting) + PR #35 (8B corpus cache) + PR #36 (8C operational logs), Checkpoint 8 (ADR-026). **Cost coverage excludes the generation path, by design (D8); live Gemini application generation was NOT implemented and remains deferred.** |
 | Documentation and local production readiness | 9A | **COMPLETE** — Checkpoint 9A (`95a1187`); seven slices merged or verified (ADR-027) |
 | Deployment and sharing (Render/Railway, hosted PostgreSQL, access control) | 9B | **OPTIONAL — NOT STARTED.** Not required for ordinary use; seven owner decisions open (ADR-027) |
+| Live job sources (Greenhouse; Lever, Ashby) | post-9A (ADR-028) | **PARTIAL** — HTTP infrastructure (#49) and Greenhouse adapter (#52) merged; not wired into ingestion; Lever and Ashby not built |
+| `UNKNOWN` employment type | post-9A (ADR-029) | **COMPLETE** — PR #51 |
+| Verified job-requirement extraction | post-9A (ADR-030) | **PARTIAL, DISABLED** — Steps 1–5 and Step 6 PR A/B merged; PR C #66 open; wiring blocked on OPEN-4; Steps 7–10 not started |
 
 **Week 6 is the declared safe stopping point** — at that line the system is complete and
 demoable. Weeks 7–10 are enhancement.
@@ -141,10 +158,60 @@ demoable. Weeks 7–10 are enhancement.
 
 ## Next approved phase
 
-**None. Week 9B — Deployment and Sharing — is OPTIONAL, owner-triggered and NOT started.** It is
-not required for ordinary use of EligiCore and may never be performed. Week 6 remains the dossier's
-declared safe stopping point (§15). **Nothing is deployed: there is no hosted instance, no public
-URL and no Checkpoint 9.**
+**ADR-030's implementation sequence, which is approved step by step.** Step 6 PR C (#66) is open;
+the Step 6 wiring PR **may not start until the owner rules on OPEN-4**; Steps 7–10 are not started.
+*(As at Checkpoint 9A this section read "None"; that stopped being true when ADR-028 was accepted
+on 2026-09-30.)* **Week 9B — Deployment and Sharing — is still OPTIONAL, owner-triggered and NOT
+started.** It is not required for ordinary use of EligiCore and may never be performed. Week 6
+remains the dossier's declared safe stopping point (§15). **Nothing is deployed: there is no hosted
+instance, no public URL and no Checkpoint 9.**
+
+### Post-Checkpoint 9A — early activation (ADR-028 / ADR-029 / ADR-030) · IN PROGRESS, no checkpoint
+
+Verified live on 2026-10-27: PRs #48–#65 are **merged** (GitHub REST `merged: true`); PR #66 is
+**open**, mergeable, CI green. `main` is `319245a` (PR #65 merge) with CI green on that commit.
+
+**Why this work exists.** The first live Greenhouse fetch (2026-10-02) returned seven jobs with
+3–6 KB descriptions and **0/7** structured criteria. ADR-017 rule 1 then answered `ELIGIBLE` for a
+candidate the description plainly excluded. PR #54 made that honest by disclosure; ADR-030 is the
+route to evaluating it.
+
+| Stage | PRs | State |
+|---|---|---|
+| ADR-028 · live HTTP infrastructure | #48, #49 | Merged |
+| ADR-029 · `JobType.UNKNOWN` · Greenhouse adapter | #50, #51, #52 | Merged |
+| Privacy-marker flake · live-job description disclosure | #53, #54 | Merged |
+| ADR-030 · downstream amendments (ADR-028 D9a/D19a, ADR-017) · Phase 1 owner rulings | #55, #56, #57 | Merged |
+| ADR-030 Steps 3–5 — verifier · storage · extractors · orchestration · ACTIVE-only uniqueness | #58, #59, #60, #61, #62 | Merged |
+| **Step 6 PR A** — provenance and evidence on `RequirementResult` | #63 | Merged |
+| **Step 6 PR B** — amended D4 precedence; D4a regression test (`c8acf43`) added before merge | #64 | Merged |
+| **Step 6 PR C** — D20 engine boundary (`derived=` parameter, typed `VerifiedDerivedRequirement` input) + D20a R-COLLISION | #66 | **Open** |
+| Step 6 wiring — load ACTIVE derived rows and pass them in | — | **Blocked on OPEN-4** |
+| Steps 7–10 — provider operation + mock · Gemini → `gemini-3.8-flash` · fixture corpus · enable on live Greenhouse | — | **Not started** |
+
+**Production behaviour today.** Extraction is **disabled** (`extraction_enabled: bool = False`,
+`app/config.py`), no live source is wired into ingestion, and nothing supplies derived requirements
+to the engine — so every verdict a running instance can return is the same as before ADR-030,
+except one reworded `LIKELY_ELIGIBLE` summary (PR #64) and the description disclosure (PR #54).
+
+### Test database isolation (PR #65)
+
+**What it guards against.** `Settings.database_url` defaults to `sqlite:///./eligicore.db`,
+**relative to the working directory**, and `app.database` builds its engine at import time. Three
+privacy tests inspected that module-level engine, so running `pytest` from a checkout holding a
+developer database **opened the developer database**. No write path was found, but the connection
+alone broke the rule, and the checks were weak (they inspected an empty file on a fresh checkout).
+
+**What it does.** `tests/conftest.py` forces `ELIGICORE_DATABASE_URL` to a test-owned SQLite file
+in a fresh temp directory before `app` is imported (environment outranks `.env`); the session
+**refuses to start** if the engine resolves anywhere else, and **fails** if `eligicore.db` or a
+sidecar beside the repository or the working directory is created or changed. The three privacy
+tests now inspect the database `get_db` serves and assert an allowlist. Four tests in
+`tests/test_database_isolation.py`.
+
+**Rule that stands regardless of the guard: never run the test suite from `E:/EligiCore`** (the
+main checkout, which holds the developer database). Run it from a worktree. Never connect to
+`E:/EligiCore/eligicore.db` from a session.
 
 ### Week 9A — Local production readiness · COMPLETE (Checkpoint 9A)
 
@@ -298,7 +365,11 @@ stage (PR #11, ADR-019) are merged and verified as **Checkpoint 4**.
 
 ## Blockers
 
-**None open.**
+| # | Blocker | Blocks | Since |
+|---|---|---|---|
+| 3 | **OPEN-4 — owner decision.** Must `POST /api/v1/recommendations` receive the same derived requirements as `POST /api/v1/eligibility/check`? ADR-022 §1/§5 guarantee the two endpoints return identical verdicts; ADR-030 lists recommendation behaviour as unchanged and a non-goal. Both cannot hold once derived requirements reach the engine. | ADR-030 Step 6 wiring (router/service loading of ACTIVE derived rows). Not PR C #66, which touches no router or service. | Raised at the Step 6 design gate; recorded in PRs #63–#66 |
+
+*(At Checkpoint 9A this section read "None open".)*
 
 ## Resolved blockers
 
@@ -376,6 +447,19 @@ status" string still reads *"Weeks 1–6 of a 10-week build are complete."* whil
 here. This is deliberate: two merged tests pin that sentence and reject Week 7-era wording, so
 correcting it touches application code and is out of scope for a documentation-only checkpoint
 record. It is the same handling C-32 received at Checkpoint 6, and is listed under Next actions.
+*(Superseded: PR #39 corrected the sentence to "Weeks 1–8 of a 10-week build are complete." —
+see Next actions item 2.)*
+
+### Open owner decisions (2026-10-27)
+
+None of these may be decided implicitly by an implementation PR.
+
+| Decision | Where | What is open |
+|---|---|---|
+| **OPEN-4** | ADR-022 §1/§5 vs ADR-030 Non-goals | Whether recommendations receive the same derived requirements as eligibility check. **Blocks Step 6 wiring** (Blockers #3). This is a genuine conflict between two merged ADRs, surfaced per `AGENTOS.md`, not resolved here. |
+| **Unreachable `without backlogs` verifier pattern** | `app/services/requirement_verifier.py`; pinned in `tests/test_requirement_extractors.py` | The verifier's zero-backlog pattern has a `without` alternative that cannot fire (it consumes its own whitespace before a mandatory `\s+`, so it needs a double space that `collapse_whitespace` removes). The extractor deliberately does not recognise *"without backlogs"*; a test pins the current behaviour so a verifier fix turns it red. Whether and how to fix the verifier needs its own review. |
+| **ADR-028 OD-1..OD-5, OD-7** | ADR-028 § Open decisions | Stale-job threshold and closure (OD-1) · refresh cadence (OD-2) · quota persistence (OD-3) · live Gemini application generation and its cost accounting (OD-4) · authenticated ingestion endpoint (OD-5) · Adzuna licensing (OD-7). **OD-6 is resolved by ADR-030.** |
+| **Week 9B's seven** | ADR-027 | Render vs Railway · hosted PostgreSQL · rate limiting · deployed AI provider · hosted catalogue seeding · `/docs` exposure · shared-instance access control. |
 
 
 ---
@@ -386,6 +470,10 @@ Full index in `context/decisions.md`.
 
 | ADR | Title | Date |
 |---|---|---|
+| ADR-030 | Verified job requirement extraction (D1–D27, D10a, D23a; amended 2026-10-03 with OD-11..OD-13, D7a, D20a, D4a; resolves ADR-028 OD-6) | 2026-10-02 |
+| ADR-029 | Explicit unknown employment type (D1–D16) | 2026-09-30 |
+| ADR-028 | Early activation of live job sources and live Gemini (D1–D22; amended with D9a, D19a) | 2026-09-30 |
+| ADR-027 | Week 9 local-first deployment model | 2026-09-24 |
 | ADR-026 | Week 8 refinement, caching and cost logging (W8-A..W8-H; partially supersedes ADR-020 §5) | 2026-09-23 |
 | ADR-025 | Week 7 application preparation and truthfulness validation (C-3, C-35..C-40, A-53..A-70) | 2026-09-20 |
 | ADR-024 | Week 6 MVP scope: local setup, curated catalogue, full-flow test (C-30..C-34) | 2026-09-20 |
@@ -488,9 +576,27 @@ main
   ├── 229acc1  PR #41 — 9A-3 production config  ·  88c884b  PR #42 — 9A-4 secrets
   ├── 8cd6ad8  PR #43 — 9A-5 privacy and logging
   |
-  └── 95a1187  Checkpoint 9A — Week 9A Local Production Readiness  <- current checkpoint anchor
-                    ↑  PR #44 (feature/week-9a7-documentation, 2 commits)
+  ├── 95a1187  Checkpoint 9A — Week 9A Local Production Readiness  <- current checkpoint anchor
+  |                 ↑  PR #44 (feature/week-9a7-documentation, 2 commits)
+  |
+  ├── bcd36cc · c10daee · e5a2f6e  PR #45–#47 — docs-only state records
+  |
+  ├── 780139d  PR #48 — ADR-028          ·  f5ade5f  PR #49 — live HTTP adapter
+  ├── 492b646  PR #50 — ADR-029          ·  e9f34e9  PR #51 — JobType.UNKNOWN (migration c4f1a8b92d63)
+  ├── 3c2becd  PR #52 — Greenhouse       ·  80bf05f  PR #53 — privacy-marker flake
+  ├── 85d574d  PR #54 — description disclosure
+  ├── 3d2adf2 · ab60346 · 9290bd6  PR #55–#57 — ADR-030 and its amendments
+  ├── cfce34d  PR #58 — verifier         ·  7639959  PR #59 — storage (migration e7b4c0d21a95)
+  ├── 546f5f3  PR #60 — extractors       ·  13c7760  PR #62 — ACTIVE-only uniqueness (migration d5c2e9a1f7b4)
+  ├── 010e6bb  PR #61 — derivation orchestration
+  ├── bedda25  PR #63 — Step 6 PR A      ·  3f318a6  PR #64 — Step 6 PR B
+  |
+  └── 319245a  PR #65 — test database isolation   <- main, 2026-10-27 (NOT a checkpoint)
 ```
+
+**No checkpoint has been recorded since 9A.** Everything after `95a1187` above is merged and
+CI-verified per PR but has not been through a checkpoint verification, and `main` now differs from
+the 9A anchor in product code and schema, not only in documentation.
 
 Checkpoint 0 is the single commit `e8c68b7` — the state of `main` at the end of Phase 0 — not the
 two-commit range that built it. Each checkpoint is declared stable only after the merged `main`
@@ -510,7 +616,35 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
 
 ## Next actions
 
-1. **Nothing is pending. Week 9B is optional.** Week 9A is complete and recorded as
+**Current (2026-10-27) — ADR-030:**
+
+- **A. PR #66 (Step 6 PR C) is open** — CI green, mergeable, awaiting the owner. Record its outcome
+  here in its own docs PR once it is merged or closed.
+- **B. Step 6 wiring is blocked on OPEN-4** (Blockers #3). Do not start it, and do not let PR C or
+  any other PR settle OPEN-4 by implication.
+- **C. Steps 7–10 are not started.** Each needs explicit approval; ADR-030's go conditions before
+  Step 8 still apply. **Extraction stays disabled** (`extraction_enabled = False`) until Step 10.
+- **D. Owner decisions** — see § Open owner decisions: OPEN-4, the unreachable `without backlogs`
+  verifier pattern, ADR-028 OD-1..OD-5/OD-7, and Week 9B's seven.
+
+### Known debt (2026-10-27)
+
+| Item | Detail | Belongs with |
+|---|---|---|
+| **No re-extraction / backfill CLI** | ADR-030 D22 requires an explicit operation for extractor- or model-version changes, following the `python -m app.cli <command>` convention. None exists; ordinary ingestion only derives for new or changed descriptions. | ADR-028's refresh/CLI slice |
+| **`ELIGICORE_EXTRACTION_ENABLED` missing from `.env.example`** | The setting exists in `app/config.py` but is undocumented in the example file. | A small config-docs PR |
+| **No record of zero-yield derivation attempts** | Only promoted requirements are stored, so a job that was derived and yielded nothing is indistinguishable from one never derived. Recording it needs a schema change. | Its own design decision |
+| **ADR-017 C-13 cross-reference pointer** | ADR-017's C-13 section still says any deterministic failure closes the AI stage; D4a (ADR-017's own amendment) narrows that to `SOURCE_STATED`. The amendment notes the pointer under C-13 belongs to a separate documentation gate. | A docs-only ADR PR ("PR E") |
+| **`context/decisions.md` index** | Does not list ADR-028, ADR-029 or ADR-030. | A docs-only PR |
+| **For the wiring PR** | `ENGINE_VERSION` (still `"2"`) must be bumped once verdicts can differ · `app/routers/eligibility.py`'s endpoint prose that enumerates the precedence · `RequirementResult.confidence`'s OpenAPI description ("Deterministic PASS and FAIL are HIGH"), which D7a makes incomplete for derived entries. | Step 6 wiring, after OPEN-4 |
+| **Configured Gemini model is dead** | `gemini_model` defaults to `gemini-2.0-flash`, shut down 2026-06-01 (ADR-028 D19a). Harmless while the provider default is `mock`. | ADR-030 Step 8 |
+
+### Carried forward from Checkpoint 9A
+
+Items 1–7 below are the 9A record, kept as written except where marked.
+
+1. **Nothing is pending. Week 9B is optional.** *(Superseded 2026-10-27 — see items A–D above.)*
+   Week 9A is complete and recorded as
    Checkpoint 9A (`95a1187`). **Week 9B — Deployment and Sharing — is not required for ordinary
    use**, begins only when the owner decides to share EligiCore, and has seven open owner
    decisions in front of it (ADR-027). No phase rolls into the next automatically.
@@ -521,7 +655,8 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
    once during Week 9A-6 and has passed in every run since, but its assertion text was not
    captured. The cause is unknown; the subsequent green runs do not establish that it was benign.
    Investigate if it recurs, and capture pytest output to a file so the next occurrence is
-   diagnosable.
+   diagnosable. *(2026-10-27: PR #53 fixed a ~1-in-1500 false-positive in the privacy-marker
+   sweep in the same file — a plausible cause, not a confirmed one. The item stays open.)*
 4. Before relying on live AI: exercise Gemini's `assess_field_relatedness` (and
    `extract_resume`) against the real service once, and confirm the model identifier. Both now
    carry cost and usage accounting, so a live call would also be the first real measurement of it.

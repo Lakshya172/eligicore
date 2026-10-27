@@ -405,6 +405,18 @@ membership does not.
 **What to do:** assert group *membership* against curated `source_job_id`s, and assert ordering
 separately on scores and ranks. Only compare positions where the score is unique.
 
+### D-35 · `pytest` from the main checkout opened the developer database
+`Settings.database_url` defaults to `sqlite:///./eligicore.db`, relative to the working
+directory, and `app.database` builds its engine at import time. Three privacy tests inspected
+that engine, so a run from `E:/EligiCore` connected to the developer's `eligicore.db`; from a fresh
+worktree it left a 0-byte file and the checks inspected an empty database. No write path was
+found, but the connection alone broke the rule.
+**What to do:** PR #65 now forces a test-owned database in `tests/conftest.py`, refuses to start
+if the engine resolves elsewhere, and fails the session if a root `eligicore.db*` is created or
+changed. Still never run the suite from `E:/EligiCore` — use a worktree — and never import
+`app.database` from a test helper before the conftest has run. Any new test needing the database
+inspects the one `get_db` serves (`application_database_tables()`), never the module engine.
+
 ---
 
 ## Lessons
