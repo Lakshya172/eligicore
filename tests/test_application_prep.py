@@ -77,6 +77,7 @@ from app.services.application_prep import (
 )
 from app.services.truthfulness_validator import VALIDATOR_VERSION
 from tests.conftest import ALLOWED_OPERATIONAL_TABLES
+from tests.privacy_markers import contains_marker
 
 PREPARE = "/api/v1/applications/prepare"
 
@@ -1242,7 +1243,7 @@ def test_preparation_writes_nothing_and_logs_no_content(
 
     logged = caplog.text + "\n".join(str(record.args) for record in caplog.records)
     for marker in ALL_MARKERS:
-        assert marker not in logged, marker
+        assert not contains_marker(logged, marker), marker
     for content in (
         "Dear Hiring Team", "Campus Ledger", "Advanced Kubernetes Operations", COMPANY_NAME,
         "Why do you want this role?",

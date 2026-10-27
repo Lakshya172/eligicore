@@ -34,6 +34,7 @@ from app.models.job import Job, JobStatus
 from app.schemas.candidate import JobType
 from app.schemas.tracker import MAX_TRACKER_ROWS
 from tests.conftest import ALLOWED_OPERATIONAL_TABLES
+from tests.privacy_markers import contains_marker
 
 URL = "/api/v1/applications/export"
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -419,7 +420,7 @@ def test_only_a_counts_line_is_logged(server: Server, caplog: pytest.LogCaptureF
     assert response.status_code == 200
     logged = caplog.text + "\n".join(str(record.args) for record in caplog.records)
     for marker in MARKERS + [str(SCORE), "2026-11-15"]:
-        assert marker not in logged, marker
+        assert not contains_marker(logged, marker), marker
     lines = [r.getMessage() for r in caplog.records if r.name == "eligicore.tracker_export"]
     assert len(lines) == 1
     assert re.fullmatch(

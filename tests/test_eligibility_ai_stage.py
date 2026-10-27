@@ -44,6 +44,7 @@ from app.services.eligibility_ai import (
 )
 from app.services.eligibility_engine import evaluate_requirements
 from tests.conftest import ALLOWED_OPERATIONAL_TABLES
+from tests.privacy_markers import contains_marker
 from tests.test_eligibility_endpoint import CHECK_URL, Catalogue, catalogue  # noqa: F401
 from tests.test_eligibility_engine import edu, make_job, make_profile
 
@@ -557,8 +558,26 @@ async def test_ai_inputs_prompts_and_responses_are_not_logged(caplog: pytest.Log
     assert reason in field_entry(results["a"]).note  # returned to the caller...
     logged = caplog.text + "\n".join(str(r.args) for r in caplog.records)
     for secret in MARKERS + (reason, "FIELD-LOG-MARKER-2d", "ALLOWED-FIELD-LOG-MARKER", "RELATED"):
-        assert secret not in logged, f"leaked into logs: {secret}"  # ...never logged
+        assert not contains_marker(logged, secret), f"leaked into logs: {secret}"  # ...never logged
     assert "ai_assessments=1 ai_unavailable=0" in caplog.text
+
+
+def test_a_timing_float_in_the_logged_args_is_not_a_year_leak() -> None:
+    """The collision that turned CI red on main (run 40530305768), pinned so it cannot return.
+
+    The ``ai_call`` record's args end in an unrounded duration (rendered as ``%.1f``, so the
+    log line itself was clean), and that float contained ``2027``. The args are rebuilt from
+    the call site around the float the run printed, and asserted to still contain the marker as a
+    substring first, so this cannot pass by the sample having lost the collision.
+    """
+    logged_args = ("('mock', 'mock-deterministic-v1', 1, 'prompt_tokens=10 completion_tokens=12 "
+                   "total_tokens=22 cost_micros=unknown', 0.02027799999382296)")
+    assert str(YEAR) in logged_args, "the colliding duration no longer contains the marker"
+    assert [m for m in MARKERS if contains_marker(logged_args, m)] == []
+
+    # The year and the grade are still caught wherever they appear as a value.
+    for leak in (f"grad_year={YEAR}", f"({YEAR},)", f"{CGPA} (SCALE_10)", f"'cgpa': {CGPA}}}"):
+        assert [m for m in MARKERS if contains_marker(leak, m)] != [], leak
 
 
 def _override(provider: AIProvider) -> None:
