@@ -16,22 +16,28 @@ digit run is eventually a substring of one. That flake has been seen twice:
   ``test_eligibility_ai_stage.py::test_ai_inputs_prompts_and_responses_are_not_logged``.
 
 Making the marker longer does not help. This module applies the rule PR #53 established: a
-numeric marker counts only where it is the whole number, so it is not preceded by a digit or
-``.`` and not followed by a digit. A real leak renders the value as a value (``cgpa=8.63``,
-``"grad_year": 2027``, ``(8.63,)``, ``... is 2027.``) and never with a digit against it, so the
-assertion keeps its full strength. A trailing ``.`` still counts, because prose ends that way.
+numeric marker counts only where it is the whole number. The haystack is read as the numbers
+it is written with (digits, an optional fraction, an optional exponent, each taken whole), and
+the marker is a leak where one of them has the marker's value. So ``cgpa=8.63``, ``(8.63,)``,
+``8.630``, ``... is 2027.``, ``2027-06`` and ``2027.0`` are leaks, while ``18.63``, ``8.631``,
+``0.0202779…``, a ``2027.45`` ms duration and ``8.63e-05`` are other numbers, and are not. A
+character check either side of the marker cannot tell those apart; comparing values can.
 """
 
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 
 #: A marker made only of digits and dots is matched as a whole number, not as a substring.
 PURELY_NUMERIC = re.compile(r"[0-9.]+\Z")
+#: One whole number as a log writes it, taken at its longest: ``8``, ``8.63``, ``8.63e-05``.
+NUMBER = re.compile(r"\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
 
 
 def contains_marker(haystack: str, marker: str) -> bool:
     """Whether `marker` appears in `haystack` as a marker, not as part of a longer number."""
     if PURELY_NUMERIC.match(marker):
-        return re.search(rf"(?<![0-9.]){re.escape(marker)}(?!\d)", haystack) is not None
+        value = Decimal(marker)
+        return any(Decimal(number) == value for number in NUMBER.findall(haystack))
     return marker in haystack
