@@ -24,6 +24,7 @@ figure only ever appears for it if an operator deliberately prices ``mock`` (ADR
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 
 from app.ai.errors import (
     AIError,
@@ -42,6 +43,7 @@ from app.schemas.application import (
 )
 from app.schemas.candidate import Confidence, GradeScale
 from app.schemas.eligibility import FieldRelatedness, FieldRelatednessAssessment
+from app.schemas.extraction import ExtractionProposal
 from app.schemas.resume import (
     ExtractedEducation,
     ResumeExtraction,
@@ -110,8 +112,12 @@ class MockAIProvider(AIProvider):
     would hand real users a fabricated ``LIKELY_ELIGIBLE`` from an unconfigured deployment
     (ADR-019).
 
+    **Job-requirement extraction is silent by default** (ADR-030 D14). Unless a test pins
+    proposals, the mock extracts nothing — so an unconfigured deployment can never fabricate a
+    requirement, and behaves exactly as it did before the operation existed.
+
     Args:
-        fail_with: Raise this error from either method. Lets tests exercise provider failure
+        fail_with: Raise this error from any method. Lets tests exercise provider failure
             handling without a live provider.
         return_extraction: Return this exact extraction, bypassing pattern matching. Lets a
             test pin the AI's output precisely.
@@ -119,6 +125,9 @@ class MockAIProvider(AIProvider):
             simulating a reply that failed schema validation.
         return_relatedness: Return this exact field-relatedness assessment instead of the
             conservative default.
+        return_job_requirements: Return these exact proposals from
+            :meth:`extract_job_requirements` instead of none. Lets a test hand the verifier
+            proposals — including ones a real provider should never produce.
         return_draft: Return this exact application draft, bypassing composition. Lets a test
             pin provider output precisely — including output a real provider should never
             produce.
@@ -143,6 +152,7 @@ class MockAIProvider(AIProvider):
         return_extraction: ResumeExtraction | None = None,
         raise_invalid_response: bool = False,
         return_relatedness: FieldRelatednessAssessment | None = None,
+        return_job_requirements: Sequence[ExtractionProposal] | None = None,
         return_draft: ApplicationDraft | None = None,
         fabricate: str | None = None,
         over_length: bool = False,
@@ -153,6 +163,9 @@ class MockAIProvider(AIProvider):
         self._return_extraction = return_extraction
         self._raise_invalid_response = raise_invalid_response
         self._return_relatedness = return_relatedness
+        self._return_job_requirements = (
+            None if return_job_requirements is None else tuple(return_job_requirements)
+        )
         self._return_draft = return_draft
         self._fabricate = fabricate
         self._over_length = over_length
@@ -167,6 +180,11 @@ class MockAIProvider(AIProvider):
         self.relatedness_call_count = 0
         #: Number of permitted fields per relatedness call — counts, never the strings.
         self.received_allowed_field_counts: list[int] = []
+        #: Literal count of job-requirement extraction calls. The zero-call tests assert on it
+        #: to prove no ingestion or evaluation path reaches the operation (ADR-030 D14, D21).
+        self.job_requirement_call_count = 0
+        #: Length of each description it was asked to read — never the text.
+        self.received_description_lengths: list[int] = []
         #: Literal count of application-generation calls. The orchestration contract is exactly
         #: one call per request, and a test asserts it (ADR-025 § Orchestration).
         self.generation_call_count = 0
@@ -230,6 +248,29 @@ class MockAIProvider(AIProvider):
             confidence=Confidence.LOW,
             reason="The mock provider makes no relatedness judgement unless one is configured.",
         )
+
+    async def extract_job_requirements(
+        self, description: str, *, usage: UsageSink | None = None
+    ) -> list[ExtractionProposal]:
+        """Return the pinned proposals, or none at all (ADR-030 D14).
+
+        The description is never inspected: the mock does not extract, it only returns what a
+        test configured. Only the length is recorded.
+        """
+        self.job_requirement_call_count += 1
+        self.received_description_lengths.append(len(description))
+        if self._report_usage:
+            _report(usage, len(description))
+
+        if self._fail_with is not None:
+            raise self._fail_with
+        if self._raise_invalid_response:
+            raise AIResponseInvalidError(
+                "Mock provider returned a response that failed schema validation."
+            )
+        if self._return_job_requirements is not None:
+            return list(self._return_job_requirements)
+        return []
 
     async def generate_application_content(
         self,

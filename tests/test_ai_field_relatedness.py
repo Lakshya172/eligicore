@@ -98,10 +98,15 @@ def test_there_is_no_generic_eligibility_method() -> None:
     ``generate_application_content`` joined it in Slice 7B (ADR-025). It is not an eligibility
     method and cannot become one: it returns an application draft, it is given an
     ``ApplicationEvidence`` projection rather than a profile, and no verdict is derived from it.
+
+    ``extract_job_requirements`` joined it in ADR-030 Step 7 (D13). It is not an eligibility
+    method either: it reads a job description and never sees a candidate, and what it returns
+    are proposals the verifier may discard, never a verdict.
     """
     methods = {name for name in dir(AIProvider) if not name.startswith("_")}
     assert methods == {
         "assess_field_relatedness",
+        "extract_job_requirements",
         "extract_resume",
         "generate_application_content",
         "model",
