@@ -195,9 +195,13 @@ route to evaluating it.
 | Steps 7–10 — provider operation + mock · Gemini → `gemini-3.8-flash` · fixture corpus · enable on live Greenhouse | — | **Not started** |
 
 **Production behaviour today.** Extraction is **disabled** (`extraction_enabled: bool = False`,
-`app/config.py`), no live source is wired into ingestion, and nothing supplies derived requirements
-to the engine — so every verdict a running instance can return is the same as before ADR-030,
-except one reworded `LIKELY_ELIGIBLE` summary (PR #64) and the description disclosure (PR #54).
+`app/config.py`) and no live source is wired into ingestion. The derived-requirement engine
+boundary is merged (PR #66), but no router or service supplies derived requirements, so neither
+`/api/v1/eligibility/check` nor `/api/v1/recommendations` evaluates any. Measured against `main`
+just before ADR-030 (#55), every verdict a running instance can return is unchanged, and the only
+change to a summary is one reworded `LIKELY_ELIGIBLE` sentence on the AI-assisted path (PR #64).
+That baseline already includes PR #54's description disclosure, which predates ADR-030: whenever a
+job's description is non-empty, the summary says the description was not evaluated.
 
 ### Test database isolation (PR #65)
 
@@ -475,7 +479,7 @@ Full index in `context/decisions.md`.
 
 | ADR | Title | Date |
 |---|---|---|
-| ADR-030 | Verified job requirement extraction (D1–D27, D10a, D23a; amended 2026-10-03 with OD-11..OD-13, D7a, D20a, D4a; resolves ADR-028 OD-6) | 2026-10-02 |
+| ADR-030 | Verified job requirement extraction (D1–D27, D10a, D23a; amended 2026-10-03 with OD-11..OD-13, D7a, D20a, D4a; amended 2026-10-27 with D20b / OD-14, PR #68; resolves ADR-028 OD-6) | 2026-10-02 |
 | ADR-029 | Explicit unknown employment type (D1–D16) | 2026-09-30 |
 | ADR-028 | Early activation of live job sources and live Gemini (D1–D22; amended with D9a, D19a) | 2026-09-30 |
 | ADR-027 | Week 9 local-first deployment model | 2026-09-24 |
