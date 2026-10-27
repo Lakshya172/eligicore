@@ -12,10 +12,13 @@ Evaluation order (dossier §12.1, ADR-003, ADR-017):
 
 1. Select the qualification the per-qualification requirements apply to (ADR-018, A-1).
 2. Evaluate **every** stated structured requirement deterministically, so a candidate who
-   fails learns every verified reason rather than just the first (C-13).
-3. If any verified deterministic requirement FAILED, ambiguous requirements are marked
-   ``SKIPPED_AFTER_HARD_FAILURE`` and are never offered to AI. This is the INV-2 guard, and
-   it lives in control flow — :func:`ambiguous_requirements` returns nothing for such a job.
+   fails learns every verified reason rather than just the first (C-13). Verified derived
+   requirements supplied beside the job are evaluated by the same comparisons, once
+   R-COLLISION has removed any whose type the source states (ADR-030 D20, D20a).
+3. If any **source-stated** deterministic requirement FAILED, ambiguous requirements are
+   marked ``SKIPPED_AFTER_HARD_FAILURE`` and are never offered to AI. This is the INV-2
+   guard, and it lives in control flow — :func:`ambiguous_requirements` returns nothing for
+   such a job. A prose-derived failure does not close the stage (ADR-030 D4a).
 4. Compose the final state from the breakdown (:func:`compose_verdict`).
 
 The AI ambiguity stage is deliberately **not** part of this module: it lives in
@@ -32,7 +35,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import Counter
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -53,6 +56,12 @@ from app.schemas.eligibility import (
     RequirementResult,
     RequirementStatus,
     RequirementType,
+)
+from app.schemas.extraction import (
+    GradYearWindowValue,
+    MaxBacklogsValue,
+    MinCgpaValue,
+    VerifiedDerivedRequirement,
 )
 from app.schemas.job import JobRead
 
@@ -218,11 +227,17 @@ def evaluate_min_cgpa(
     """
     if job.min_cgpa is None:
         return None
+    return _compare_min_cgpa(job.min_cgpa, job.min_cgpa_scale, selection)
 
-    stated_scale = (job.min_cgpa_scale or "").strip().upper()
+
+def _compare_min_cgpa(
+    min_cgpa: float, scale: str | None, selection: QualificationSelection
+) -> RequirementResult:
+    """The minimum-CGPA comparison, shared by a source-stated and a derived minimum."""
+    stated_scale = (scale or "").strip().upper()
     kind = RequirementType.MIN_CGPA
     requirement = (
-        f"Minimum CGPA {_format_number(job.min_cgpa)} "
+        f"Minimum CGPA {_format_number(min_cgpa)} "
         f"({stated_scale if stated_scale else 'scale not stated'})"
     )
 
@@ -242,7 +257,7 @@ def evaluate_min_cgpa(
             "interpreted.",
         )
     job_maximum = job_scale.maximum
-    if job_maximum is None or job.min_cgpa > job_maximum:
+    if job_maximum is None or min_cgpa > job_maximum:
         return _result(
             kind, requirement, RequirementStatus.UNKNOWN, ReasonCode.JOB_VALUE_EXCEEDS_SCALE,
             "The job's minimum exceeds the maximum of its own grading scale, so the "
@@ -287,7 +302,7 @@ def evaluate_min_cgpa(
         )
 
     # --- comparison ----------------------------------------------------------------------
-    if entry.cgpa >= job.min_cgpa:
+    if entry.cgpa >= min_cgpa:
         return _result(
             kind, requirement, RequirementStatus.PASS, ReasonCode.MEETS_MINIMUM,
             "The grade meets or exceeds the minimum on the same scale.",
@@ -310,7 +325,16 @@ def evaluate_grad_year_window(
     low, high = job.min_grad_year, job.max_grad_year
     if low is None and high is None:
         return None
+    return _compare_grad_year_window(low, high, selection)
 
+
+def _compare_grad_year_window(
+    low: int | None, high: int | None, selection: QualificationSelection
+) -> RequirementResult:
+    """The graduation-window comparison, shared by a source-stated and a derived window.
+
+    At least one bound must be stated; the callers guarantee it.
+    """
     kind = RequirementType.GRAD_YEAR_WINDOW
     if low is not None and high is not None:
         requirement = f"Graduation year {low}-{high}"
@@ -364,9 +388,13 @@ def evaluate_max_backlogs(
     """
     if job.max_backlogs is None:
         return None
+    return _compare_max_backlogs(job.max_backlogs, profile)
 
+
+def _compare_max_backlogs(limit: int, profile: CandidateProfile) -> RequirementResult:
+    """The backlog comparison, shared by a source-stated and a derived limit."""
     kind = RequirementType.MAX_BACKLOGS
-    requirement = f"Maximum {job.max_backlogs} active backlog(s)"
+    requirement = f"Maximum {limit} active backlog(s)"
 
     if profile.backlogs is None:
         return _result(
@@ -376,7 +404,7 @@ def evaluate_max_backlogs(
         )
 
     candidate_value = str(profile.backlogs)
-    if profile.backlogs <= job.max_backlogs:
+    if profile.backlogs <= limit:
         return _result(
             kind, requirement, RequirementStatus.PASS, ReasonCode.WITHIN_LIMIT,
             "The active backlog count is within the job's limit.",
@@ -760,24 +788,141 @@ def build_summary(
 
 
 # ---------------------------------------------------------------------------------------
+# Derived requirements — the engine boundary (ADR-030 D20, D20a)
+# ---------------------------------------------------------------------------------------
+#
+# Verified derived requirements arrive as a separate, typed collection beside the job.
+# ``JobRead`` is never modified and no derived value is written into a source-owned field,
+# so the engine always knows which requirements the employer published structurally (D20).
+# The caller loads them; the engine stays free of any database or extractor.
+
+#: When the job's source-owned fields state a requirement type (ADR-030 D20a). The same
+#: condition each evaluator above uses to emit a requirement at all, so no new notion of
+#: statedness is introduced. **Presence, not usability**: a minimum CGPA stated without its
+#: scale still states the requirement, and a derived one may not step in for it.
+_SOURCE_STATES: dict[RequirementType, Callable[[JobRead], bool]] = {
+    RequirementType.MIN_CGPA: lambda job: job.min_cgpa is not None,
+    RequirementType.GRAD_YEAR_WINDOW: lambda job: (
+        job.min_grad_year is not None or job.max_grad_year is not None
+    ),
+    RequirementType.MAX_BACKLOGS: lambda job: job.max_backlogs is not None,
+}
+
+
+def effective_derived_requirements(
+    job: JobRead, derived: Iterable[VerifiedDerivedRequirement]
+) -> dict[RequirementType, VerifiedDerivedRequirement]:
+    """The derived requirements that are evaluated, by type — R-COLLISION (ADR-030 D20a).
+
+    Applied while the requirement set is assembled, **before** ADR-017's precedence. A
+    derived requirement whose type the source states is suppressed: it is left out here, so
+    it produces no breakdown entry and reaches no verdict, and it is not modified.
+
+    Raises ``ValueError`` for input the verifier never produces — two requirements of one
+    type, a type that disagrees with its value, or a window with no bound. D20a guarantees at
+    most one requirement per type; choosing between two, or guessing at a malformed one,
+    would be the engine deciding something the verifier and storage exist to decide.
+    """
+    effective: dict[RequirementType, VerifiedDerivedRequirement] = {}
+    seen: set[RequirementType] = set()
+    for requirement in derived:
+        kind = requirement.requirement_type
+        value = requirement.value
+        if kind is not value.requirement_type:
+            raise ValueError(
+                f"derived requirement type {kind.value} disagrees with its "
+                f"{value.requirement_type.value} value"
+            )
+        if kind in seen:
+            raise ValueError(f"more than one derived requirement of type {kind.value}")
+        seen.add(kind)
+        if (
+            isinstance(value, GradYearWindowValue)
+            and value.min_grad_year is None
+            and value.max_grad_year is None
+        ):
+            raise ValueError("a derived graduation-year window must state at least one bound")
+        if not _SOURCE_STATES[kind](job):
+            effective[kind] = requirement
+    return effective
+
+
+def _evaluate_derived(
+    requirement: VerifiedDerivedRequirement,
+    selection: QualificationSelection,
+    profile: CandidateProfile,
+) -> RequirementResult:
+    """Evaluate one effective derived requirement and label it as derived.
+
+    The comparison is the one a source-stated requirement of the same type gets. What makes
+    the entry derived is set here, explicitly, and nowhere else — the ``SOURCE_STATED``
+    default on :class:`RequirementResult` is never relied on.
+    """
+    value = requirement.value
+    if isinstance(value, MinCgpaValue):
+        compared = _compare_min_cgpa(value.min_cgpa, value.min_cgpa_scale.value, selection)
+    elif isinstance(value, GradYearWindowValue):
+        compared = _compare_grad_year_window(
+            value.min_grad_year, value.max_grad_year, selection
+        )
+    elif isinstance(value, MaxBacklogsValue):
+        compared = _compare_max_backlogs(value.max_backlogs, profile)
+    else:  # pragma: no cover - DerivedValue is a closed union of the three above
+        raise TypeError(f"unsupported derived value {type(value).__name__}")
+
+    return RequirementResult.model_validate(
+        {
+            **compared.model_dump(),
+            "provenance": RequirementProvenance.PROSE_DERIVED,
+            "evidence": requirement.evidence_text,
+            # ADR-030 D7a: exact, but against a requirement read from prose, so MEDIUM rather
+            # than HIGH. An UNKNOWN stays LOW. Confidence is only ever lowered.
+            "confidence": (
+                Confidence.LOW
+                if compared.status is RequirementStatus.UNKNOWN
+                else Confidence.MEDIUM
+            ),
+        }
+    )
+
+
+# ---------------------------------------------------------------------------------------
 # Entry points
 # ---------------------------------------------------------------------------------------
 
 
 def evaluate_requirements(
-    profile: CandidateProfile, job: JobRead
+    profile: CandidateProfile,
+    job: JobRead,
+    derived: Iterable[VerifiedDerivedRequirement] = (),
 ) -> list[RequirementResult]:
     """Evaluate every structured requirement the job states, deterministically.
 
     One qualification is selected once and shared by every per-qualification rule, so no
     two requirements can read from different education records. Requirements the job does
     not state are omitted, not reported as passing.
+
+    ``derived`` carries verified requirements read from the job's prose (ADR-030 D20).
+    R-COLLISION decides which are effective; each effective one takes its type's place in
+    the breakdown, so there is at most one entry per type. With none, the result is exactly
+    what it was before this parameter existed.
     """
     selection = select_qualification(profile.education)
+    effective = effective_derived_requirements(job, derived)
+
+    def source_or_derived(
+        kind: RequirementType, source: RequirementResult | None
+    ) -> RequirementResult | None:
+        if kind in effective:
+            return _evaluate_derived(effective[kind], selection, profile)
+        return source
+
     evaluated = [
-        evaluate_min_cgpa(job, selection),
-        evaluate_grad_year_window(job, selection),
-        evaluate_max_backlogs(job, profile),
+        source_or_derived(RequirementType.MIN_CGPA, evaluate_min_cgpa(job, selection)),
+        source_or_derived(
+            RequirementType.GRAD_YEAR_WINDOW, evaluate_grad_year_window(job, selection)
+        ),
+        source_or_derived(RequirementType.MAX_BACKLOGS, evaluate_max_backlogs(job, profile)),
         evaluate_min_degree_level(job, selection),
         evaluate_allowed_fields(job, selection),
     ]
@@ -785,9 +930,13 @@ def evaluate_requirements(
     return _skip_ambiguity_after_hard_failure(results)
 
 
-def evaluate_job(profile: CandidateProfile, job: JobRead) -> JobEligibility:
+def evaluate_job(
+    profile: CandidateProfile,
+    job: JobRead,
+    derived: Iterable[VerifiedDerivedRequirement] = (),
+) -> JobEligibility:
     """Produce the full, explained deterministic verdict for one candidate-job pair."""
-    return assemble_job_eligibility(job, evaluate_requirements(profile, job))
+    return assemble_job_eligibility(job, evaluate_requirements(profile, job, derived))
 
 
 def assemble_job_eligibility(
