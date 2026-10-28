@@ -46,6 +46,7 @@ from app.schemas.application import (
     JobBrief,
 )
 from app.schemas.eligibility import FieldRelatednessAssessment
+from app.schemas.extraction import ExtractionProposal
 from app.schemas.resume import ResumeExtraction
 
 logger = logging.getLogger("eligicore.ai.gemini")
@@ -229,6 +230,32 @@ class GeminiFlashProvider(AIProvider):
                 "Gemini relatedness response failed schema validation "
                 f"({exc.error_count()} error(s))."
             ) from exc
+
+    async def extract_job_requirements(
+        self, description: str, *, usage: UsageSink | None = None
+    ) -> list[ExtractionProposal]:
+        """Not implemented until ADR-030 Step 8. Fails closed and calls nothing.
+
+        **An interface stub, not a Gemini implementation**, for the same reason as
+        :meth:`generate_application_content` below: the interface gained an abstract method
+        and this class must stay concrete, or selecting Gemini would break resume parsing and
+        field relatedness, which do work.
+
+        Step 8 brings the prompt, the injection corpus, the data-block boundary and the
+        ``gemini-3.8-flash`` model (ADR-030 D15, D25). Until then this makes no HTTP request,
+        builds no prompt, uses no key and writes nothing to ``usage``. The description is
+        accepted and dropped: never logged, retained or forwarded.
+
+        Raising :class:`~app.ai.errors.AIProviderUnavailableError` is ADR-030 D26's
+        "extractor unavailable" case: no requirement is produced, and a caller records the
+        derivation as unavailable rather than as a posting without requirements.
+
+        Raises:
+            AIProviderUnavailableError: Always.
+        """
+        raise AIProviderUnavailableError(
+            "Gemini job-requirement extraction is not implemented until ADR-030 Step 8."
+        )
 
     # -- request ------------------------------------------------------------------------
 

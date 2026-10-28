@@ -13,7 +13,12 @@ text, response content, resume text, or any candidate field (INV-4). Input *leng
 number and carries no content. For field relatedness not even the assessment's result is
 logged — it is a statement about one candidate's eligibility.
 
-**Cost accounting covers ``extract_resume`` and ``assess_field_relatedness`` only.**
+**Cost accounting covers ``extract_resume``, ``assess_field_relatedness`` and
+``extract_job_requirements`` only.** The third joined under ADR-030 D13, which refines ADR-026
+D2's original two: job text is public and not candidate content, so the length concern below
+does not apply to it, and extraction is "a counted, logged AI operation". Its log line carries
+the description's length and the number of proposals — never the description, a proposal, its
+value or its evidence (ADR-030 D24).
 ``generate_application_content`` is excluded (ADR-026 D8): ADR-025 bars logging any length
 that could characterize one candidate's content, and a token count is such a length. The
 exclusion is structural rather than conditional — that method is passed no sink, its provider
@@ -47,6 +52,7 @@ from app.schemas.application import (
     JobBrief,
 )
 from app.schemas.eligibility import FieldRelatednessAssessment
+from app.schemas.extraction import ExtractionProposal
 from app.schemas.resume import ResumeExtraction
 
 logger = logging.getLogger("eligicore.ai")
@@ -269,6 +275,58 @@ class AIService:
             (time.perf_counter() - started) * 1000,
         )
         return result
+
+    async def extract_job_requirements(self, description: str) -> list[ExtractionProposal]:
+        """Ask the provider to propose criteria read from one job description (ADR-030 D13).
+
+        Logs provider, model, outcome, the description's **length**, the **number** of
+        proposals, token counts, cost and timing. Never the description, a proposal, its value
+        or its evidence (D24, INV-4).
+
+        **Nothing in production calls this yet.** Extraction is ingestion-time only (D21), and
+        connecting a provider to derivation is a later step with its own approval. Every
+        proposal returned still has to pass the verifier before it can become a requirement.
+
+        Raises:
+            AIError: Construction or provider failure, or a reply that is not a list of
+                validated :class:`~app.schemas.extraction.ExtractionProposal`.
+        """
+        started = time.perf_counter()
+        provider = self._get_provider()
+        # One sink per call, as for the other accounted operations (ADR-026 D3).
+        sink = UsageSink()
+        try:
+            result = await provider.extract_job_requirements(description, usage=sink)
+            if not isinstance(result, list) or not all(
+                isinstance(proposal, ExtractionProposal) for proposal in result
+            ):
+                raise AIResponseInvalidError(
+                    "Provider returned unvalidated job-requirement proposals."
+                )
+        except AIError as exc:
+            logger.warning(
+                "ai_call provider=%s model=%s operation=extract_job_requirements "
+                "outcome=error error_type=%s input_chars=%d %s duration_ms=%.1f",
+                provider.name,
+                provider.model,
+                type(exc).__name__,
+                len(description),
+                self._accounting(provider, sink),
+                (time.perf_counter() - started) * 1000,
+            )
+            raise
+
+        logger.info(
+            "ai_call provider=%s model=%s operation=extract_job_requirements "
+            "outcome=success input_chars=%d proposals=%d %s duration_ms=%.1f",
+            provider.name,
+            provider.model,
+            len(description),
+            len(result),
+            self._accounting(provider, sink),
+            (time.perf_counter() - started) * 1000,
+        )
+        return list(result)
 
 
     async def generate_application_content(

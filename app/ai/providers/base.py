@@ -26,6 +26,7 @@ from app.schemas.application import (
     JobBrief,
 )
 from app.schemas.eligibility import FieldRelatednessAssessment
+from app.schemas.extraction import ExtractionProposal
 from app.schemas.resume import ResumeExtraction
 
 
@@ -107,6 +108,47 @@ class AIProvider(ABC):
         Raises:
             AIConfigurationError, AIProviderUnavailableError, AIProviderRejectedError,
             AIResponseInvalidError: As for :meth:`extract_resume`.
+        """
+
+    @abstractmethod
+    async def extract_job_requirements(
+        self, description: str, *, usage: UsageSink | None = None
+    ) -> list[ExtractionProposal]:
+        """Propose eligibility criteria read out of one job description (ADR-030 D13).
+
+        **The signature is the privacy boundary.** It takes a job's description and nothing
+        else: no candidate identifier, profile, grade, year, backlog count, resume or
+        evaluation has a parameter to travel in, so the exclusion is structural rather than a
+        filter someone must remember (D13, D24). It is deliberately **not**
+        :meth:`extract_resume`, whose input is candidate content that must never be logged;
+        job text must never be routed through it.
+
+        **A proposal asserts nothing.** Every one returned is an input to the verifier, which
+        discards it whole if any of ADR-030 D6's eight conditions fails. Reported strength and
+        confidence are advisory and may only lower trust (D7, D10a). An implementation must
+        not fabricate a criterion, and is contained rather than trusted if it does.
+
+        **No production path calls this yet.** Extraction runs at ingestion time only (D21),
+        and wiring a provider into derivation is a later, separately approved step.
+
+        Args:
+            description: The job's pinned normalized description. Public job text, but
+                third-party and untrusted: a provider passes it as a labelled data block,
+                never as instructions (D25). Never logged.
+            usage: Optional per-call sink for token counts. **Output only**, as for
+                :meth:`extract_resume`. Unlike generation, this operation is cost-accounted:
+                job text is not candidate content (ADR-030 D13, which refines ADR-026 D2).
+
+        Returns:
+            Validated proposals, possibly none. An empty list is an ordinary answer — a
+            description that states no criterion, or a provider that extracts nothing.
+
+        Raises:
+            AIConfigurationError: The provider is not usable as configured.
+            AIProviderUnavailableError: Transport failure, timeout, or a 5xx response. Also
+                raised by a provider whose extraction support is not implemented.
+            AIProviderRejectedError: The provider refused the request.
+            AIResponseInvalidError: The reply could not be validated into the schema.
         """
 
     @abstractmethod
