@@ -31,6 +31,7 @@
 16. Risks and Mitigations
 17. Success Criteria
 18. Future Phases
+18a. Job Source Discovery Strategy *(addendum, 2026-10-28)*
 19. Glossary
 
 ---
@@ -152,6 +153,8 @@ This constraint is stated openly rather than treated as a limitation — it is t
 ### It does not scrape live portals in Phase 1
 
 The initial dataset is manually curated. This de-risks the hardest unsolved part of the problem (legally and technically sound job data acquisition) while everything downstream is built and validated. The adapter architecture means adding real sources later requires no changes to the rest of the system.
+
+*Note, 2026-10-28:* ADR-028 has since moved work on sanctioned public job-board feeds forward; these are documented APIs, not scraping. See §18a for what exists, which is a Greenhouse adapter not yet wired into ingestion, and what is only proposed.
 
 ### It does not include a user interface in Phase 1
 
@@ -459,6 +462,8 @@ Every job source — a curated JSON file, a portal API, a scraper — implements
 - Sources can be enabled or disabled independently
 - The system is testable with a fake source
 - The hardest unsolved problem (real data acquisition) is isolated behind a stable boundary
+
+Which live sources are evaluated, implemented or only proposed, and what freshness they can honestly support, is in §18a.
 
 ---
 
@@ -829,11 +834,248 @@ The tools surveyed evaluate *fit* — a soft, judgment-based question. They do n
 
 **Phase 2 — Frontend.** A web dashboard consuming the existing API without modification. Possibly a browser extension that autofills application forms within the candidate's own session, preserving the no-auto-submit constraint.
 
-**Phase 3 — Live job sources.** Real adapters for portals and ATS platforms, built within Terms of Service constraints. The adapter interface already accommodates this.
+**Phase 3 — Live job sources.** Real adapters for portals and ATS platforms, built within Terms of Service constraints. The adapter interface already accommodates this. *(Part of this has been brought forward by ADR-028. Its current state and the proposed rollout are in §18a.)*
 
 **Phase 4 — Multi-user platform.** Authentication, per-user isolation, notification digests, deadline reminders.
 
 **Phase 5 — Institutional features.** Cohort-level evaluation for placement cells: check an entire batch against a set of openings at once.
+
+---
+
+# 18a. JOB SOURCE DISCOVERY STRATEGY
+
+*Addendum, 2026-10-28. Documentation only. This section changes no milestone, no decision and no code. The decisions it relies on are recorded elsewhere and stay authoritative there:*
+- *ADR-028: live job sources;*
+- *ADR-029: the explicit `UNKNOWN` employment type;*
+- *ADR-030: verified job-requirement extraction.*
+
+*`context/state.md` records the current project state. Where this section proposes something, it says so.*
+
+Every item below carries one of three labels:
+
+| Label | Meaning |
+|---|---|
+| **Implemented and verified** | Exists in the repository and is covered by the offline test suite. **Not** a claim that it has run against a live service. |
+| **Proposed** | A recommendation in this document. Not approved, not built. |
+| **Requires investigation or authorization** | A fact that could not be verified from authoritative documentation, or a step that needs an owner decision before it can happen. |
+
+## 18a.1 What EligiCore promises about job discovery
+
+EligiCore discovers openings **only through source integrations that are supported, authorized and configured**. It does not and cannot find every opening on the internet.
+
+- **Discovery is per employer, not per market.** The public applicant-tracking-system (ATS) feeds chosen as the first live direction (ADR-028 D5) publish one employer's own postings each. They are reached through an identifier that the operator supplies for that employer, such as a Greenhouse board token or a Lever site name. An employer that is not configured, or that does not use a supported ATS, is not covered at all.
+- **Broad, multi-employer search** would need an aggregator such as Adzuna. Its use is not approved (ADR-028 D7, open decision OD-7); see §18a.3 C.
+- **No scraping, by decision.** Generic web scraping, LinkedIn, Internshala, Naukri, Unstop, Indeed, JSearch, SerpApi and Apify-style scraping intermediaries are excluded (ADR-028 D6).
+- **Unchanged:** EligiCore never submits an application (§6). A human applies through the employer's own link.
+
+## 18a.2 Current implementation
+
+The state of `main` as of 2026-10-28, read from the repository:
+
+| Component | Status | What exists |
+|---|---|---|
+| Curated catalogue (`CuratedJobAdapter`) | **Implemented and verified** | The 40-job curated catalogue. Authoritative: the source of truth for its own jobs. The **only** adapter wired into an entry point, `python -m app.cli seed-catalogue`. |
+| Shared live HTTP layer (`LiveHTTPAdapter`, PR #49) | **Implemented and verified** (offline) | Explicit timeout, bounded retries with jittered backoff, an in-process rate limiter, pagination hooks, and sanitized errors that cannot echo a URL or credential. Nothing that runs by default constructs or calls it. |
+| Greenhouse adapter (`GreenhouseAdapter`, PR #52) | **Implemented and verified** (offline, through a mocked transport) | See the detail below the table. **Not wired into any ingestion entry point**, and never run against live Greenhouse by this repository's code or tests. The one recorded live Greenhouse fetch, on 2026-10-02 (`context/state.md`), was a single owner-authorized observation, not an operating integration. |
+| Lever adapter | **Not built** | Named as a direction in ADR-028 D5. |
+| Ashby adapter | **Not built** | Named in ADR-028 D5. Not evaluated in this section. |
+| Adzuna adapter | **Not built, not selected** | ADR-028 D7. It needs a separate legal and Terms-of-Service decision (OD-7). |
+| Normalization (`job_normalizer`) and deduplication (`job_ingestion.find_existing_job`) | **Implemented and verified** | §18a.4 stages 3–4. |
+| Freshness fields | **Implemented and verified**, with the caveats in §18a.5 | `jobs.status`, `jobs.last_verified_at`, and per-source `ingestion_state` history. |
+| Refresh schedule, stale-job closure, assigning `EXPIRED`, a refresh command | **Not implemented, not decided** | OD-2 (cadence), OD-1 and D17 (stale closure), D16 (expiry), ADR-028 PR 6 (refresh command). |
+
+**What the Greenhouse adapter does:**
+- **Requests:** only two public GETs per board, `GET /v1/boards/{token}` and `GET /v1/boards/{token}/jobs?content=true`, and never the application POST.
+- **Authority:** non-authoritative (ADR-028 D14).
+- **Configuration:** board tokens are constructor input only. There is no environment setting and no default token, so a default checkout makes zero requests.
+- **Identity:** `source_job_id` is `board_token:job_post_id` (D11a).
+- **Employment type:** always `UNKNOWN` (ADR-029 D3).
+- **Fields mapped:** title, location name, `absolute_url` and `content`.
+- **Fields deliberately dropped:** `updated_at`, `first_published`, `departments`, `offices`, `metadata` and the internal ids.
+
+## 18a.3 Source evaluation
+
+These facts are taken from each provider's official documentation, retrieved on 2026-10-28. **No external API was called for this evaluation.** Anything the documentation does not state is marked *requires confirmation*.
+
+### A. Greenhouse — public Job Board API
+
+| Topic | Verified from documentation | Requires confirmation |
+|---|---|---|
+| **Access** | Base `https://boards-api.greenhouse.io/v1/`. *"Job Board data is publicly available, so authentication is not required for any GET endpoints."* Only the application POST uses Basic Auth with the employer's API key. | — |
+| **Identifier** | A `board_token`, the *"Job Board URL token"*, scopes every request to one employer's board. | **How an operator discovers a given employer's token.** The documentation gives no lookup procedure; tokens appear in example form only. |
+| **Retrievable** | **Endpoints:** board (organization name), jobs list (`content=true` adds description, departments, offices), single job (`questions=true`, `pay_transparency=true`), offices, departments, sections, education lists. **List fields:** `id`, `internal_job_id`, `title`, `updated_at`, `requisition_id`, `location`, `absolute_url`, `language`, `metadata`. **The single-job response additionally carries** `first_published`, `company_name` and **`application_deadline`**. | Whether every employer populates `application_deadline`. |
+| **Limits** | The documentation states no rate limit, no caching rule and no freshness guarantee. Pagination is documented only for the education endpoints. | **Rate limits and Terms of Use for API consumers**, which the API documentation does not state. ADR-028 D8 requires this confirmation at the adapter's gate. |
+| **Lifecycle signal** | Only that an application requires the job to be *"live and published"*. | **Whether a post missing from a board's listing means it closed.** The documentation does not say, which is why the adapter is non-authoritative. |
+
+**Normalization.** Implemented as described in §18a.2. Two proposals:
+- **Source-reported deadline (*Proposed*).** It is available only from the single-job endpoint, which costs one request per job. Using it needs a rate-limit and ToS decision.
+- **Source timestamps (*Proposed*).** Keeping `updated_at` and `first_published` needs new storage; see §18a.5.
+
+### B. Lever — Postings API
+
+| Topic | Verified from documentation | Requires confirmation |
+|---|---|---|
+| **Access** | Global base `https://api.lever.co/v0/postings/` and EU base `https://api.eu.lever.co/v0/postings/`, HTTPS only. The documented GET examples carry no key; only the application POST (`?key=APIKEY`) is documented as needing one. | That reads are unauthenticated: the documentation implies it but does not say so in words. ADR-028 D5 records it as the basis. Also which base serves a given employer, global or EU. |
+| **Identifier** | A `SITE` path segment. *"Each company currently only has one site (usually your company name with no spaces)."* | How an operator confirms the exact site name for an employer. |
+| **Retrievable** | **Endpoints:** `GET /v0/postings/SITE?skip=X&limit=Y` and `GET /v0/postings/SITE/POSTING-ID`. **Filters:** `location`, `commitment`, `team`, `department`, `level`, `group`. Multiple values are OR'ed and case-sensitive. **Fields:** `id`, `text`, `categories` (location, commitment, team, department, allLocations), `country`, `opening`, `description` / `descriptionPlain`, `descriptionBody`, `lists`, `additional`, `hostedUrl`, `applyUrl`, `workplaceType`, `salaryRange`, `salaryDescription`. | A creation or update timestamp field: none appeared in the documentation retrieved. A deadline field: none documented. |
+| **Limits** | Pagination by `skip` / `limit`, with no default or maximum stated. The only documented rate limit is for application POSTs (over 2 per second returns `429`). No full-text search. | **Rate limits for reads, and Terms of Use for API consumers.** Neither is stated (ADR-028 D8). |
+| **Lifecycle signal** | *"all job postings in the `published` state are publicly viewable"*; all others are hidden from the API. | Whether a posting's disappearance always means it was unpublished. |
+
+**Normalization (*Proposed*):**
+- **Identity:** `source="lever"`, with `source_job_id` scoped as the source scopes it, per D11a. Whether Lever posting ids are global, or must be qualified with the site, requires confirmation.
+- **Fields:** `text` becomes the role title, `categories.location` the location, `descriptionPlain` the description and `hostedUrl` the apply link.
+- **Employment type:** `categories.commitment` is an employer-defined label such as "Intern". Mapping it to a `JobType` is a decision ADR-029 D3 has not made; until then it stays `UNKNOWN`.
+
+### C. Adzuna — aggregator search API (a possible broader source, not approved)
+
+| Topic | Verified from documentation | Requires confirmation |
+|---|---|---|
+| **Access** | Register to receive an `app_id` and `app_key`. Both are sent **as query parameters** on every call. Search pattern: `https://api.adzuna.com/v1/api/jobs/{country}/search/{page}`, with parameters such as `what`, `where`, `results_per_page`, `sort_by`, `salary_min`, `full_time`, `permanent`. | — |
+| **Markets** | The country is a path segment; the documentation shows `gb`. | **The full list of supported countries**, including whether India is one. It is not stated on the pages retrieved. |
+| **Results** | `id`, `title`, `created`, `company.display_name`, `location`, `salary_min`/`salary_max` (with `salary_is_predicted`), `contract_type`, `contract_time`, `category`, `redirect_url`. *"we currently only provide a snipped of the job description"*: the description is truncated. | Whether `redirect_url` always routes through Adzuna. The examples point at `adzuna.co.uk/jobs/land/ad/...`, but the documentation does not say so. |
+| **Rate limits and pricing** | A free key is issued immediately and is *"intended for evaluating the API"*. Limits *"may vary from time to time"* and are shown in the account. | **Numeric quotas and pricing.** Neither is published. |
+| **Usage and licensing** | **Permitted:** personal job search, publishing Adzuna listings, Jobsworth salary estimates, and personal or academic research. **Needs Adzuna's written agreement:** commercial analysis, data resale, and lead generation. **Organisations:** commercial, government and academic organisations get a 14-day trial, after which a licence is required for any revenue- or lead-generating use. **Attribution:** each displayed advert must carry an "Adzuna" label of at least 116 × 23 px, hyperlinked to Adzuna. **Termination:** all data acquired from Adzuna must be removed. | **How a headless, API-only product could meet the display-attribution rule** (ADR-028 D7). Which licence category EligiCore falls under. Any retention limit, which the terms do not set. |
+
+**Fit with EligiCore.** Adzuna is the only one of the three that searches across employers. Several of its terms clash with existing project rules, so **adopting it requires investigation and authorization** (OD-7):
+- **Credentials in the URL.** Sending them as query parameters conflicts with the project's rule that keys travel in headers, never in URLs.
+- **Truncated description.** The snippet is too short to support ADR-030's evidence-verified extraction.
+- **Aggregator apply link.** An aggregator redirect undermines ADR-028 D5's reason for preferring the employer's own application URL.
+- **Display attribution.** The attribution rule assumes a user interface that does not exist.
+
+The separate "Adzuna Intelligence API" is a different product and was not evaluated.
+
+### Comparison
+
+| | Greenhouse | Lever | Adzuna |
+|---|---|---|---|
+| Coverage | One employer per board token | One employer per site | Many employers per country |
+| Read authentication | None (documented) | None in examples (implied) | `app_id` + `app_key` in the URL |
+| Full description | Yes (`content=true`) | Yes | Snippet only |
+| Employer's own apply URL | `absolute_url` | `hostedUrl` / `applyUrl` | `redirect_url` (appears to route via Adzuna) |
+| Source deadline | `application_deadline` (single-job endpoint only) | None documented | None documented |
+| Source timestamps | `updated_at`, `first_published` | Requires confirmation | `created` |
+| Read rate limit | Not documented | Not documented | Account-specific, not published |
+| Consumer terms | Not stated in API docs | Not stated in API docs | Explicit ToS, with licence and attribution |
+| EligiCore status | Adapter implemented, not wired | Not built | Not selected (D7, OD-7) |
+
+## 18a.4 Source pipeline
+
+ADR-028 sets the direction for this pipeline. Each stage is labelled with where it stands.
+
+1. **Discover supported employers or source identifiers.** *Requires authorization.* No process or registry exists. Board tokens are constructor arguments, and there is no source configuration (ADR-028 PR 3). Who selects employers, and how their identifiers are verified, is undecided.
+2. **Fetch listings from an authorized source.** *Implemented and verified offline* for Greenhouse, through the shared HTTP layer. *Not built* for Lever. Each live source still needs ADR-028 D8's per-source ToS and rate-limit confirmation.
+3. **Normalize into the existing job schema.** *Implemented and verified.* `RawJob` → `normalize_job`: whitespace collapsed, deadlines never inferred (D10), missing eligibility criteria left absent (D9), employment type `UNKNOWN` unless the source states it (ADR-029).
+4. **Deduplicate.** *Implemented and verified.* Identity is `(source, source_job_id)` where the source supplies a stable id, falling back to `content_hash` (§10.2). Matching is **within one source only**: the same posting from two sources is two rows (ADR-028 D4).
+5. **Persist only approved data.** *Implemented and verified.* Ingestion writes only `jobs`, `ingestion_state` and, when `extraction_enabled` is on, `extracted_requirements`. No candidate data has anywhere to go.
+6. **Refresh on a documented schedule.** *Requires authorization.* No cadence is approved (OD-2), so none is stated here. There is no refresh command or scheduler.
+7. **Track fetch times, errors and listing status.** *Partly implemented.*
+   - **Built:** `ingestion_state` keeps one row per **source**, with `last_run_at`, `last_success_at`, `last_status`, `last_error` and per-run counts. `jobs.last_verified_at` is updated whenever a fetch lists the job.
+   - **Not built:** per-board or per-employer state, and source-reported timestamps (§18a.5).
+8. **Expose qualified freshness to downstream matching.** *Partly implemented.* `JobRead` exposes `status`, `is_active` and `last_verified_at`. Recommendations consider `ACTIVE` and `UNKNOWN` jobs, ordered by `last_verified_at`. What these fields do and do not prove is set out in §18a.5.
+
+Sources do not share the same status fields, refresh semantics or query capabilities (§18a.3). The pipeline must not assume they do.
+
+## 18a.5 What "real-time" means
+
+**The product promise.** EligiCore reports listings it **retrieved** from supported sources, and when each was last seen. Freshness depends on three things: the source, the refresh schedule (not yet decided), and whether the source was reachable. Two things follow:
+- **A retrieved listing is not proof the vacancy is still open.**
+- **EligiCore does not guarantee exhaustive coverage.**
+
+Three facts need to be kept apart:
+
+| Fact | Meaning | Current implementation |
+|---|---|---|
+| **Source-reported status** | What the source itself says, e.g. a Lever posting is listed only while `published`, or a Greenhouse post is live and published. | Not stored as a separate field. A listed job is set to `ACTIVE` on ingestion. |
+| **Last successful retrieval** | When EligiCore last saw the listing in a successful fetch. | `jobs.last_verified_at` is set each time a fetch lists the job. `ingestion_state.last_success_at` records it per source. |
+| **Independently verified current availability** | A check, at a known time, that the posting is still open, e.g. a per-job request or a passed deadline. | **Not implemented.** Assigning `EXPIRED` is permitted (D16) but nothing does it. No per-job check exists, and none is proposed without a rate-limit and ToS decision. |
+
+**Gaps between this and the code:**
+
+- **The `ACTIVE` docstring overclaims.** `JobStatus.ACTIVE` is described in `app/models/job.py` as *"open and accepting applications"*. For a non-authoritative live source it can only mean *"listed at the last successful retrieval"*.
+- **`last_verified_at` is misnamed.** The field records "last seen in a fetch", not independent verification. Renaming it or adding fields would change the public contract and the schema, which needs its own decision.
+- **Source timestamps are discarded.** Greenhouse's `updated_at` and `first_published` are dropped by the adapter. ADR-028 D11 asks for posted/updated timestamps "where the source supplies it", and the adapter defers that to "the separate freshness slice" (ADR-028 PR 4), which is not started.
+- **Freshness is per source, not per employer.** `ingestion_state` holds one row per source. One failing Greenhouse board cannot be told apart from all of them in the stored state.
+- **Live jobs accumulate.** Non-authoritative sources never close a job (D14, D15). Without a stale-job rule (OD-1, D17), a posting withdrawn at the source stays `ACTIVE`, distinguishable only by an old `last_verified_at`.
+
+Building any of these requires authorization: the freshness slice (ADR-028 PR 4, likely with a migration), the stale-job rule (OD-1), and the refresh cadence (OD-2). **Until then, EligiCore should not describe any listing as "currently open". It should describe a listing as "retrieved from {source}, last seen {time}".**
+
+## 18a.6 Proposed initial rollout (proposal only)
+
+*Proposed.* No adapter is added and no external integration is activated by this document. Each step needs its own owner gate, as ADR-028's sequencing already requires.
+
+1. **Greenhouse first.**
+   - Confirm Greenhouse's consumer Terms of Use and read rate limits (D8).
+   - Decide how employers and board tokens are chosen and configured (ADR-028 PR 3).
+   - Then wire the existing adapter into an explicit, operator-run ingestion command (ADR-028 PR 6), still off by default.
+2. **Freshness before scale.**
+   - Before relying on live listings, decide OD-1 (stale closure) and OD-2 (cadence).
+   - Decide whether to store source-reported timestamps and per-employer fetch state (ADR-028 PR 4).
+3. **Lever second.**
+   - Confirm read access, the global or EU base, identifier scope and Terms of Use.
+   - Decide how `categories.commitment` maps under ADR-029.
+   - Then build one adapter class on the shared HTTP layer (D13).
+4. **Adzuna last, and only after a decision.**
+   - Confirm the supported countries (including India), quotas, pricing and the licence category.
+   - Confirm how attribution and credentials-in-URL could be handled.
+   - Then decide OD-7. Until then it is not an integration candidate.
+
+## 18a.7 Coverage and availability limitations
+
+- **Per-employer coverage.** ATS feeds cover only configured employers on supported ATS platforms. Employers on other systems, or with no public board, are invisible.
+- **Unavailability is not closure.** A source can be unreachable or rate-limited. Ingestion records the failure in `ingestion_state` and leaves existing jobs untouched (D14, D15), so stored listings simply age.
+- **Missing structured eligibility.** ATS feeds publish requirements as prose. The 2026-10-02 Greenhouse observation found 0/7 jobs with structured criteria (`context/state.md`). ADR-030's verified extraction addresses this and remains **disabled by default**.
+- **Missing employment type.** Greenhouse publishes none, so live jobs are `UNKNOWN` (ADR-029).
+- **Missing deadlines.** These are absent unless the source states them (D10). Greenhouse states one only on its single-job endpoint, which the adapter does not call.
+- **Possible duplicates across sources.** The same posting from two sources is two rows, by decision (D4).
+
+## 18a.8 Decisions requiring authorization
+
+| # | Decision | Existing reference |
+|---|---|---|
+| 1 | How employers and their board tokens or site names are discovered, verified and configured | ADR-028 PR 3 (source configuration) |
+| 2 | Confirmation of Greenhouse's and Lever's consumer Terms of Use and read rate limits | ADR-028 D8 |
+| 3 | Refresh cadence, and how a partially failed run is handled | OD-2 |
+| 4 | Stale-job closure threshold and algorithm for non-authoritative sources | OD-1, D17 |
+| 5 | Whether expiry is computed at ingest or derived at read | D16 |
+| 6 | Whether to store source-reported timestamps and per-employer fetch state (schema change) | ADR-028 PR 4 |
+| 7 | Whether to call Greenhouse's single-job endpoint for `application_deadline` (one request per job) | D8, D10 |
+| 8 | Whether `ACTIVE` and `last_verified_at` are reworded or supplemented to match §18a.5 (contract change) | ADR-014 |
+| 9 | How Lever's `categories.commitment` maps to `JobType` | ADR-029 |
+| 10 | Durable quota and rate-limit accounting, only if a chosen source requires it | OD-3 |
+| 11 | Adzuna: supported markets, quotas, pricing, licence category, attribution in a headless API, credentials in URL, truncated descriptions | OD-7, D7 |
+
+## 18a.9 Where the strategy and the implementation differ
+
+These are all recorded, not resolved:
+- **§6 is out of date.** It says EligiCore *"does not scrape live portals in Phase 1"*. That remains true, since public ATS feeds are sanctioned APIs, not scraping. But live sources were moved forward from §18 Phase 3 by ADR-028, a recorded roadmap deviation. Only the Greenhouse adapter exists, and it is not wired.
+- **`ACTIVE` and `last_verified_at` overstate what is known** for non-authoritative sources (§18a.5).
+- **Source timestamps are dropped**, although ADR-028 D11 asks for them where supplied.
+- **No refresh path exists.** There is no scheduler, refresh command or source configuration, so stages 1 and 6 of §18a.4 are absent.
+- **Fetch state is too coarse.** `ingestion_state` is per source, while the strategy needs per-employer visibility.
+
+## 18a.10 Invariants this strategy does not change
+
+- **No server-side candidate data.** The server persists no candidate profile, resume, evaluation, application tracking, notes, chat history or AI memory (§8.1a, §10).
+- **Temporary resume processing.** Resumes are processed temporarily, with cleanup after success or failure. Resume contents and personally identifiable information are never logged.
+- **Limited operational persistence.** The server stores only the job catalogue, ingestion state and approved extracted job requirements.
+- **Deterministic authority.** A verified, source-stated deterministic hard failure keeps final authority, and AI cannot override it. A `PROSE_DERIVED` requirement carries its evidence, and a derived deterministic failure gives `NEEDS_REVIEW`, never `NOT_ELIGIBLE` (ADR-030).
+- **Safe defaults.** The mock AI provider stays the default and Gemini stays swappable. `extraction_enabled` stays `False`, and `extract_job_requirements` is not wired into derivation, ingestion or eligibility.
+- **No automation of applications.** There is no automatic submission, no CAPTCHA, OTP or anti-bot bypass, and no unauthorized browser automation (§6, ADR-028 D6).
+
+## 18a.11 Sources consulted (retrieved 2026-10-28)
+
+**Official documentation:**
+- [Greenhouse Job Board API](https://docs.greenhouse.io/job-board.html) (redirected from `developers.greenhouse.io/job-board.html`)
+- [Lever Postings API](https://github.com/lever/postings-api)
+- [Adzuna API overview](https://developer.adzuna.com/overview)
+- [Adzuna job search](https://developer.adzuna.com/docs/search)
+- [Adzuna API Terms of Service](https://developer.adzuna.com/docs/terms_of_service)
+
+**Repository:**
+- `app/adapters/greenhouse_adapter.py`, `app/adapters/live_http_adapter.py`, `app/adapters/curated_adapter.py`
+- `app/services/job_ingestion.py`, `app/models/job.py`, `app/models/ingestion_state.py`, `app/schemas/job.py`, `app/cli.py`
+- ADR-028, ADR-029, ADR-030
+- `context/state.md`
 
 ---
 
