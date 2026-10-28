@@ -45,10 +45,20 @@ class AIUsage:
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
     total_tokens: int | None = None
+    #: Reasoning ("thinking") tokens billed **on top of** ``completion_tokens``. Zero, not
+    #: unknown, for a provider that reports no thinking — that is what such a provider spends
+    #: — and ``None`` when a provider that does think could not say how many. Kept out of
+    #: ``completion_tokens`` so that field still means exactly what it meant before
+    #: (ADR-030 Step 8a); ``total_tokens`` is whatever the provider reported.
+    thought_tokens: int | None = 0
 
     @property
     def is_unknown(self) -> bool:
-        """True when nothing at all could be determined."""
+        """True when nothing at all could be determined.
+
+        Reads the three original fields only: a zero thought count is the default for every
+        provider, so it is not evidence that anything was measured.
+        """
         return (
             self.prompt_tokens is None
             and self.completion_tokens is None
@@ -82,14 +92,19 @@ class UsageSink:
     A field becomes unknown as soon as any contributing response failed to report it.
     Reporting the readable part of a total as if it were the whole would under-report cost,
     which is the failure this accumulation exists to prevent. Fields degrade independently.
+
+    Thought tokens follow the same rules, with one difference: a call that never recorded
+    any reports **zero**, because a provider that does not think spends none. A provider
+    that does think must always pass a value, or ``None`` when it cannot read one.
     """
 
-    __slots__ = ("_completion", "_prompt", "_seen", "_total", "_unreadable")
+    __slots__ = ("_completion", "_prompt", "_seen", "_thought", "_total", "_unreadable")
 
     def __init__(self) -> None:
         self._prompt = 0
         self._completion = 0
         self._total = 0
+        self._thought = 0
         #: Fields at least one response reported usably.
         self._seen: set[str] = set()
         #: Fields at least one response failed to report usably.
@@ -101,17 +116,22 @@ class UsageSink:
         prompt_tokens: object = None,
         completion_tokens: object = None,
         total_tokens: object = None,
+        thought_tokens: object = 0,
     ) -> None:
         """Add one response's reported usage.
 
         Accepts ``object`` deliberately: the values come from a provider's JSON and are
         untrusted. Anything that is not a non-negative integer marks its field unknown
         instead of raising.
+
+        ``thought_tokens`` defaults to ``0``, so a provider without thinking records exactly
+        what it did before; ``None`` marks the count unreadable like any other field.
         """
         for name, raw in (
             ("_prompt", prompt_tokens),
             ("_completion", completion_tokens),
             ("_total", total_tokens),
+            ("_thought", thought_tokens),
         ):
             usable = _usable(raw)
             if usable is None:
@@ -126,11 +146,14 @@ class UsageSink:
         Distinct from recording nothing: a response that omits its usage block still consumed
         tokens, so the total becomes unknown rather than staying at whatever else was seen.
         """
-        self._unreadable.update({"_prompt", "_completion", "_total"})
+        self._unreadable.update({"_prompt", "_completion", "_total", "_thought"})
 
     @property
     def usage(self) -> AIUsage:
-        """The accumulated totals, with unreadable or unreported fields as ``None``."""
+        """The accumulated totals, with unreadable or unreported fields as ``None``.
+
+        An unreported thought count is ``0``, not ``None``: see the class docstring.
+        """
 
         def value(name: str) -> int | None:
             if name in self._unreadable or name not in self._seen:
@@ -141,6 +164,7 @@ class UsageSink:
             prompt_tokens=value("_prompt"),
             completion_tokens=value("_completion"),
             total_tokens=value("_total"),
+            thought_tokens=None if "_thought" in self._unreadable else self._thought,
         )
 
 
@@ -156,6 +180,12 @@ def cost_micros(
     ``total_tokens`` with an unknown split cannot be priced either: the answer depends on a
     ratio nobody reported.
 
+    **Pricing assumption: thought tokens are billed at the completion rate.** Google prices a
+    Gemini response as its output tokens plus its thinking tokens, at the output price, so
+    they are added to ``completion_tokens`` before pricing. An unknown thought count makes the
+    cost unknown, for the same reason as an unknown split. For a provider that reports no
+    thinking the count is zero, and the figure is exactly what it was before.
+
     Integer arithmetic throughout, truncating toward zero. A cost is an accounting figure and
     must not accumulate float drift; sub-micro precision is below anything worth reporting.
     """
@@ -163,8 +193,11 @@ def cost_micros(
         return None
     if usage.prompt_tokens is None or usage.completion_tokens is None:
         return None
+    if usage.thought_tokens is None:
+        return None
     if prompt_micros_per_1k < 0 or completion_micros_per_1k < 0:
         return None
     prompt = usage.prompt_tokens * prompt_micros_per_1k // TOKENS_PER_RATE_UNIT
-    completion = usage.completion_tokens * completion_micros_per_1k // TOKENS_PER_RATE_UNIT
+    output = usage.completion_tokens + usage.thought_tokens
+    completion = output * completion_micros_per_1k // TOKENS_PER_RATE_UNIT
     return prompt + completion

@@ -32,6 +32,11 @@ from app.ai.providers.mock import MockAIProvider
 from app.ai.usage import TOKENS_PER_RATE_UNIT, AIUsage, UsageSink, cost_micros
 from app.config import ModelCostRate, Settings
 
+#: Every field unknown, the thought count included: what an unreadable reply leaves behind.
+#: ``AIUsage()`` alone reads a zero thought count, the default for a provider that does not
+#: think (ADR-030 Step 8a), so it is not "all unknown" for a provider that does.
+ALL_UNKNOWN = AIUsage(thought_tokens=None)
+
 RESUME = "Candidate resume text for accounting tests. CGPA 8.4/10."
 FIELD = "Information Technology"
 ALLOWED = ["Computer Science"]
@@ -151,7 +156,7 @@ def test_an_unreadable_response_makes_every_field_unknown() -> None:
     sink = UsageSink()
     sink.record(prompt_tokens=10, completion_tokens=2, total_tokens=12)
     sink.record_unreadable()
-    assert sink.usage == AIUsage()
+    assert sink.usage == ALL_UNKNOWN
 
 
 @pytest.mark.anyio
@@ -292,7 +297,7 @@ async def test_a_reply_without_usage_metadata_is_unreadable_not_free() -> None:
     await _gemini(lambda r: _reply(RELATED, None), max_retries=0).assess_field_relatedness(
         FIELD, ALLOWED, usage=sink
     )
-    assert sink.usage == AIUsage()
+    assert sink.usage == ALL_UNKNOWN
 
 
 @pytest.mark.anyio
@@ -303,7 +308,7 @@ async def test_a_malformed_usage_block_degrades_without_failing_the_call() -> No
         max_retries=0,
     ).assess_field_relatedness(FIELD, ALLOWED, usage=sink)
     assert result.result.value == "RELATED"
-    assert sink.usage == AIUsage()
+    assert sink.usage == ALL_UNKNOWN
 
 
 @pytest.mark.anyio
@@ -605,7 +610,7 @@ def test_record_usage_marks_a_missing_metadata_block_unreadable() -> None:
     sink = UsageSink()
     sink.record(prompt_tokens=10, completion_tokens=2, total_tokens=12)
     _record_usage(sink, {"candidates": []}, tokens_certain=True)
-    assert sink.usage == AIUsage()
+    assert sink.usage == ALL_UNKNOWN
 
 
 @pytest.mark.parametrize("metadata", [None, "none", 7, [], {"promptTokenCount": None}])
@@ -614,7 +619,7 @@ def test_record_usage_survives_any_shape_of_metadata(metadata: Any) -> None:
 
     sink = UsageSink()
     _record_usage(sink, {"usageMetadata": metadata} if metadata is not None else {}, tokens_certain=True)
-    assert sink.usage == AIUsage()
+    assert sink.usage == ALL_UNKNOWN
 
 
 def test_record_usage_without_a_sink_does_nothing() -> None:
@@ -834,7 +839,7 @@ def test_an_error_reply_missing_usage_is_not_marked_unreadable() -> None:
     after_success = UsageSink()
     after_success.record(prompt_tokens=10, completion_tokens=2, total_tokens=12)
     _record_usage(after_success, {"candidates": []}, tokens_certain=True)
-    assert after_success.usage == AIUsage()
+    assert after_success.usage == ALL_UNKNOWN
 
 
 @pytest.mark.anyio
@@ -881,4 +886,4 @@ async def test_a_success_missing_usage_invalidates_what_earlier_attempts_reporte
 
     assert len(attempts) == 2
     assert result.result.value == "RELATED"
-    assert sink.usage == AIUsage(), "a silent success must not be billed at the retries' rate"
+    assert sink.usage == ALL_UNKNOWN, "a silent success must not be billed at the retries' rate"

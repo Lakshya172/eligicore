@@ -17,7 +17,13 @@ but has not been exercised end to end. See ADR-013 § Unverified.
 Privacy: the resume-extraction prompt contains resume text, and its response contains
 candidate data. The field-relatedness prompt contains only a field of study and a job's
 permitted fields (ADR-019). **No prompt or response is ever logged** (INV-4). Logging in
-this module is confined to provider name, model, status category and timing.
+this module is confined to provider name, model, status category and timing. **No request
+is stored by Google either:** every body sets ``store: false``, which takes precedence over a
+project's own logging setting — and new paid projects store ``generateContent`` requests by
+default.
+
+Request configuration follows ADR-030 D15 for ``gemini-3.8-flash``: no sampling parameter
+(they are deprecated and ignored), an explicit ``thinkingLevel``, and structured JSON output.
 """
 
 from __future__ import annotations
@@ -120,6 +126,56 @@ _RELATEDNESS_SCHEMA: dict[str, Any] = {
 }
 
 
+#: ``LOW`` for both calls. Each is bounded — read fields out of a resume, or answer one
+#: three-valued question — and Google's guidance is that reasoning depth, not sampling, is
+#: what controls determinism on this model generation. Set explicitly because Google
+#: documents two different defaults for an unset level. ``MINIMAL`` is rejected by
+#: ``gemini-3.8-flash``.
+_THINKING_LEVEL = "LOW"
+
+
+def _generate_content_body(text: str, schema: dict[str, Any]) -> dict[str, Any]:
+    """The one request body every Gemini call sends, so none can drift from it.
+
+    ``store`` is a top-level request field, not part of ``generationConfig``.
+    """
+    return {
+        "contents": [{"parts": [{"text": text}]}],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": schema,
+            "thinkingConfig": {"thinkingLevel": _THINKING_LEVEL},
+        },
+        "store": False,
+    }
+
+
+def _is_count(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _thought_tokens(metadata: dict[str, Any]) -> object:
+    """The reply's thinking-token count, ``0`` only where the reply proves it, else ``None``.
+
+    Gemini's JSON omits a count that is zero, so an absent ``thoughtsTokenCount`` is not by
+    itself a zero. ``totalTokenCount`` is prompt + tool-use prompt + thoughts + candidates,
+    so when every other part is a readable count and they already sum to the total, there
+    were no thoughts. Anything less certain is ``None``, which the sink records as unknown
+    rather than as a guess (ADR-026 D5). A reported value is passed through untouched; the
+    sink rejects it if it is not a count.
+    """
+    if "thoughtsTokenCount" in metadata:
+        return metadata["thoughtsTokenCount"]
+    total = metadata.get("totalTokenCount")
+    prompt = metadata.get("promptTokenCount")
+    candidates = metadata.get("candidatesTokenCount")
+    tool_use = metadata.get("toolUsePromptTokenCount", 0)
+    if all(_is_count(value) for value in (total, prompt, candidates, tool_use)):
+        if total == prompt + candidates + tool_use:  # type: ignore[operator]
+            return 0
+    return None
+
+
 def _record_usage(
     sink: UsageSink | None, raw: dict[str, Any], *, tokens_certain: bool
 ) -> None:
@@ -155,6 +211,7 @@ def _record_usage(
         prompt_tokens=metadata.get("promptTokenCount"),
         completion_tokens=metadata.get("candidatesTokenCount"),
         total_tokens=metadata.get("totalTokenCount"),
+        thought_tokens=_thought_tokens(metadata),
     )
 
 
@@ -241,8 +298,9 @@ class GeminiFlashProvider(AIProvider):
         and this class must stay concrete, or selecting Gemini would break resume parsing and
         field relatedness, which do work.
 
-        Step 8 brings the prompt, the injection corpus, the data-block boundary and the
-        ``gemini-3.8-flash`` model (ADR-030 D15, D25). Until then this makes no HTTP request,
+        Step 8 brings the prompt, the injection corpus and the data-block boundary (ADR-030
+        D25); the ``gemini-3.8-flash`` request configuration it will share (D15) is already
+        in place for the other two calls. Until then this makes no HTTP request,
         builds no prompt, uses no key and writes nothing to ``usage``. The description is
         accepted and dropped: never logged, retained or forwarded.
 
@@ -306,32 +364,17 @@ class GeminiFlashProvider(AIProvider):
             {"candidate_field_of_study": field_of_study, "allowed_fields": list(allowed_fields)},
             ensure_ascii=False,
         )
-        return {
-            "contents": [{"parts": [{"text": f"{prompt}\n{data}\n"}]}],
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "responseSchema": _RELATEDNESS_SCHEMA,
-                "temperature": 0.0,
-            },
-        }
+        return _generate_content_body(f"{prompt}\n{data}\n", _RELATEDNESS_SCHEMA)
 
     def _build_payload(self, resume_text: str) -> dict[str, Any]:
         """Build the request body.
 
         The prompt and the resume text are both sensitive; this returns them for immediate
-        transmission and they are never retained or logged.
+        transmission and they are never retained or logged — by this service or, through
+        ``store: false``, by Google.
         """
         prompt = load_prompt("resume_extraction")
-        return {
-            "contents": [{"parts": [{"text": prompt + resume_text}]}],
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "responseSchema": _RESPONSE_SCHEMA,
-                # Deterministic extraction, not creative writing. Extraction should return
-                # the same structure for the same resume.
-                "temperature": 0.0,
-            },
-        }
+        return _generate_content_body(prompt + resume_text, _RESPONSE_SCHEMA)
 
     async def _post_with_retries(
         self, payload: dict[str, Any], usage: UsageSink | None = None
@@ -481,7 +524,14 @@ class GeminiFlashProvider(AIProvider):
             raise AIResponseInvalidError("Gemini response was truncated.")
 
         parts = (first.get("content") or {}).get("parts") or []
-        text = "".join(part.get("text", "") for part in parts if isinstance(part, dict))
+        # A part marked as a thought is the model's reasoning, not its answer: joining it in
+        # would corrupt the JSON. A thoughtSignature on an answer part is metadata, and the
+        # part's text is still read.
+        text = "".join(
+            part.get("text", "")
+            for part in parts
+            if isinstance(part, dict) and part.get("thought") is not True
+        )
         if not text.strip():
             raise AIResponseInvalidError("Gemini response contained no text.")
 

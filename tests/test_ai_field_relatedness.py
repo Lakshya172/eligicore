@@ -254,7 +254,9 @@ async def test_gemini_request_contains_only_the_two_inputs() -> None:
     await _gemini(capture).assess_field_relatedness(FIELD, ALLOWED)
 
     body = capture.bodies[0]
-    assert set(body) == {"contents", "generationConfig"}
+    # `store` carries no input: it opts the request out of Google's request storage.
+    assert set(body) == {"contents", "generationConfig", "store"}
+    assert body["store"] is False
     assert capture.data_block() == {"candidate_field_of_study": FIELD, "allowed_fields": ALLOWED}
     assert capture.prompt().startswith(load_prompt("field_relatedness"))
 
@@ -265,7 +267,7 @@ async def test_gemini_requests_constrained_deterministic_json() -> None:
     await _gemini(capture).assess_field_relatedness(FIELD, ALLOWED)
     config = capture.bodies[0]["generationConfig"]
     assert config["responseMimeType"] == "application/json"
-    assert config["temperature"] == 0.0
+    assert "temperature" not in config, "deprecated and ignored on gemini-3.8-flash (D15)"
     schema = config["responseSchema"]
     assert set(schema["properties"]) == {"result", "confidence", "reason"}
     assert schema["properties"]["result"]["enum"] == ["RELATED", "NOT_RELATED", "UNCERTAIN"]

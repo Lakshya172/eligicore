@@ -323,7 +323,9 @@ async def test_gemini_requests_structured_json_output() -> None:
 
     config = captured["body"]["generationConfig"]
     assert config["responseMimeType"] == "application/json"
-    assert config["temperature"] == 0.0, "extraction must be deterministic, not creative"
+    # Sampling controls are deprecated and ignored on gemini-3.8-flash (ADR-030 D15); the
+    # full no-sampling and thinking-level contract is in test_gemini_request_contract.py.
+    assert "temperature" not in config
     assert "responseSchema" in config
 
 

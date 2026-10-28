@@ -177,7 +177,7 @@ def test_extraction_is_disabled_by_default() -> None:
 def test_enabling_extraction_changes_no_ai_setting() -> None:
     """The deterministic path is not an AI path. Enabling it authorizes no provider call."""
     assert ENABLED.ai_provider is Settings().ai_provider
-    assert ENABLED.gemini_model == "gemini-2.0-flash"
+    assert ENABLED.gemini_model == Settings().gemini_model
     assert ENABLED.gemini_api_key is None
 
 
