@@ -104,9 +104,12 @@ class Settings(BaseSettings):
     # make a paid API call by accident.
     ai_provider: AIProviderName = AIProviderName.MOCK
     gemini_api_key: str | None = None
-    # Configurable so the model can change without touching source. Not verified against a
-    # live API from this environment — confirm before first live use (ADR-013 § Unverified).
-    gemini_model: str = "gemini-2.0-flash"
+    # Configurable so the model can change without touching source. ADR-030 D15 selects
+    # gemini-3.8-flash; gemini-2.0-flash was shut down on 2026-06-01 (ADR-028 D19a). The
+    # identifier follows Google's model list but has not been called live from this
+    # environment — confirm before first live use (ADR-013 § Unverified). The provider sends
+    # `thinkingLevel`, which models before Gemini 3 reject.
+    gemini_model: str = "gemini-3.8-flash"
     gemini_api_base: str = "https://generativelanguage.googleapis.com/v1beta"
     ai_timeout_seconds: float = Field(default=30.0, gt=0)
     # An unbounded retry loop against a paid API is a financial bug (standards/ai.md §7).
@@ -129,8 +132,11 @@ class Settings(BaseSettings):
 
     # --- AI cost accounting (ADR-026, dossier §9.2, §10.2) ------------------------------
     # Maps "<provider>:<model>" to its rate, e.g.
-    #   ELIGICORE_AI_COST_RATES={"gemini:gemini-2.0-flash":
-    #                            {"prompt_micros_per_1k": 75, "completion_micros_per_1k": 300}}
+    #   ELIGICORE_AI_COST_RATES={"gemini:gemini-3.8-flash":
+    #                            {"prompt_micros_per_1k": 750, "completion_micros_per_1k": 3750}}
+    # — Google's introductory gemini-3.8-flash price ($0.75 / $3.75 per million tokens) through
+    # 2026-12-31; $1.50 / $7.50 (1500 / 7500) from 2027-01-01. Thinking tokens are billed as
+    # output, so they are priced at the completion rate (app/ai/usage.py, cost_micros).
     # Empty by default and deliberately so: an unpriced model logs cost=unknown, which is
     # honest, where a shipped default would be a guess about somebody else's price list.
     # Operational accounting only — never a per-candidate ledger (ADR-026 D9).

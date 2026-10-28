@@ -125,6 +125,10 @@ class AIService:
         defect must not be able to change the outcome of an AI call that worked (D6).
 
         Counts and one derived number. No identifier, no content, nothing candidate-specific.
+
+        ``thought_tokens`` comes **last**, after ``cost_micros``, so every field that existed
+        before keeps its name and position. It is ``0`` for a provider that does not think,
+        and the cost already includes it at the completion rate (:func:`cost_micros`).
         """
         usage = UsageSink().usage
         cost: int | None = None
@@ -147,7 +151,8 @@ class AIService:
             f"prompt_tokens={shown(usage.prompt_tokens)} "
             f"completion_tokens={shown(usage.completion_tokens)} "
             f"total_tokens={shown(usage.total_tokens)} "
-            f"cost_micros={shown(cost)}"
+            f"cost_micros={shown(cost)} "
+            f"thought_tokens={shown(usage.thought_tokens)}"
         )
 
     @property
