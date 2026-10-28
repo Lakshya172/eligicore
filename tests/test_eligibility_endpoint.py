@@ -29,6 +29,7 @@ from app.schemas.eligibility import MAX_JOB_IDS
 from app.services.eligibility_engine import ENGINE_VERSION
 from app.services.job_ingestion import ingest_source
 from tests.conftest import ALLOWED_OPERATIONAL_TABLES, FORBIDDEN_TABLES
+from tests.privacy_markers import contains_marker
 from tests.test_job_ingestion import FakeAdapter, make_raw
 
 CHECK_URL = "/api/v1/eligibility/check"
@@ -415,7 +416,7 @@ def test_logs_contain_no_candidate_data_or_candidate_id(
 
     logged = caplog.text + "\n".join(str(record.args) for record in caplog.records)
     for marker in MARKERS:
-        assert marker not in logged, f"leaked into logs: {marker}"
+        assert not contains_marker(logged, marker), f"leaked into logs: {marker}"
 
     lines = [r.getMessage() for r in caplog.records if r.name == "eligicore.eligibility"]
     assert len(lines) == 1
