@@ -27,6 +27,17 @@ The eight conditions, and where each lives:
  8   No contradicting text in the contradiction window invalidates it    :func:`_check_contradiction_window`
 ===  ==================================================================  =====================
 
+One further refusal sits beside the eight and serves condition 1.
+:func:`_check_untrusted_instructions` refuses every proposal from a description that carries
+**instruction-shaped text** — an instruction addressed to whoever reads the posting, a forged
+role label or data-block marker, or markup a reader never sees (ADR-030 D25). A
+requirement-shaped phrase inside such text passes the other conditions on its own, because it
+really is in the source; it is still an instruction rather than the employer stating a
+criterion. Adopted, it would be presented to candidates as a genuine requirement, and one who
+does not meet it would be sent to ``NEEDS_REVIEW`` (never ``NOT_ELIGIBLE``, which a
+``PROSE_DERIVED`` failure cannot produce: D2). The refusal covers the whole description
+because collapsed text has no boundary that says where an injection ends.
+
 Any condition failing means the proposal **does not become a requirement**. It is discarded
 — not downgraded, not retried with a lower bar, not surfaced as a weaker constraint. The
 job's criterion simply stays absent, which is the pre-existing behaviour and is never a
@@ -547,6 +558,108 @@ def _window_invalidates(
 
 
 # ---------------------------------------------------------------------------------------
+# Untrusted instruction text (ADR-030 D25)
+# ---------------------------------------------------------------------------------------
+
+#: Text that addresses a reader of the posting rather than stating a criterion, or that a
+#: reader is never shown. Deterministic and pattern-based, like the contradiction scan: asking
+#: a model whether a description is trying to instruct it would hand the decision back to the
+#: thing being instructed.
+#:
+#: Each pattern is narrow on purpose, because a match refuses every proposal from the
+#: description, and each is paired in the tests with ordinary text it must not match:
+#:
+#: * Setting rules aside needs an *earlier* set of instructions — *"ignore previous
+#:   instructions"*, never *"employees must never ignore safety rules"* or *"please ignore
+#:   the previous posting"*.
+#: * A role label counts only where a transcript would put it: at the start of the text or
+#:   after punctuation, so *"Backend role. SYSTEM: …"* and *"(assistant: …"* match while
+#:   *"Lab Assistant: part-time"* and *"OPERATING SYSTEM: LINUX"* do not. Capitalised labels
+#:   are matched only in capitals, so *"Operating system: Linux"* is never one.
+#: * ``hidden`` alone is not a signal (*"no hidden fees"*); hidden *styling* is.
+#:
+#: Markup is matched both raw and entity-escaped, because Greenhouse returns ``content``
+#: escaped and it is stored that way.
+#:
+#: **What each kind of error costs.** A false positive refuses one job's derived requirements,
+#: which is the honest pre-ADR-030 state (ADR-003). A false negative lets an injected criterion
+#: be presented as one the employer stated: a candidate who does not meet it is moved to
+#: ``NEEDS_REVIEW`` on the strength of text the employer never meant as a requirement. It cannot
+#: produce ``NOT_ELIGIBLE`` — a ``PROSE_DERIVED`` failure never does (D2, D4) — which is why
+#: this gate errs toward refusing.
+#:
+#: **Limitations. This is a narrow heuristic, not prompt-injection prevention.** It recognises
+#: the common English shapes listed below and nothing else. Each of these was checked and is
+#: **not** caught: an instruction split by a zero-width character (``collapse_whitespace``
+#: does not remove one) or spelled with a look-alike letter from another alphabet; markup
+#: written as numeric or hex entities (``&#60;script``); an instruction in another language,
+#: paraphrased (*"pay no attention to what you were told before"*), split across words or
+#: encoded (base64); a lowercase or mid-sentence role label. A requirement-shaped injection
+#: worded in any such way still passes, exactly as it did before this gate existed, and is
+#: still capped at ``NEEDS_REVIEW`` by provenance. The gate also cannot tell an injection from
+#: an honest posting that happens to use one of these shapes, and refuses both. What it adds
+#: is a refusal for the recognisable cases; the authority bound is still D2.
+_UNTRUSTED_INSTRUCTION_PATTERNS: tuple[re.Pattern[str], ...] = (
+    # An instruction to set earlier instructions aside.
+    re.compile(
+        r"\b(?:ignore|disregard|forget|override)\s+(?:(?:all|any|the|of|your|my)\s+){0,3}"
+        r"(?:previous|prior|above|earlier|preceding|foregoing|original|system|existing)\s+"
+        r"(?:\w+\s+)?(?:instructions?|rules?|prompts?|directions?|guidelines?|messages?"
+        r"|commands?|context)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\byou\s+are\s+now\s+(?:in\s+\w+\s+mode|acting\s+as|operating\s+as"
+        r"|an?\s+(?:AI|assistant|language\s+model|LLM|bot)\b|DAN\b)",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bnew\s+(?:rules?|instructions?)\s*:", re.IGNORECASE),
+    # A forged role label or chat-control token.
+    re.compile(r"(?:^|[(\[{.;!?]\s*)(?:SYSTEM|ASSISTANT|DEVELOPER)\s*:"),
+    re.compile(r"\bsystem\s+(?:prompt|override)\b", re.IGNORECASE),
+    re.compile(r"(?:^|[(\[{.;!?]\s*)(?:assistant|chatbot|LLM)\s*:", re.IGNORECASE),
+    re.compile(
+        r"\b(?:note|message|instructions?)\s+(?:to|for)\s+(?:the\s+|any\s+)?"
+        r"(?:AI|LLM|assistant|model|bot|extractor|parser)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"<\|[a-z_]+\|>|\[/?INST\]|<</?SYS>>", re.IGNORECASE),
+    # The extraction contract's own vocabulary: no posting names these fields.
+    re.compile(
+        r"\b(?:min_cgpa(?:_scale)?|min_grad_year|max_grad_year|max_backlogs|requirement_type"
+        r"|evidence_text|reported_(?:strength|confidence))\b",
+        re.IGNORECASE,
+    ),
+    # A forged data-block marker.
+    re.compile(r"\b(?:BEGIN|END)\s+JOB\s+DESCRIPTION\b", re.IGNORECASE),
+    # Markup a reader is never shown: scripts and their kin, comments, hidden styling.
+    re.compile(
+        r"(?:<|&lt;)\s*/?\s*(?:script|style|iframe|object|embed|template|noscript)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"(?:<|&lt;)!--"),
+    re.compile(r"\bdisplay\s*:\s*none\b", re.IGNORECASE),
+    re.compile(r"\bvisibility\s*:\s*hidden\b", re.IGNORECASE),
+    re.compile(r"\bfont-size\s*:\s*0(?:px|pt|em|rem)?(?![\d.])", re.IGNORECASE),
+    re.compile(r"\bopacity\s*:\s*0(?![\d.])", re.IGNORECASE),
+    re.compile(r"\baria-hidden\s*=\s*(?:\"|'|&quot;)?true\b", re.IGNORECASE),
+)
+
+
+def _check_untrusted_instructions(pinned_text: str) -> VerificationFailure | None:
+    """Refuse every proposal from a description carrying instruction-shaped text (D25).
+
+    Serves condition 1: an instruction is not the source stating a requirement, even when the
+    instruction contains a requirement-shaped phrase that every other condition accepts. It
+    reads the whole pinned text, not a window, because a collapsed description has no
+    boundary marking where an injected passage stops.
+    """
+    if any(pattern.search(pinned_text) for pattern in _UNTRUSTED_INSTRUCTION_PATTERNS):
+        return VerificationFailure.UNTRUSTED_INSTRUCTION_IN_SOURCE
+    return None
+
+
+# ---------------------------------------------------------------------------------------
 # The eight conditions
 # ---------------------------------------------------------------------------------------
 
@@ -720,6 +833,10 @@ def verify_proposal(
         # A source-stated requirement lives in a `jobs` column by definition (ADR-030 D1) and
         # has no extraction path. A proposal claiming one is refused rather than relabelled.
         failures.append(VerificationFailure.PROVENANCE_NOT_DERIVED)
+
+    instruction_failure = _check_untrusted_instructions(pinned_text)
+    if instruction_failure is not None:
+        failures.append(instruction_failure)
 
     failures.extend(_check_requirement_type(proposal))
 
