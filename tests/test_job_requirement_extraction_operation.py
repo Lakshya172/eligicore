@@ -6,7 +6,7 @@ The operation exists and is reachable from nothing in production. These tests pi
 * the mock as silent by default, and configurable only by a test;
 * proposals as untrusted — whatever a provider returns still has to pass the verifier;
 * the literal zero-call guarantee — ingestion, derivation and evaluation never reach it;
-* Gemini failing closed with no network call until Step 8;
+* Gemini sending one request and logging nothing from the description (Step 8b);
 * ADR-026 accounting on the new operation, with no description or proposal in any log.
 
 Every provider and network assertion uses a mock, a spy or ``httpx.MockTransport``.
@@ -255,36 +255,43 @@ def test_no_production_module_calls_the_operation() -> None:
 
 
 # ---------------------------------------------------------------------------------------
-# Gemini fails closed with no network call until Step 8
+# Gemini: one request through the transport, and nothing from the description in any log
+# (the prompt, the injection corpus and reply validation are pinned in
+# tests/test_job_requirement_injection.py)
 # ---------------------------------------------------------------------------------------
 
 
+def _replying(seen: list[httpx.Request], response: httpx.Response) -> Any:
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return response
+    return handler
+
+
 @pytest.mark.anyio
-async def test_gemini_fails_closed_without_a_request(monkeypatch: pytest.MonkeyPatch) -> None:
-    provider, seen = gemini()
+async def test_gemini_sends_exactly_one_request_and_validates_the_reply() -> None:
+    seen: list[httpx.Request] = []
+    reply = httpx.Response(
+        200, json={"candidates": [{"content": {"parts": [{"text": '{"proposals": []}'}]}}]}
+    )
+    provider, _ = gemini(_replying(seen, reply))
 
-    async def no_post(*_args: Any, **_kwargs: Any) -> Any:
-        raise AssertionError("Gemini built or sent a request")
-
-    monkeypatch.setattr(GeminiFlashProvider, "_post_with_retries", no_post)
-    sink = UsageSink()
-    with pytest.raises(AIProviderUnavailableError):
-        await provider.extract_job_requirements(FULL, usage=sink)
-
-    assert seen == []
-    assert sink.usage == UsageSink().usage, "nothing was reported because nothing was called"
+    assert await provider.extract_job_requirements(FULL) == []
+    assert len(seen) == 1
+    assert seen[0].url.path.endswith(":generateContent")
 
 
 @pytest.mark.anyio
 async def test_selecting_gemini_degrades_honestly_through_the_service(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    provider, seen = gemini()
+    seen: list[httpx.Request] = []
+    provider, _ = gemini(_replying(seen, httpx.Response(503)))
     with caplog.at_level(logging.DEBUG, logger="eligicore.ai"):
         with pytest.raises(AIProviderUnavailableError):
             await AIService(provider).extract_job_requirements(f"{FULL} {DESCRIPTION_MARKER}")
 
-    assert seen == []
+    assert len(seen) == 1
     assert "operation=extract_job_requirements outcome=error " in caplog.text
     assert "error_type=AIProviderUnavailableError" in caplog.text
     assert "prompt_tokens=unknown" in caplog.text

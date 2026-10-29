@@ -249,6 +249,9 @@ class VerificationFailure(str, Enum):
     # --- provenance (ADR-030 D1) ---------------------------------------------------------
     PROVENANCE_NOT_DERIVED = "PROVENANCE_NOT_DERIVED"
 
+    # --- untrusted instruction text in the source (ADR-030 D25) --------------------------
+    UNTRUSTED_INSTRUCTION_IN_SOURCE = "UNTRUSTED_INSTRUCTION_IN_SOURCE"
+
     # --- collection-level (ADR-030 D8) ---------------------------------------------------
     COMPETING_PROPOSALS = "COMPETING_PROPOSALS"
 

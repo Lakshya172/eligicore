@@ -16,7 +16,9 @@ but has not been exercised end to end. See ADR-013 § Unverified.
 
 Privacy: the resume-extraction prompt contains resume text, and its response contains
 candidate data. The field-relatedness prompt contains only a field of study and a job's
-permitted fields (ADR-019). **No prompt or response is ever logged** (INV-4). Logging in
+permitted fields (ADR-019). The job-requirement prompt contains only one job description,
+untrusted third-party text passed inside a labelled data block (ADR-030 D25), and never
+anything about a candidate (D24). **No prompt or response is ever logged** (INV-4). Logging in
 this module is confined to provider name, model, status category and timing. **No request
 is stored by Google either:** every body sets ``store: false``, which takes precedence over a
 project's own logging setting — and new paid projects store ``generateContent`` requests by
@@ -30,10 +32,11 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+import re
+from typing import Any, Literal
 
 import httpx
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 from app.ai.errors import (
     AIConfigurationError,
@@ -51,8 +54,16 @@ from app.schemas.application import (
     GenerationLimits,
     JobBrief,
 )
-from app.schemas.eligibility import FieldRelatednessAssessment
-from app.schemas.extraction import ExtractionProposal
+from app.schemas.candidate import Confidence, GradeScale
+from app.schemas.eligibility import FieldRelatednessAssessment, RequirementType
+from app.schemas.extraction import (
+    DerivedValue,
+    ExtractionProposal,
+    GradYearWindowValue,
+    MaxBacklogsValue,
+    MinCgpaValue,
+    RequirementStrength,
+)
 from app.schemas.resume import ResumeExtraction
 
 logger = logging.getLogger("eligicore.ai.gemini")
@@ -126,9 +137,128 @@ _RELATEDNESS_SCHEMA: dict[str, Any] = {
 }
 
 
-#: ``LOW`` for both calls. Each is bounded — read fields out of a resume, or answer one
-#: three-valued question — and Google's guidance is that reasoning depth, not sampling, is
-#: what controls determinism on this model generation. Set explicitly because Google
+#: Response schema for job-requirement extraction (ADR-030 D15). Every string but the evidence
+#: is an enum, and there is **no free-form explanatory field**: unrestricted prose is the
+#: channel an injected instruction or an unverifiable rationalisation travels through. There is
+#: no ``provenance`` either — a model cannot claim ``SOURCE_STATED``, and the provider sets
+#: every field that says who produced a proposal.
+_JOB_REQUIREMENT_TYPES = ["MIN_CGPA", "GRAD_YEAR_WINDOW", "MAX_BACKLOGS"]
+_STRENGTH_ENUM = ["REQUIRED", "PREFERRED", "CONDITIONAL", "INFORMATIONAL"]
+
+_JOB_REQUIREMENTS_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "proposals": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "requirement_type": {"type": "STRING", "enum": _JOB_REQUIREMENT_TYPES},
+                    "evidence_text": {"type": "STRING"},
+                    "min_cgpa": {"type": "NUMBER", "nullable": True},
+                    "min_cgpa_scale": {
+                        "type": "STRING",
+                        "enum": ["SCALE_4", "SCALE_5", "SCALE_10", "PERCENTAGE"],
+                        "nullable": True,
+                    },
+                    "min_grad_year": {"type": "INTEGER", "nullable": True},
+                    "max_grad_year": {"type": "INTEGER", "nullable": True},
+                    "max_backlogs": {"type": "INTEGER", "nullable": True},
+                    "reported_strength": {
+                        "type": "STRING", "enum": _STRENGTH_ENUM, "nullable": True
+                    },
+                    "reported_confidence": {
+                        "type": "STRING", "enum": _CONFIDENCE_ENUM, "nullable": True
+                    },
+                },
+                "required": ["requirement_type", "evidence_text"],
+            },
+        },
+    },
+    "required": ["proposals"],
+}
+
+#: Who produced a Gemini proposal, recorded with it (ADR-030 D18, D22). Bump the version with
+#: any change to the prompt or the schema, so a stale extraction is detectable from stored
+#: provenance rather than by bookkeeping.
+_JOB_REQUIREMENTS_EXTRACTOR = "gemini.job_requirements"
+_JOB_REQUIREMENTS_EXTRACTOR_VERSION = "1"
+
+#: The value fields each requirement type owns. A field belonging to another type must be
+#: absent or null: an item mixing them is malformed, not merely over-generous.
+_VALUE_FIELDS: dict[str, tuple[str, ...]] = {
+    "MIN_CGPA": ("min_cgpa", "min_cgpa_scale"),
+    "GRAD_YEAR_WINDOW": ("min_grad_year", "max_grad_year"),
+    "MAX_BACKLOGS": ("max_backlogs",),
+}
+
+#: The prompt's data-block markers, in any case and spacing. A description that contains one
+#: could close the block early and speak outside it, so it is never sent (ADR-030 D25).
+_DATA_BLOCK_MARKER = re.compile(r"\b(?:BEGIN|END)\s+JOB\s+DESCRIPTION\b", re.IGNORECASE)
+
+
+class _WireProposal(BaseModel):
+    """One proposal exactly as the reply must carry it. Strict: nothing is coerced.
+
+    ``strict`` refuses ``"7.0"`` for a number, ``true`` for a count and ``2026.0`` for a year;
+    ``extra="forbid"`` refuses any key the schema does not name, including ``provenance``
+    and ``explanation``. Either refuses the **whole reply** (ADR-030 D26).
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+
+    requirement_type: Literal["MIN_CGPA", "GRAD_YEAR_WINDOW", "MAX_BACKLOGS"]
+    evidence_text: str
+    min_cgpa: float | None = None
+    min_cgpa_scale: Literal["SCALE_4", "SCALE_5", "SCALE_10", "PERCENTAGE"] | None = None
+    min_grad_year: int | None = None
+    max_grad_year: int | None = None
+    max_backlogs: int | None = None
+    reported_strength: Literal["REQUIRED", "PREFERRED", "CONDITIONAL", "INFORMATIONAL"] | None = (
+        None
+    )
+    reported_confidence: Literal["HIGH", "MEDIUM", "LOW"] | None = None
+
+    @model_validator(mode="after")
+    def _fields_belong_to_the_type(self) -> _WireProposal:
+        own = _VALUE_FIELDS[self.requirement_type]
+        for kind, fields in _VALUE_FIELDS.items():
+            if kind != self.requirement_type and any(
+                getattr(self, name) is not None for name in fields
+            ):
+                raise ValueError("value field of another requirement type")
+        if self.requirement_type != "GRAD_YEAR_WINDOW" and any(
+            getattr(self, name) is None for name in own
+        ):
+            # A window may omit a bound; the verifier decides whether it has enough.
+            raise ValueError("missing value field")
+        return self
+
+    def value(self) -> DerivedValue:
+        if self.requirement_type == "MIN_CGPA":
+            assert self.min_cgpa is not None and self.min_cgpa_scale is not None
+            return MinCgpaValue(
+                min_cgpa=self.min_cgpa, min_cgpa_scale=GradeScale(self.min_cgpa_scale)
+            )
+        if self.requirement_type == "GRAD_YEAR_WINDOW":
+            return GradYearWindowValue(
+                min_grad_year=self.min_grad_year, max_grad_year=self.max_grad_year
+            )
+        assert self.max_backlogs is not None
+        return MaxBacklogsValue(max_backlogs=self.max_backlogs)
+
+
+class _WireReply(BaseModel):
+    """The whole extraction reply: one ``proposals`` list and nothing else."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+
+    proposals: list[_WireProposal]
+
+
+#: ``LOW`` for every call. Each is bounded — read fields out of a resume or a posting, or
+#: answer one three-valued question — and Google's guidance is that reasoning depth, not
+#: sampling, is what controls determinism on this model generation. Set explicitly because Google
 #: documents two different defaults for an unset level. ``MINIMAL`` is rejected by
 #: ``gemini-3.8-flash``.
 _THINKING_LEVEL = "LOW"
@@ -229,7 +359,7 @@ def _error_body(response: httpx.Response) -> dict[str, Any]:
 
 
 class GeminiFlashProvider(AIProvider):
-    """Structured resume extraction and field-relatedness assessment via the Gemini API."""
+    """Resume extraction, field relatedness and job-requirement proposals via the Gemini API."""
 
     name = "gemini"
 
@@ -291,29 +421,69 @@ class GeminiFlashProvider(AIProvider):
     async def extract_job_requirements(
         self, description: str, *, usage: UsageSink | None = None
     ) -> list[ExtractionProposal]:
-        """Not implemented until ADR-030 Step 8. Fails closed and calls nothing.
+        """Propose criteria read from one job description (ADR-030 D13, D15, D25).
 
-        **An interface stub, not a Gemini implementation**, for the same reason as
-        :meth:`generate_application_content` below: the interface gained an abstract method
-        and this class must stay concrete, or selecting Gemini would break resume parsing and
-        field relatedness, which do work.
+        **The description is untrusted third-party text** and is sent only inside the
+        prompt's labelled ``BEGIN … END`` data block, after the rules. A description that
+        contains a data-block marker itself could close the block and speak outside it, so it
+        is refused before any request is built: nothing is sent and nothing is spent.
 
-        Step 8 brings the prompt, the injection corpus and the data-block boundary (ADR-030
-        D25); the ``gemini-3.8-flash`` request configuration it will share (D15) is already
-        in place for the other two calls. Until then this makes no HTTP request,
-        builds no prompt, uses no key and writes nothing to ``usage``. The description is
-        accepted and dropped: never logged, retained or forwarded.
+        **What comes back is a proposal, never a requirement.** The reply is validated whole
+        against a strict wire shape, and one malformed item refuses all of it — no partial
+        adoption (D26). The provider, not the model, sets provenance and who produced each
+        proposal. Every proposal then has to pass the verifier against the pinned text, and
+        that, not this prompt, is what makes an injection unable to produce a requirement.
 
-        Raising :class:`~app.ai.errors.AIProviderUnavailableError` is ADR-030 D26's
-        "extractor unavailable" case: no requirement is produced, and a caller records the
-        derivation as unavailable rather than as a posting without requirements.
+        **No production path calls this.** Wiring extraction into derivation is a later,
+        separately approved step.
 
         Raises:
-            AIProviderUnavailableError: Always.
+            AIProviderRejectedError: The description contains a data-block marker, or Gemini
+                refused or blocked the request.
+            AIProviderUnavailableError, AIResponseInvalidError: As for the other operations.
         """
-        raise AIProviderUnavailableError(
-            "Gemini job-requirement extraction is not implemented until ADR-030 Step 8."
+        if _DATA_BLOCK_MARKER.search(description):
+            # The reason is a category; the description is never quoted (INV-4, D24).
+            raise AIProviderRejectedError(
+                "Job description contains the prompt's data-block marker; it was not sent."
+            )
+        payload = _generate_content_body(
+            load_prompt("job_requirement_extraction").format(description=description),
+            _JOB_REQUIREMENTS_SCHEMA,
         )
+        raw = await self._post_with_retries(payload, usage)
+        data = self._response_object(raw)
+        try:
+            reply = _WireReply.model_validate(data)
+        except ValidationError as exc:
+            # error_count only: Pydantic's detail would quote the reply, and the reply quotes
+            # the description.
+            raise AIResponseInvalidError(
+                "Gemini job-requirement response failed schema validation "
+                f"({exc.error_count()} error(s))."
+            ) from exc
+        return [
+            ExtractionProposal(
+                requirement_type=RequirementType(item.requirement_type),
+                value=item.value(),
+                evidence_text=item.evidence_text,
+                extractor=_JOB_REQUIREMENTS_EXTRACTOR,
+                extractor_version=_JOB_REQUIREMENTS_EXTRACTOR_VERSION,
+                provider=self.name,
+                model=self._model,
+                reported_strength=(
+                    None
+                    if item.reported_strength is None
+                    else RequirementStrength(item.reported_strength)
+                ),
+                reported_confidence=(
+                    None
+                    if item.reported_confidence is None
+                    else Confidence(item.reported_confidence)
+                ),
+            )
+            for item in reply.proposals
+        ]
 
     # -- request ------------------------------------------------------------------------
 
