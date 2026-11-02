@@ -83,3 +83,33 @@ jobs:
       # The suite must pass offline and unconfigured (standards/testing.md §1).
       - name: Run tests
         run: pytest -q
+
+  # The student web app. Separate job so a frontend failure never hides a backend result.
+  # Its tests mock the API, so this job needs no backend, database or network beyond npm.
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check and build
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
