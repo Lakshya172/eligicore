@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link, type Route } from "../router";
 import { useProfile } from "../state/ProfileContext";
+import { ShieldIcon } from "./icons";
 
 const NAV: { to: string; label: string; match: Route["name"][] }[] = [
   { to: "dashboard", label: "Dashboard", match: ["dashboard"] },
@@ -74,7 +75,11 @@ export function Layout({ route, children }: { route: Route; children: ReactNode 
             onClick={() => setMenuOpen((open) => !open)}
           >
             <span className="visually-hidden">Menu</span>
-            <span aria-hidden="true">{menuOpen ? "✕" : "☰"}</span>
+            <span className={`menu-toggle__bars ${menuOpen ? "menu-toggle__bars--open" : ""}`} aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
           </button>
           <nav
             id="primary-nav"
@@ -104,11 +109,22 @@ export function Layout({ route, children }: { route: Route; children: ReactNode 
       </main>
       <footer className="footer">
         <div className="footer__inner">
-          <p>
-            <strong>EligiCore</strong> helps you discover openings and understand your eligibility.
-            It never applies on your behalf.
-          </p>
+          <div className="footer__brand">
+            <Logo />
+            <p>
+              Helps students discover openings and understand their eligibility. It never applies on
+              anyone's behalf.
+            </p>
+          </div>
+          <nav className="footer__nav" aria-label="Footer">
+            {NAV.map((item) => (
+              <Link key={item.to} to={item.to} className="footer__link">
+                {item.label}
+              </Link>
+            ))}
+          </nav>
           <p className="footer__privacy">
+            <ShieldIcon size={15} />
             Your profile stays in this browser tab. The server evaluates it and keeps nothing.
           </p>
         </div>
