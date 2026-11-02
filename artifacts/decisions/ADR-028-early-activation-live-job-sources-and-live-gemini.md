@@ -146,6 +146,44 @@ preserved. Adding a source is never a matter of writing an adapter and switching
 to the three sources named in D5 as well: D5 records the direction, and the per-source technical and
 ToS confirmation happens at the implementation gate for that adapter.
 
+> **Proposed amendment, drafted 2026-11-02 (D8a). Proposed owner decision; not approved.** Not in
+> force until the owner explicitly approves it.
+>
+> **The rule.** From its approval, and only from then, ADR-028 D8 must be resolved for dispatch for
+> the Greenhouse Job Board API before any request is dispatched to that API, whether by the adapter,
+> by a script or by hand. This includes the single fetch recorded by ADR-030 D23 (Step 9a-2 in
+> context/state.md). There is no exception for a single request.
+>
+> **This is a new owner decision, not a reading of D8, and it does not apply retroactively.** D8 as
+> written requires validation before implementation, at the implementation gate for that adapter,
+> and does not mention dispatch. D8a does not claim that D8 was already a dispatch blocker. It makes
+> no finding on whether PR #52 or the live fetch of 2026-10-02 satisfied D8. D8's text is unchanged.
+>
+> **What resolution means.** A recorded owner decision (OD-8) that states, for each of D8's elements
+> (technical access, authentication, rate limits, Terms of Service, and preservation of an official
+> application URL), what is confirmed and records the evidence for it. **D8 is resolved for dispatch
+> only when every element is confirmed. An unconfirmed element does not count as resolved for
+> dispatch.** A source's silence is not confirmation. **Greenhouse's reviewed documentation does not
+> specify an applicable Job Board API rate limit. The absence of a published limit does not mean
+> unrestricted access, and an unconfirmed rate-limit element remains unresolved under D8a.** **OD-8
+> cannot convert an unresolved Terms of Service question into permission;** that element stays
+> unconfirmed until evidence resolves it. Confirming D8's Terms of Service element is not itself
+> Greenhouse-side permission. **OD-8 cannot create an informal exception to D8a; changing this rule
+> requires a separately documented owner decision.** OD-8 covers the API as a source and may not
+> merely exempt one request.
+>
+> **Separate decisions.** D23 and OD-7 record the existing internal authorization for one bounded
+> fetch. D8a, OD-8, any further ADR-030 decision on the scope of the D23 fetch, and final execution
+> approval are separate decisions. The existing internal authorization does not itself release the
+> fetch to run. Approval of D8a, OD-8, or a further scope decision does not provide final execution
+> approval. Only final execution approval releases the bounded fetch for the specifically approved
+> board and fetch scope, subject to all applicable prerequisites.
+>
+> **What this does not do.** D8a does not resolve D8, does not change the text of ADR-030 D23 or
+> OD-7, and changes no code. D5's description of these feeds as sanctioned does not establish
+> permission. A request sent through a mock transport is not a dispatch to the API. Lever and Ashby
+> remain under D8 as written.
+
 ### Data fidelity
 
 **D9 — Missing eligibility criteria stay missing.** A live job with no published CGPA cutoff, branch
@@ -501,6 +539,11 @@ job source or to an AI provider is prohibited (D21). Live sources are exercised 
 `httpx.MockTransport` against captured, sanitized payloads — the pattern the Gemini tests already
 use.
 
+> **Proposed note, drafted 2026-11-02 (ADR-030 D23b); not in force.** Under proposed ADR-030 D23b,
+> Step 9a-2 captures and retains no raw real payload, so it supplies no captured payload for these
+> tests, and synthetic fixtures stay the default. D23 remains current until OD-16 is explicitly
+> approved.
+
 QG-001, QG-003, QG-005, QG-006 and QG-008 apply per slice as usual. QG-007 remains relevant only if
 Week 9B is ever activated.
 
@@ -519,6 +562,7 @@ Recorded as open. **None may be chosen implicitly by an implementation PR.**
 | **OD-5** | **Whether an authenticated or shared-instance ingestion endpoint is ever needed** — reopens ADR-024's C-25 deferral. |
 | **OD-6** | ~~**Response to the structured-eligibility gap** — accept mostly-`None` live requirements, rely on the curated tier for structured evaluation, or authorize something new. AI extraction of criteria is **not** authorized (see Alternatives).~~ **RESOLVED 2026-10-03 by ADR-030:** controlled, evidence-verified extraction is authorized under ADR-030's contract; see **D9a**. |
 | **OD-7** | **Adzuna's attribution and licensing terms** — a separate legal/ToS decision before it could ever be adopted (D7). |
+| **OD-8** *(proposed with D8a; not in force)* | **ADR-028 D8 resolution for the Greenhouse Job Board API**, element by element, with the evidence recorded (D8a). An unconfirmed element, including an unconfirmed rate limit, does not count as resolved for dispatch. This decision cannot convert an unresolved Terms of Service question into permission and cannot create an informal exception to D8a; changing that rule requires a separately documented owner decision. Confirming D8's Terms of Service element is not itself Greenhouse-side permission. Resolving it does not provide final execution approval. This number is ADR-028's; ADR-030's OD-8 is a separate decision. |
 
 Week 9B's seven deployment decisions (ADR-027) remain separately open and are untouched by this ADR.
 

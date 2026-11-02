@@ -789,6 +789,136 @@ enough surrounding text to exercise the contradiction window (D9), which bounds 
 can be. Where a real case needs more context than the artifact policy permits, it is tested with
 synthetic text and the real case is exercised against the local corpus only.
 
+> **Proposed amendment, drafted 2026-11-02 (D23b). Proposed owner decision OD-16; not approved.**
+> **D23 remains current until OD-16 is explicitly approved. D23b remains proposed and not in force,
+> and OD-7 stands as written.** D23 and OD-7 record the existing internal authorization for one
+> bounded fetch; this amendment does not change that record.
+>
+> **If the D23 fetch is released to run, it is processed in memory and discarded. This amendment
+> does not provide final execution approval.**
+>
+> **No dispatch is permitted until every required prerequisite is satisfied:** OD-16 explicitly
+> approved; ADR-028 D8 resolved for dispatch through its own owner decision (proposed as ADR-028
+> OD-8), with every D8 element confirmed; permission established separately on the Greenhouse and
+> employer sides; the data protection assessment completed; a reviewed script tested on a synthetic
+> payload; the board and endpoint approved; and final execution approval immediately before the
+> request. **OD-16 approval is a documentation and decision prerequisite only. It does not provide
+> final execution approval and does not permit dispatch.**
+>
+> **Scope.** **Step 9a-2 evaluates API-response feasibility, structural parsing and aggregate
+> processing only. It does not establish extraction precision, recall or production accuracy.** The
+> run performs **no deterministic extraction and no requirement verification**, and does not run the
+> D25a instruction gate, so it produces no extraction result and does not validate extraction
+> accuracy. It does not meet the revisit condition for measured precision, and it sets no value for
+> `CONTRADICTION_WINDOW`.
+>
+> **Access is not permission.** Greenhouse's public Job Board API documents unauthenticated GET
+> access. That does not establish permission to collect, retain or reuse job content. OD-7 is an
+> internal authorization and grants no rights over third-party content.
+>
+> **Permission is unresolved, and required separately on each side.** On each side, permission must
+> cover this use: the fetch, in-memory processing, and retention of approved aggregates (those
+> listed under **What may be kept**). Neither side's permission stands in for the other's.
+>
+> - **Greenhouse side.** Greenhouse's terms applicable to this use must explicitly permit it, with
+>   evidence documented. Where those terms are silent, unclear or restrictive, Greenhouse's written
+>   permission is required. The reviewed Greenhouse documents neither permit nor forbid this use.
+>   Confirming the Terms of Service element of ADR-028 D8 is not itself Greenhouse-side permission.
+> - **Employer side.** The selected employer's terms or permissions must explicitly permit this use,
+>   with evidence documented. Where they are silent, unclear or restrictive, the employer's written
+>   permission is required. No employer has been selected.
+>
+> Permission stays unresolved on each side until the owner records that the evidence for that side
+> is sufficient. Evidence is kept privately; the repository records only the outcome.
+>
+> **Under this amendment, an open ADR-028 D8 blocks the fetch.** D8 remains unresolved until its own
+> separate owner decision is recorded, and that decision must precede the single Step 9a-2 request.
+> **Approval of OD-16 does not resolve, waive or satisfy D8.** There is no exception for a single
+> request. Greenhouse's reviewed documentation does not specify an applicable Job Board API rate
+> limit. Limits for other Greenhouse APIs or customer Order Forms are not treated as applying. The
+> absence of a published limit does not mean unrestricted access and is not permission to make
+> additional requests. This amendment does not narrow D8, and no document may claim D8 compliance on
+> the strength of it. Proposed ADR-028 D8a and OD-8 are separate decisions and are not in force.
+>
+> **Personal data.** In-memory processing may still constitute processing of personal data, and it
+> does not resolve applicable data protection obligations. Those obligations must be assessed before
+> any dispatch. The assessment must consider personal information in job descriptions, the purpose
+> of the processing, the legal basis, and the proposed processing and aggregate retention. **No such
+> assessment has been completed, and this amendment makes no finding on those obligations.**
+>
+> **Single-dispatch restrictions.** The run dispatches one request, with **no redirect followed,
+> automatically or by hand, no retry at any layer, including the HTTP client and its transport, and
+> no concurrency**. A redirect response is recorded as `dispatched` and its target is not requested.
+> After `dispatched` or `ambiguous`, the run is not repeated. A repeat after `not_sent` needs fresh
+> final execution approval. The run creates **no raw files and no raw logs**, makes **no database
+> writes** and makes **no AI-provider calls**. No console output, log line, exception or error
+> message carries response content, a request URL or a board token. Library request logging is
+> suppressed, because the adapter's guard is not used. `GreenhouseAdapter` is not used, because it
+> makes two requests per board and retries.
+>
+> **Dispatch accounting.**
+>
+> - **`dispatched`:** a request actually dispatched consumes the one-fetch internal authorization,
+>   whatever its outcome, including a non-success status.
+> - **`not_sent`:** used only when the implementation can reliably establish that no HTTP request
+>   was dispatched, because the failure came before a send was attempted, such as input validation
+>   or client setup. A failure after a send was attempted is never `not_sent`. It does not consume
+>   the internal authorization.
+> - **`ambiguous`:** every other case, including a timeout or connection failure unless the
+>   implementation can reliably establish `dispatched`. **An ambiguous dispatch counts as
+>   dispatched** and consumes the internal authorization.
+> - **The retained dispatch-status value is exactly one fixed label for the run:** `not_sent`,
+>   `dispatched` or `ambiguous`. It carries no request details, URL, token, exception text, response
+>   content or identifying information. No response content is retained to establish it.
+>
+> **Processing.** The response is processed in memory only, outside `pytest` and CI, by structural
+> parsing and aggregate counting. All response content is discarded when the run ends. ADR-028's
+> rule that live job responses are never written to raw debug files or logs applies unchanged.
+>
+> **What may be kept.** Only these aggregates, for the run as a whole:
+>
+> - the UTC date, the single dispatch-status label, the response status category and the elapsed
+>   time
+> - the number of postings processed, and the number with a non-empty description
+> - the number of postings that parsed into the expected structure, and the number that failed, per
+>   failure category; categories are fixed labels set before the run and carry no response content
+> - the number of postings in each description-length band, after normalization: under 1,000;
+>   1,000–2,999; 3,000–5,999; 6,000 or more characters
+> - the number of postings whose description contains entity-escaped markup; this is a structural
+>   observation only and does not establish sanitization safety, safe rendering or extraction
+>   quality
+>
+> These aggregates are not assumed to be non-identifying: an exact posting count or a small band
+> count, with the date, can point to a public board or a single posting. Any set proposed for commit
+> must be reviewed for this, with small counts banded or suppressed.
+>
+> **All aggregates stay outside the repository by default.** None may appear in the repository,
+> including in an ADR, `context/state.md`, a commit message or PR text, without a separate owner
+> review and approval of that specific set.
+>
+> **What may not be kept.** Raw or full job text; any excerpt, fragment or evidence string;
+> extracted values; hashes or fingerprints of job content; per-posting rows; response headers;
+> personal contact information; and any board token, company name, job ID, title, location,
+> department or URL.
+>
+> **Supersession, for Step 9a-2 only.** The real-posting local corpus expectation in D23 no longer
+> applies to Step 9a-2. No local corpus is kept, so this supersedes D23's lost-corpus consequence,
+> its sentence exercising a real case against the local corpus, the matching Consequences entry, and
+> the expectation that the window constant is set from that corpus. Step 9a-2 commits no derived
+> corpus or verbatim fragment, adds no real employer description to any committed fixture, and does
+> not validate extraction accuracy. The completed Step 9a-1 synthetic corpus
+> (`tests/requirement_corpus.py`, `tests/test_requirement_corpus.py`) is preserved and remains
+> available, and synthetic fixtures are the default. A real verbatim excerpt may enter the public
+> repository only under a separate owner decision and documented permission; because nothing is
+> kept, it would also need a new fetch decision. D23's text, single-use rule and licensing reasoning
+> stand, its artifact shape remains a ceiling, and no other decision is changed.
+>
+> **Endpoint.** The proposed endpoint is
+> `GET https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true`. **It has no
+> final execution approval.** The board token is not recorded in the public repository. Dispatch
+> requires final execution approval, immediately before the request, naming the board and the
+> endpoint.
+
 ### Deadlines
 
 **D23a — Deadline extraction and freshness are outside ADR-030.** They belong to ADR-028's
@@ -985,6 +1115,9 @@ signature-as-privacy-boundary property that two merged ADRs depend on.
 - **The committed fixture corpus is deliberately weaker than the real data** (D23), so some
   contradiction cases are exercised only locally.
 
+> **Proposed amendment, drafted 2026-11-02 (D23b).** Step 9a-2 would keep no local corpus, so
+> real-posting contradiction cases would not be exercised locally; synthetic cases remain.
+
 ---
 
 ## Testing implications
@@ -1079,6 +1212,10 @@ nothing changes behaviour until the last.
 | 9 | **Fixture fetch and derived corpus** (D23) |
 | 10 | **Enable on live Greenhouse** behind explicit configuration, with a measured first run |
 
+> **Proposed amendment, drafted 2026-11-02 (D23b).** Step 9 would become Step 9a-1, the merged
+> synthetic corpus, and Step 9a-2, an in-memory run with no final execution approval that performs
+> no extraction or verification and commits no derived corpus.
+
 **Go conditions before step 8 or any live extraction:** steps 1–3 merged · the verifier pure and
 mutation-tested · the pinned-text rule tested against `collapse_whitespace` · mock extracts nothing
 and the zero-call test passes · the model resolved and the deprecated sampling parameters removed ·
@@ -1113,6 +1250,11 @@ into existence."* Only the fourth verb is reached.
 - The Consequences statement predicting that live jobs *"will evaluate to `UNKNOWN` /
   `NEEDS_REVIEW`"* is **factually wrong** and should be corrected to `ELIGIBLE`, independently of
   everything above.
+
+> **Proposed amendment, drafted 2026-11-02 (D23b).** D23b does not amend ADR-028. ADR-028's rule
+> against writing live job responses to raw debug files or logs applies to the D23 fetch unchanged.
+> D8 remains unresolved and, under this proposal, blocks the fetch until resolved through its own
+> decision. Proposed ADR-028 D8a and OD-8 are separate decisions and are not in force.
 
 ### ADR-017 — a later additive amendment is required
 
@@ -1162,6 +1304,9 @@ the implementing PR with evidence rather than guessed here.
    must be chosen deliberately and must not re-enable the rule-5 failure D4 closes.
    **Resolved 2026-10-03 (D4a): labelled `DETERMINISTIC`; no third `EvaluationMethod` is created.**
 
+> **Proposed amendment, drafted 2026-11-02 (D23b).** Step 9a-2 would retain no corpus, so it would
+> not resolve note 1 (`CONTRADICTION_WINDOW` stays 300) or note 5. Both stay open.
+
 ---
 
 ## Revisit conditions
@@ -1181,6 +1326,10 @@ the implementing PR with evidence rather than guessed here.
 ## Owner decisions
 
 **All resolved.** Decided by the project owner across the ADR-030 gates, 2026-10-02.
+
+> **Proposed note, drafted 2026-11-02 (OD-16).** "All resolved" describes the decisions of
+> 2026-10-02 and the owner rulings recorded as amendments below. It does not cover proposed OD-16,
+> further down this section, which is not approved, not resolved and not in force.
 
 | # | Decision | Resolution |
 |---|---|---|
@@ -1233,6 +1382,16 @@ seven remain open and untouched.
 >
 > Decided by the project owner on 2026-10-29. No other open decision is resolved by it.
 
+> **Proposed amendment, drafted 2026-11-02.** One proposed owner decision for the Step 9a-2 gate,
+> recorded here as **OD-16**. **It is not approved and is not normative.** D23 remains current until
+> OD-16 is explicitly approved, and OD-7 stands as written.
+>
+> | # | Decision | Proposed resolution |
+> |---|---|---|
+> | **OD-16 (proposed)** | What scope and conditions should apply to Step 9a-2? | **PROPOSED: IN MEMORY AND DISCARDED — D23b.** Evaluates API-response feasibility, structural parsing and aggregate processing only; establishes no precision, recall or production accuracy. One dispatch, with no followed redirects, retries, concurrency, raw files, raw logs, database writes, AI-provider calls, deterministic extraction, requirement verification or D25a gate. Dispatch status is exactly one fixed label for the run, `not_sent` only where reliably established; an ambiguous dispatch counts as dispatched. Aggregates stay outside the repository unless separately reviewed by the owner. Synthetic fixtures remain the default. **Approval of OD-16 would be a documentation and decision prerequisite only, and would not provide final execution approval or permit dispatch. No dispatch is permitted until every required prerequisite is satisfied:** ADR-028 D8 resolved for dispatch through its own owner decision, which this approval would not resolve, waive or satisfy; permission established separately on the Greenhouse and employer sides; the data protection assessment completed; a reviewed script tested on a synthetic payload; the board and endpoint approved; and final execution approval immediately before the request. |
+>
+> Awaiting explicit owner approval. No open decision is resolved by this proposal.
+
 > **Numbering note.** These OD numbers belong to the ADR-030 gates and are **not** ADR-028's
 > OD-1 … OD-7. ADR-028's own **OD-6** — the structured-eligibility gap — is resolved by this ADR as
 > OD-1 above. ADR-030's OD-6 is the Gemini model.
@@ -1264,3 +1423,16 @@ requirements reaching one endpoint's evaluation but not the other's, or the two 
 different sets for the same catalogue state (D20b) · recommendation code reading, filtering or
 re-evaluating a derived requirement instead of consuming the shared path's verdict (D20b) · a
 grouping, ranking, scoring or explanation rule changed on the strength of this ruling (D20b).
+
+**Proposed 2026-11-02 with OD-16; not in force.** Each of the following would be a review failure in
+its own right: a dispatch while ADR-028 D8 is open · a raw file or raw log from the D23 fetch ·
+response content, a request URL or a board token in console output, a log line, an exception or an
+error message · a second dispatch, followed redirect, retry or concurrent request · a dispatch
+status that is not exactly one fixed label, that carries any further detail, or that reads
+`not_sent` without reliable establishment · response content retained to establish dispatch status ·
+a database write, AI-provider call, deterministic extraction, requirement verification or D25a gate
+during the run · a dispatch before the data protection assessment or without final execution
+approval · data kept outside D23b's aggregate list · an aggregate committed without separate owner
+review · a real verbatim excerpt committed without a separate owner decision and documented
+permission · a real employer description added to a committed fixture · a claim of ADR-028 D8
+compliance, or of precision, recall or production accuracy from Step 9a-2 (D23b).
