@@ -1,9 +1,9 @@
 import { api } from "../api/client";
-import type { RecommendationItem } from "../api/types";
+import type { CandidateProfile, EducationEntry, RecommendationItem } from "../api/types";
 import { ArrowRightIcon, CheckIcon, CrossIcon, QuestionIcon } from "../components/icons";
 import { Badge, Card, CatalogueNotice, EmptyState, ErrorState, PageHeader, SectionHead, Spinner, VerdictBadge } from "../components/ui";
 import { JOB_TYPE_LABEL } from "../lib/jobs";
-import { hasEvaluableData } from "../lib/profile";
+import { DEGREE_LEVELS, hasEvaluableData } from "../lib/profile";
 import { useAsync } from "../lib/useAsync";
 import { Link } from "../router";
 import { useProfile } from "../state/ProfileContext";
@@ -40,6 +40,72 @@ function Stat({ label, value }: { label: string; value: number | string }) {
       <p className="stat__value">{value}</p>
       <p className="stat__label">{label}</p>
     </div>
+  );
+}
+
+// One decimal place, so 19 / 12 / 9 of 40 reads 47.5% / 30% / 22.5% rather than rounding to 101%.
+const SHARE = new Intl.NumberFormat("en", { style: "percent", maximumFractionDigits: 1 });
+
+function formatGrade(entry: EducationEntry): string {
+  if (entry.cgpa == null) return "Not stated";
+  switch (entry.scale) {
+    case "SCALE_10":
+      return `${entry.cgpa} / 10`;
+    case "SCALE_4":
+      return `${entry.cgpa} / 4`;
+    case "SCALE_5":
+      return `${entry.cgpa} / 5`;
+    case "PERCENTAGE":
+      return `${entry.cgpa}%`;
+    default:
+      return `${entry.cgpa} (scale not stated)`;
+  }
+}
+
+/** What the counts below were computed from: the profile held in this tab, shown as stated. */
+function ProfileStrip({ profile }: { profile: CandidateProfile }) {
+  const [first, ...others] = profile.education ?? [];
+  const level = first?.level ? DEGREE_LEVELS.find((option) => option.value === first.level)?.label : undefined;
+  const qualification = first
+    ? [first.degree || level, first.field_of_study].filter(Boolean).join(" · ") || "Not stated"
+    : "Not stated";
+  const items = [
+    { label: "Qualification", value: others.length ? `${qualification} +${others.length}` : qualification },
+    { label: "Graduation", value: first?.grad_year != null ? String(first.grad_year) : "Not stated" },
+    { label: "Grade", value: first ? formatGrade(first) : "Not stated" },
+    { label: "Backlogs", value: profile.backlogs != null ? String(profile.backlogs) : "Not stated" },
+  ];
+  return (
+    <dl className="profile-strip" aria-label="Evaluated against">
+      {items.map((item) => (
+        <div key={item.label} className="profile-strip__item">
+          <dt>{item.label}</dt>
+          <dd className={item.value === "Not stated" ? "profile-strip__missing" : undefined}>{item.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Mirrors the loaded layout, so nothing jumps when results arrive. */
+function RecommendationsSkeleton() {
+  return (
+    <Card>
+      <div aria-busy="true">
+        <Spinner label="Evaluating your eligibility" />
+        <div className="skeleton skeleton--title" aria-hidden="true" />
+        <div className="metric-skeleton" aria-hidden="true">
+          {[0, 1, 2].map((key) => (
+            <div key={key} className="metric-skeleton__item">
+              <div className="skeleton skeleton--metric" />
+              <div className="skeleton skeleton--line skeleton--short" />
+            </div>
+          ))}
+        </div>
+        <div className="skeleton skeleton--line" aria-hidden="true" />
+        <div className="skeleton skeleton--line skeleton--short" aria-hidden="true" />
+      </div>
+    </Card>
   );
 }
 
@@ -99,12 +165,7 @@ function Recommendations() {
   }
 
   if (result.status === "loading" || result.status === "idle") {
-    return (
-      <Card className="centered">
-        <Spinner label="Evaluating your eligibility" />
-        <p className="muted">Checking requirements across the catalogue…</p>
-      </Card>
-    );
+    return <RecommendationsSkeleton />;
   }
   if (result.status === "error") {
     return (
@@ -136,6 +197,7 @@ function Recommendations() {
             {data.jobs_not_considered > 0 && ` (${data.jobs_not_considered} more not evaluated in this pass)`}.
           </p>
         </SectionHead>
+        <ProfileStrip profile={profile} />
         {total > 0 && (
           <div className="distribution" aria-hidden="true">
             {groups.map((group) =>
@@ -157,6 +219,9 @@ function Recommendations() {
               </span>
               <p className="summary-tile__value">{group.count}</p>
               <p className="summary-tile__label">{group.label}</p>
+              {total > 0 && (
+                <p className="summary-tile__share">{SHARE.format(group.count / total)} of evaluated</p>
+              )}
             </div>
           ))}
         </div>

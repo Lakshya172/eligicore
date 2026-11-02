@@ -10,7 +10,7 @@ function Icon({ children, size = 16 }: { children: ReactNode; size?: number }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="1.75"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -156,7 +156,19 @@ export const ChevronRightIcon = ({ size }: { size?: number }) => (
   </Icon>
 );
 
-export const AlertIcon = ({ size }: { size?: number }) => (
+export const HomeIcon = ({ size }: { size?: number }) => (
+  <Icon size={size}>
+    <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1v-8.5Z" />
+  </Icon>
+);
+
+export const CommandIcon = ({ size }: { size?: number }) => (
+  <Icon size={size}>
+    <path d="M9 9V6.5A2.5 2.5 0 1 0 6.5 9H9Zm0 0h6m-6 0v6m6-6V6.5A2.5 2.5 0 1 1 17.5 9H15Zm0 0v6m0 0h2.5a2.5 2.5 0 1 1-2.5 2.5V15Zm0 0H9m0 0v2.5A2.5 2.5 0 1 1 6.5 15H9Z" />
+  </Icon>
+);
+
+export const AlertIcon =({ size }: { size?: number }) => (
   <Icon size={size}>
     <path d="M12 3 2 20h20L12 3Z" />
     <path d="M12 10v4M12 17h.01" />

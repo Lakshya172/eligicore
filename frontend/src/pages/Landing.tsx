@@ -1,65 +1,98 @@
-import { ArrowRightIcon, CheckIcon, InfoIcon, QuestionIcon, RuleIcon, ShieldIcon, SparkIcon } from "../components/icons";
+import {
+  ArrowRightIcon,
+  CheckIcon,
+  CompassIcon,
+  DocumentIcon,
+  ExternalIcon,
+  InfoIcon,
+  QuestionIcon,
+  RuleIcon,
+  ShieldIcon,
+  SparkIcon,
+  UserIcon,
+} from "../components/icons";
 import { VerdictBadge } from "../components/ui";
 import { Link } from "../router";
 
-const STEPS = [
+/** The product's real workflow, in order. Each step names only what the app does today. */
+const WORKFLOW = [
   {
-    title: "Add your profile",
-    text: "Enter your degree, graduation year, grade and backlogs, or upload a résumé to pre-fill them. It stays in your browser tab.",
+    icon: <UserIcon />,
+    title: "Build your profile",
+    text: "Enter your degree, graduation year, grade and backlogs, or upload a PDF or DOCX résumé to pre-fill them. It stays in this tab.",
   },
   {
-    title: "Explore opportunities",
-    text: "Browse the supported catalogue of internships and graduate roles, with the requirements each employer states.",
+    icon: <CompassIcon />,
+    title: "Discover opportunities",
+    text: "Browse the supported catalogue of internships and graduate roles, and filter by type, status and verdict.",
   },
   {
-    title: "See exactly why",
-    text: "Every verdict comes with a requirement-by-requirement explanation, so you know where you stand before you apply.",
+    icon: <RuleIcon />,
+    title: "Review the evidence",
+    text: "Every stated requirement is shown as passed, failed or not verified, with where it came from.",
+  },
+  {
+    icon: <QuestionIcon />,
+    title: "Prepare",
+    text: "See exactly what needs your attention, such as a missing value, a different grading scale or an ambiguous field, before you apply.",
+  },
+  {
+    icon: <ExternalIcon />,
+    title: "Apply yourself",
+    text: "Open the employer's own page when you are ready. EligiCore never submits, fills a form or contacts anyone for you.",
   },
 ];
 
 /** A static illustration built from the real components. It shows no catalogue data. */
 function ProductPreview() {
   const rows = [
-    { icon: <CheckIcon size={13} />, tone: "success", label: "Minimum grade 7.0 out of 10", value: "Yours: 8.2", status: "Pass" },
-    { icon: <CheckIcon size={13} />, tone: "success", label: "Graduation year 2026 – 2027", value: "Yours: 2027", status: "Pass" },
-    { icon: <QuestionIcon size={13} />, tone: "neutral", label: "Field of study", value: "Not an exact match", status: "Not verified" },
+    { icon: <CheckIcon size={13} />, tone: "success", label: "Minimum grade 7.0 out of 10", value: "8.2", status: "Passed" },
+    { icon: <CheckIcon size={13} />, tone: "success", label: "Graduation year 2026 – 2027", value: "2027", status: "Passed" },
+    { icon: <QuestionIcon size={13} />, tone: "neutral", label: "Field of study", value: "Information Technology", status: "Not verified" },
   ] as const;
   return (
     <figure className="preview" aria-label="Illustration of an eligibility explanation">
-      <div className="preview__backplate" aria-hidden="true" />
-      <div className="preview__window">
-        <div className="preview__chrome" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-          <p>Eligibility · Example employer</p>
-        </div>
-        <div className="preview__body">
-          <div className="preview__head">
-            <span className="preview__logo" aria-hidden="true">E</span>
-            <div>
-              <p className="preview__title">Software Engineering Intern</p>
-              <p className="preview__company">Example employer · Internship</p>
+      {/* The callout follows the window in normal flow, so it never covers a row or the caption. */}
+      <div className="preview__stage">
+        <div className="preview__window">
+          <div className="preview__bar" aria-hidden="true">
+            <span className="preview__crumb">Opportunities</span>
+            <span className="preview__crumb-sep">/</span>
+            <span>Eligibility</span>
+            <span className="preview__counts">2 passed · 0 failed · 1 not verified</span>
+          </div>
+          <div className="preview__body">
+            <div className="preview__head">
+              <span className="preview__logo" aria-hidden="true">E</span>
+              <div>
+                <p className="preview__title">Software Engineering Intern</p>
+                <p className="preview__company">Example employer · Internship</p>
+              </div>
+              <VerdictBadge state="NEEDS_REVIEW" />
             </div>
+            <ul className="preview__rows">
+              {rows.map((row) => (
+                <li key={row.label} className={`preview__row preview__row--${row.tone}`}>
+                  <span className={`status-dot status-dot--${row.tone}`} aria-hidden="true">
+                    {row.icon}
+                  </span>
+                  <span className="preview__row-text">
+                    <span>{row.label}</span>
+                    <span className="preview__row-value">
+                      Your profile: <code>{row.value}</code>
+                    </span>
+                  </span>
+                  <span className={`badge badge--${row.tone}`}>{row.status}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-          <div className="preview__verdict">
-            <VerdictBadge state="NEEDS_REVIEW" />
-            <p>2 of 3 requirements met · 1 needs your review</p>
-          </div>
-          <ul className="preview__rows">
-            {rows.map((row) => (
-              <li key={row.label}>
-                <span className={`status-dot status-dot--${row.tone}`} aria-hidden="true">
-                  {row.icon}
-                </span>
-                <span className="preview__row-text">
-                  <span>{row.label}</span>
-                  <span className="preview__row-value">{row.value}</span>
-                </span>
-                <span className={`badge badge--${row.tone}`}>{row.status}</span>
-              </li>
-            ))}
-          </ul>
+        </div>
+        <div className="preview__evidence" aria-hidden="true">
+          <span className="preview__evidence-label">
+            <DocumentIcon size={12} /> Read from the job description
+          </span>
+          “Open to students of Computer Science or a related field.”
         </div>
       </div>
       <figcaption className="preview__caption">Illustration, not a real evaluation</figcaption>
@@ -85,12 +118,12 @@ export function Landing() {
             prepare with clarity.
           </p>
           <div className="hero__actions">
-            <Link to="opportunities" className="button button--primary button--lg">
-              Explore opportunities
+            <Link to="profile" className="button button--primary button--lg">
+              Check your eligibility
               <ArrowRightIcon />
             </Link>
-            <Link to="dashboard" className="button button--secondary button--lg">
-              Open dashboard
+            <Link to="opportunities" className="button button--secondary button--lg">
+              Browse opportunities
             </Link>
           </div>
           <ul className="hero__facts">
@@ -120,30 +153,32 @@ export function Landing() {
       </section>
 
       <section className="section" aria-labelledby="how-heading">
-        <div className="section__intro">
+        <div className="section__intro section__intro--left">
           <p className="eyebrow">How it works</p>
           <h2 id="how-heading" className="section-title">
-            Three steps to a clear answer.
+            From profile to application, in five steps.
           </h2>
+          <p className="section__lead">You decide at every step. The last one is always yours.</p>
         </div>
-        <ol className="steps">
-          {STEPS.map((step, index) => (
-            <li key={step.title} className="step">
-              <span className="step__number" aria-hidden="true">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <h3 className="step__title">
+        <ol className="workflow">
+          {WORKFLOW.map((step, index) => (
+            <li key={step.title} className={`workflow__step ${index === WORKFLOW.length - 1 ? "workflow__step--yours" : ""}`}>
+              <div className="workflow__marker" aria-hidden="true">
+                <span className="workflow__icon">{step.icon}</span>
+                <span className="workflow__number">{String(index + 1).padStart(2, "0")}</span>
+              </div>
+              <h3 className="workflow__title">
                 <span className="visually-hidden">Step {index + 1}: </span>
                 {step.title}
               </h3>
-              <p className="step__text">{step.text}</p>
+              <p className="workflow__text">{step.text}</p>
             </li>
           ))}
         </ol>
       </section>
 
       <section className="section section--split" aria-labelledby="trust-heading">
-        <div className="section__intro section__intro--left">
+        <div className="section__intro section__intro--left section__intro--sticky">
           <p className="eyebrow">Built to be trusted</p>
           <h2 id="trust-heading" className="section-title">
             Honest answers.
