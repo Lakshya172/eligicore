@@ -83,7 +83,7 @@ describe("job details breadcrumb", () => {
 describe("stylesheet guarantees", () => {
   it("loads no external fonts or assets", () => {
     // Guards against a blank import making every assertion below vacuous.
-    expect(styles).toContain("--accent: #b18a65");
+    expect(styles).toContain("--bronze: #b78a60");
     expect(styles).not.toMatch(/@import|@font-face|url\(\s*["']?https?:/i);
   });
 
@@ -94,6 +94,6 @@ describe("stylesheet guarantees", () => {
   });
 
   it("draws the keyboard focus ring as an outline that component shadows cannot hide", () => {
-    expect(styles).toMatch(/:focus-visible\s*\{\s*outline: 2px solid var\(--accent-bright\)/);
+    expect(styles).toMatch(/:focus-visible\s*\{\s*outline: 2px solid var\(--bronze-light\)/);
   });
 });
