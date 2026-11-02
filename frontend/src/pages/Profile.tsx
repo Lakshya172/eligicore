@@ -58,7 +58,9 @@ type UploadState =
 
 function ResumeUpload({ onParsed }: { onParsed: (profile: CandidateProfile) => void }) {
   const [state, setState] = useState<UploadState>({ status: "idle" });
+  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const busy = state.status === "processing";
 
   async function handleFile(file: File) {
     const lower = file.name.toLowerCase();
@@ -93,32 +95,65 @@ function ResumeUpload({ onParsed }: { onParsed: (profile: CandidateProfile) => v
         Upload a PDF or DOCX (up to 5 MB) to pre-fill the form below. The server reads it, returns the
         extracted details and deletes the file immediately, whether or not parsing succeeds.
       </p>
-      <label className={`dropzone ${state.status === "processing" ? "dropzone--busy" : ""}`}>
+      {/* Dropping a file runs the same checks and the same single request as choosing one. */}
+      <label
+        className={`dropzone ${busy ? "dropzone--busy" : ""} ${dragging ? "dropzone--dragging" : ""}`}
+        onDragOver={(event) => {
+          if (busy) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+          if (!dragging) setDragging(true);
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+          if (busy) return;
+          const files = event.dataTransfer.files;
+          if (files.length > 1) {
+            setState({ status: "error", message: "Drop one résumé at a time." });
+            return;
+          }
+          const file = files[0];
+          if (file) void handleFile(file);
+        }}
+      >
         <input
           ref={inputRef}
           type="file"
           accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           className="visually-hidden"
-          disabled={state.status === "processing"}
+          disabled={busy}
           onChange={(event) => {
             const file = event.target.files?.[0];
             if (file) void handleFile(file);
           }}
         />
         <span className="dropzone__icon" aria-hidden="true">
-          {state.status === "processing" ? <Spinner label="Processing résumé" /> : <UploadIcon size={20} />}
+          {busy ? <Spinner label="Processing résumé" /> : <UploadIcon size={20} />}
         </span>
-        {state.status === "processing" ? (
+        {busy ? (
           <span className="dropzone__text">
             <strong>Reading {state.fileName}…</strong>
-            <span className="dropzone__hint">This usually takes a second. Nothing is kept afterwards.</span>
+            <span className="dropzone__hint">Nothing is kept once the server has read it.</span>
+            {/* Indeterminate on purpose: the upload reports no progress, so none is invented. */}
+            <span className="progress" role="progressbar" aria-label="Reading résumé">
+              <span className="progress__bar" />
+            </span>
+          </span>
+        ) : dragging ? (
+          <span className="dropzone__text">
+            <strong>Release to read this résumé</strong>
+            <span className="dropzone__hint">PDF or DOCX, up to 5 MB</span>
           </span>
         ) : (
           <span className="dropzone__text">
             <span>
-              <strong>Choose a résumé file</strong> (PDF or DOCX)
+              <strong>Choose a résumé file</strong> or drop it here
             </span>
-            <span className="dropzone__hint">Up to 5 MB · read once, then deleted by the server</span>
+            <span className="dropzone__hint">PDF or DOCX · up to 5 MB · read once, then deleted by the server</span>
           </span>
         )}
       </label>
@@ -434,8 +469,15 @@ export function Profile() {
         </div>
 
         <div className="form-actions">
-          <button type="submit" className="button button--primary" disabled={saving}>
-            {saving ? "Saving…" : "Save and check eligibility"}
+          {/* Disabled while the request runs, so a second click cannot submit twice. */}
+          <button
+            type="submit"
+            className={`button button--primary ${saving ? "button--loading" : ""}`}
+            disabled={saving}
+            aria-busy={saving}
+          >
+            {saving && <span className="button__spinner" aria-hidden="true" />}
+            {saving ? "Checking your profile…" : "Save and check eligibility"}
           </button>
         </div>
       </form>
