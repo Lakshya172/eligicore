@@ -1,132 +1,167 @@
-# EligiCore — status at the one-week freeze (2026-11-02)
+# EligiCore — one-week freeze handoff
 
-Branch `feat/student-ui-mvp`, based on `main` at `a993440`. The PR is open for review and not merged.
+**Freeze:** 2026-11-03 to 2026-11-10. No implementation work during the freeze.
+**State at handoff (verified 2026-11-02):** `main` is `1df4c48`, the PR #83 merge, with post-merge CI
+run [41450933519](https://github.com/Lakshya172/eligicore/actions/runs/41450933519) green. Backend:
+3030 passed, 1 warning. Frontend: 41 passed. A presentation-only polish is open as PR #84.
 
-## What is implemented
+EligiCore is a **local, demonstrable** product. It is not deployed and not production-ready.
 
-- **Student web app** in `frontend/` (React 19 + TypeScript + Vite, no UI or router library). It has
-  six screens: landing, dashboard, opportunity explorer, job details with eligibility explanation,
-  profile with résumé pre-fill, and "How it works".
-- It uses only existing API endpoints: `GET /health`, `GET /jobs`, `GET /jobs/{id}`,
-  `POST /recommendations`, `POST /resumes/parse` and `POST /candidates/validate`.
-- **No backend code changed.** The dev server proxies `/api` to the backend, so no CORS change was
-  needed.
-- A separate `frontend` CI job runs lint, type-check, build and tests. `node_modules/` is now
-  git-ignored.
+---
 
-## What works end to end (verified in a browser against the real API)
+## What you are demonstrating
 
-| Journey | Result |
-|---|---|
-| Landing → Dashboard | Catalogue counts from `GET /jobs`: 40 open, 21 internships, 19 full-time, 0 closed |
-| Profile → sample profile → Dashboard | Real `POST /recommendations` result for the fictional sample: 19 eligible or likely eligible, 12 need review or unverified, 9 not eligible, with top matches |
-| Explorer | 40 cards with verdict badges; search, type, status and verdict filters; the verdict filter showed 9 "Not eligible" jobs, matching the dashboard |
-| Job details | Full breakdown for `NEEDS_REVIEW` (a scale mismatch and an inconclusive AI-assisted check) and for `NOT_ELIGIBLE` (two verified source-stated failures) |
-| Résumé upload | A generated fictional PDF was parsed by the mock provider (`PARTIAL`). The form was pre-filled, and backlogs stayed blank rather than becoming 0 |
-| API down | A clear error state appears, and "Try again" recovers once the API is back |
-| Mobile (375 px) | Collapsing menu, single-column cards, no horizontal overflow |
+- **The student web app** in `frontend/`, over the existing FastAPI backend, with no backend change.
+- **A synthetic catalogue.** The 40 opportunities come from EligiCore's curated synthetic dataset:
+  fictional "Example …" and "Sample …" employers, with placeholder `example.com` links. It is not a
+  live job feed and does not cover real employers.
+- **A fictional sample student.** "Use sample profile" loads an invented student. Evaluations of it
+  are real API results for a fictional person, and the UI labels them as such.
+- **Offline résumé parsing.** It uses the mock provider's pattern matching. No live AI provider is
+  needed, and none is called.
+- **Local only.** Nothing is deployed and no external service is contacted.
 
-No browser console errors were logged during these runs.
+## Start the demo
 
-## What is only a demo
+Use a **separate demo database**. Never point these commands at a database that matters to you.
 
-- **The catalogue is EligiCore's curated synthetic dataset** (40 postings, fictional "Example …" and
-  "Sample …" employers, placeholder `example.com` links). Every listing page says so.
-- **"Use sample profile"** loads a fictional student. It produces real evaluations of that fictional
-  profile, and every result computed from it is labelled as such.
-- Résumé parsing runs on the offline **mock** provider, which uses pattern matching.
-- The landing-page verdict card is a static illustration, labelled "Illustration, not a real
-  evaluation".
+### Backend, from the repository root
 
-## What remains incomplete
+Windows PowerShell:
 
-- Text search and the verdict filter run in the browser, because the API has no search parameter.
-  The explorer loads at most 100 jobs, the API's page limit.
-- Application preparation (`/applications/prepare`) and the Excel tracker (`/applications/export`)
-  are not in the UI yet.
-- There is no saved application tracking in the browser yet. The dossier's IndexedDB store isn't
-  built; the profile lives only in `sessionStorage`.
-- Résumé upload is click-to-choose only, with no drag-and-drop.
-- There are no end-to-end browser tests in CI; frontend tests mock the API.
-- The frontend has no ADR of its own. The README lists a frontend under "Future phases (Phase 2)",
-  and this sprint delivered one early on the owner's instruction.
-
-## Commands
-
-From the repository root, after `pip install -r requirements.txt`:
-
-```bash
-# Use a separate demo database, never a developer database.
-export ELIGICORE_DATABASE_URL=sqlite:///./demo.db     # PowerShell: $env:ELIGICORE_DATABASE_URL="sqlite:///./demo.db"
+```powershell
+$env:ELIGICORE_DATABASE_URL="sqlite:///./demo.db"
 alembic upgrade head
 python -m app.cli seed-catalogue
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-In a second terminal:
+macOS or Linux:
+
+```bash
+export ELIGICORE_DATABASE_URL=sqlite:///./demo.db
+alembic upgrade head
+python -m app.cli seed-catalogue
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+`seed-catalogue` loads the 40 synthetic postings and is safe to re-run; it reports every job
+unchanged the second time. Run it before every demo on a new database.
+
+### Frontend, in a second terminal
 
 ```bash
 cd frontend
 npm install
-npm run dev            # http://127.0.0.1:5173
+npm run dev
 ```
 
-Environment variables: none are required.
-- `ELIGICORE_DATABASE_URL` selects the database, and the default is `./eligicore.db`.
-- `ELIGICORE_AI_PROVIDER` defaults to `mock`. Leave it there; no live provider is used.
-- `ELIGICORE_API_URL` is an optional setting for the frontend dev server, if the API isn't on
-  `http://127.0.0.1:8000`.
+| URL | What it is |
+|---|---|
+| `http://127.0.0.1:5173` | The student web app |
+| `http://127.0.0.1:8000/docs` | The API's interactive documentation |
+| `http://127.0.0.1:8000/api/v1/health` | Health check: `{"status":"ok", …}` |
 
-### Five-minute demo script
+The frontend's dev server forwards `/api` to `http://127.0.0.1:8000`. For a backend elsewhere, start
+the frontend with `ELIGICORE_API_URL` set, e.g. `ELIGICORE_API_URL=http://127.0.0.1:8001 npm run dev`
+(PowerShell: `$env:ELIGICORE_API_URL="http://127.0.0.1:8001"; npm run dev`).
 
-1. Open `http://127.0.0.1:5173`. On the landing page, explain what the product proposes, then point
-   to the three steps and "never applies for you".
-2. **Opportunities**: there are 40 synthetic roles. Point out the demo-catalogue notice, then search
-   for "intern" and filter by type.
-3. **Profile**: click **Use sample profile** and note the "fictional" label in the header.
-4. **Dashboard**: show the real eligibility totals and the top matches, and explain that relevance
-   ranks only within the eligible group.
-5. **Opportunities**: filter by "Needs review" and open **Accounting Associate**. Show the scale
-   mismatch ("never converts between scales") and the AI-assisted check that verified nothing.
-6. Filter by "Not eligible" and open **Quantitative Analyst**. Show the verified, employer-stated
-   failures and the check that was skipped after a hard failure.
-7. **How it works**: cover the five verdicts, data handling and limitations.
+No environment variable is required beyond the database URL above. `ELIGICORE_AI_PROVIDER` defaults to
+`mock`; leave it there.
 
-## Tests actually executed (2026-11-02)
+## Demonstration script (about five minutes)
 
-| Suite | Command | Result |
+1. **Landing page** (`http://127.0.0.1:5173`). Explain the question EligiCore answers — "am I eligible,
+   and why?" — and that it never applies for anyone.
+2. **Dashboard.** Before a profile exists it shows only catalogue counts, and says nothing has been
+   evaluated.
+3. **Load the fictional sample profile.** Go to Profile, then **Use sample profile**. The header pill
+   now reads "Sample profile (fictional)".
+4. **Opportunities.** Point out the demo-catalogue notice and the verdict on every card.
+5. **Apply filters.** Try a search such as "intern" and the Type filter, then clear them and set
+   Eligibility to "Needs review".
+6. **Open an opportunity.** Choose **Accounting Associate**.
+7. **Inspect the requirements.** Each row shows your value, Pass / Fail / Not verified, whether it was
+   a rule check or an AI-assisted judgement, where the requirement came from, and *why* a row needs
+   attention. Here, the grade uses a different scale (EligiCore never converts scales), and the
+   field-of-study check is inconclusive.
+8. **Explain the verdicts.**
+   - Go back and filter by "Not eligible", then open **Quantitative Analyst**. Its failures are
+     verified rule checks on requirements the employer states, and a check skipped after a hard
+     failure says so.
+   - Then open **How it works** for all five verdicts.
+9. **Profile.** Demonstrate manual entry, or upload a **fictional** résumé (PDF or DOCX). The form
+   pre-fills, an unstated backlog count stays blank rather than becoming 0, and contact details are
+   not kept.
+10. **Privacy boundaries and limitations.**
+    - The profile lives in this browser tab only. The server stores no profile, résumé or result, and
+      deletes an uploaded résumé after reading it.
+    - The catalogue is synthetic, search runs in the browser, and résumé parsing is the offline mock.
+
+## Troubleshooting
+
+| Symptom | Likely cause | What to do |
 |---|---|---|
-| Frontend unit and component tests | `npm test` (Vitest) | **41 passed** (39 at first push; 2 added in the merge-readiness audit) |
-| Frontend lint | `npm run lint` | Clean |
-| Frontend type-check and build | `npm run build` | Clean; 84.6 kB gzipped JS |
-| Backend full suite | `pytest -q` from the feature worktree | **3030 passed, 1 warning** (a Starlette `BlockingPortal` deprecation notice) in 211 s |
-| Browser journey | Manual, against `uvicorn` and a seeded demo DB | See "What works end to end" |
+| "The EligiCore API isn't responding" | Backend not running, or on another port | Start `uvicorn` as above, check the health URL, then press **Try again** |
+| Proxy errors in the `npm run dev` terminal (`ECONNREFUSED`) | The frontend cannot reach `127.0.0.1:8000` | Start the backend first, or set `ELIGICORE_API_URL` to where it runs |
+| Dashboard says "No open opportunities yet" | The demo database has no catalogue | Run `python -m app.cli seed-catalogue` with the same `ELIGICORE_DATABASE_URL` as the backend |
+| `seed-catalogue: the database schema is not at the latest migration` | The demo database is behind | Run `alembic upgrade head` with the same `ELIGICORE_DATABASE_URL`, then seed again |
+| `alembic` fails with a migration error | The URL points at an unexpected database | Check `ELIGICORE_DATABASE_URL` in this terminal. Use a new file name such as `sqlite:///./demo2.db` rather than changing an existing database |
+| `Port 5173 is in use` or `address already in use` on 8000 | Another dev server is running | Stop the server you started earlier, or run on another port (`uvicorn … --port 8001` with `ELIGICORE_API_URL=http://127.0.0.1:8001`) |
+| `vite: command not found` or missing-module errors | Frontend dependencies not installed | Run `npm install` in `frontend/` (Node.js 20.19 or newer) |
 
-The developer database (`E:/EligiCore/eligicore.db`) kept md5 `9ee7d979e041d5346bfab68e96216fd0`
-before and after.
+## What is verified, and what is not
 
-## Known bugs and risks
+**Verified on 2026-11-02:**
+- the merge and CI results above, and a local re-run on `1df4c48`
+- the full journey in a browser against the real API with a seeded demo database
+- an API-down error state
+- no horizontal overflow at 375–1440 px
+- storage limited to one `sessionStorage` key
 
-- The first CI run of the new `frontend` job hasn't happened yet. The lockfile was generated on
-  Windows with npm 11; it does contain the Linux native packages, but this is unverified on CI.
-- In development, React StrictMode issues each request twice, and the first is aborted. This is
-  expected; production builds don't do it.
-- `match_score` (relevance) is shown as "Relevance N/100" and labelled as not an eligibility score.
-  Students may still read it as one.
-- One catalogue record is titled "Other" with no location. This is catalogue data, not a UI bug.
+**Not independently verified:**
+- a fresh machine with a freshly installed Python environment (the clean-setup check reused an
+  existing virtual environment)
+- screen-reader behaviour beyond automated checks
+
+## Known limitations and risks
+
+- The catalogue is synthetic; there is no live job source in the app.
+- Search and the verdict filter run in the browser over at most 100 jobs, the API's page limit.
+- Résumé upload is click-to-choose only.
+- Application preparation and the Excel tracker exist in the API but not in the UI.
+- Relevance ("Relevance N/100") is labelled as not an eligibility score, but could still be misread
+  as one.
+- `npm install` prints an npm `allow-scripts` notice; the install and build succeed regardless.
 
 ## Exact next task after the break
 
-Review and merge this PR. Then add the **application tracker** to the UI: keep chosen jobs and their
-status in browser storage (IndexedDB, per dossier §10), and export them through the existing
-`POST /api/v1/applications/export`. It needs no backend change.
+**Owner decision gate: decide the proposed ADR-030 OD-16 (D23b) and ADR-028 D8a.** That means
+approve, amend or reject each, as a separate documented owner decision.
+
+- **Why:** the approved roadmap is ADR-030's implementation sequence (`context/state.md` § Next
+  approved phase). Its next step, **Step 9a-2**, is blocked, and no implementation task is unblocked
+  until these decisions exist.
+- **No step is skipped by this decision.** Even after approval, Step 9a-2 still requires, before any
+  request:
+  - ADR-028 D8 resolved for dispatch through its own decision (proposed ADR-028 OD-8)
+  - Greenhouse-side and employer-side permission recorded
+  - a completed data protection assessment
+  - a reviewed script tested on a synthetic payload
+  - the board and endpoint approved
+  - final execution approval immediately before the request
+
+Extraction stays disabled. No Greenhouse request and no live Gemini call is authorized.
+
+*Correction:* the previous handoff named an "application tracker" as the next task. That was not an
+item on the approved roadmap and is withdrawn.
+
+Also pending, not blocking: review of PR #84 (visual polish), and whether the frontend needs its own
+ADR.
 
 ## Decisions that still require owner approval
 
-- **ADR-028 D8a** (proposed): D8 resolution required before any Greenhouse dispatch.
-- **ADR-028 OD-8** (proposed): element-by-element D8 resolution for Greenhouse.
-- **ADR-030 D23b / OD-16** (proposed): scope of Step 9a-2.
-- **Final execution approval** for any Greenhouse request: not given.
-- Whether the frontend warrants its own ADR, and whether it should ever be served by the API.
-- The ADR-030 post-8b rulings, ADR-028 OD-1..OD-5 and OD-7, and Week 9B's seven decisions, all
-  unchanged.
+- ADR-028 **D8a** and **OD-8** — proposed, not approved, not in force.
+- ADR-030 **D23b** and **OD-16** — proposed, not approved, not in force.
+- **Final execution approval** for any Greenhouse request — not given.
+- The ADR-030 post-8b rulings, ADR-028 OD-1..OD-5 and OD-7, and Week 9B's seven decisions — unchanged.
