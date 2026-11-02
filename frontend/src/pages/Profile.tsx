@@ -106,7 +106,7 @@ function ResumeUpload({ onParsed }: { onParsed: (profile: CandidateProfile) => v
           </span>
         ) : (
           <span className="dropzone__text">
-            <strong>Choose a résumé file</strong> or drop it here
+            <strong>Choose a résumé file</strong> (PDF or DOCX)
           </span>
         )}
       </label>
