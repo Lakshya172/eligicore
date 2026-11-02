@@ -110,9 +110,11 @@ function Recommendations() {
   }
 
   const data = result.data;
+  // Labels name exactly what each API group contains (app/schemas/matching.py): `ranked` holds
+  // ELIGIBLE and LIKELY_ELIGIBLE, `needs_review` holds NEEDS_REVIEW and UNKNOWN.
   const groups = [
-    { key: "ranked", label: "Eligible", tone: "success", count: data.ranked.length },
-    { key: "needs_review", label: "Need review", tone: "warning", count: data.needs_review.length },
+    { key: "ranked", label: "Eligible or likely eligible", tone: "success", count: data.ranked.length },
+    { key: "needs_review", label: "Need review or unverified", tone: "warning", count: data.needs_review.length },
     { key: "not_eligible", label: "Not eligible", tone: "danger", count: data.not_eligible.length },
   ] as const;
 
@@ -141,15 +143,15 @@ function Recommendations() {
 
       <Card>
         <div className="card__head">
-          <h2 className="card__title">Top matches you're eligible for</h2>
+          <h2 className="card__title">Top matches among roles you qualify for</h2>
           <Link to="opportunities" className="text-link">
             View all
           </Link>
         </div>
         {data.ranked.length === 0 ? (
           <p className="muted">
-            No role is fully eligible yet. Check the roles that need review — missing profile values
-            are the most common reason.
+            No role is eligible or likely eligible yet. Check the roles that need review — missing
+            profile values are the most common reason.
           </p>
         ) : (
           <ul className="rec-list">
@@ -159,8 +161,8 @@ function Recommendations() {
           </ul>
         )}
         <p className="fineprint">
-          Ranked by relevance to your skills and experience, within the roles you are eligible for.
-          Relevance never affects eligibility.
+          Ranked by relevance to your skills and experience, within the eligible and likely eligible
+          roles. Each badge shows that role's own verdict. Relevance never affects eligibility.
         </p>
       </Card>
 

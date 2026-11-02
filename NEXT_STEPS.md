@@ -19,7 +19,7 @@ Branch `feat/student-ui-mvp`, based on `main` at `a993440`. The PR is open for r
 | Journey | Result |
 |---|---|
 | Landing → Dashboard | Catalogue counts from `GET /jobs`: 40 open, 21 internships, 19 full-time, 0 closed |
-| Profile → sample profile → Dashboard | Real `POST /recommendations` result for the fictional sample: 19 eligible, 12 need review, 9 not eligible, with top matches |
+| Profile → sample profile → Dashboard | Real `POST /recommendations` result for the fictional sample: 19 eligible or likely eligible, 12 need review or unverified, 9 not eligible, with top matches |
 | Explorer | 40 cards with verdict badges; search, type, status and verdict filters; the verdict filter showed 9 "Not eligible" jobs, matching the dashboard |
 | Job details | Full breakdown for `NEEDS_REVIEW` (a scale mismatch and an inconclusive AI-assisted check) and for `NOT_ELIGIBLE` (two verified source-stated failures) |
 | Résumé upload | A generated fictional PDF was parsed by the mock provider (`PARTIAL`). The form was pre-filled, and backlogs stayed blank rather than becoming 0 |
@@ -96,7 +96,7 @@ Environment variables: none are required.
 
 | Suite | Command | Result |
 |---|---|---|
-| Frontend unit and component tests | `npm test` (Vitest) | **39 passed** |
+| Frontend unit and component tests | `npm test` (Vitest) | **40 passed** (39 at first push; 1 added in the merge-readiness audit) |
 | Frontend lint | `npm run lint` | Clean |
 | Frontend type-check and build | `npm run build` | Clean; 84.6 kB gzipped JS |
 | Backend full suite | `pytest -q` from the feature worktree | **3030 passed, 1 warning** (a Starlette `BlockingPortal` deprecation notice) in 211 s |
