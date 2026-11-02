@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { api, describeError } from "../api/client";
 import type { EligibilityState, JobType } from "../api/types";
+import { SearchIcon } from "../components/icons";
 import { JobCard } from "../components/JobCard";
 import { Badge, CatalogueNotice, EmptyState, ErrorState, PageHeader, SkeletonCards, Spinner } from "../components/ui";
 import { VERDICTS, VERDICT_ORDER } from "../lib/eligibility";
@@ -57,7 +58,7 @@ export function Opportunities() {
   return (
     <div className="page">
       <PageHeader eyebrow="Opportunities" title="Explore opportunities">
-        <p>Browse openings and see each employer's stated requirements.</p>
+        <p>Browse openings, see each employer's stated requirements, and check where you stand.</p>
       </PageHeader>
       <CatalogueNotice />
 
@@ -90,13 +91,16 @@ export function Opportunities() {
       <form className="filters" role="search" onSubmit={(event) => event.preventDefault()}>
         <label className="field field--grow">
           <span className="field__label">Search</span>
-          <input
-            type="search"
-            className="input"
-            placeholder="Role, company, location or skill"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
+          <span className="input-icon">
+            <SearchIcon />
+            <input
+              type="search"
+              className="input input--with-icon"
+              placeholder="Role, company, location or skill"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </span>
         </label>
         <label className="field">
           <span className="field__label">Type</span>

@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { api, ApiError, describeError, MAX_RESUME_BYTES } from "../api/client";
 import type { CandidateProfile, ResumeParseResponse, ValidationIssue } from "../api/types";
+import { InfoIcon, ShieldIcon, UploadIcon } from "../components/icons";
 import { Badge, Card, PageHeader, Spinner } from "../components/ui";
 import {
   DEGREE_LEVELS,
@@ -83,7 +84,11 @@ function ResumeUpload({ onParsed }: { onParsed: (profile: CandidateProfile) => v
 
   return (
     <Card>
-      <h2 className="card__title">Start from your résumé</h2>
+      <div className="card__eyebrow-row">
+        <span className="step-badge" aria-hidden="true">1</span>
+        <h2 className="card__title">Start from your résumé</h2>
+        <span className="optional-tag">Optional</span>
+      </div>
       <p className="muted">
         Upload a PDF or DOCX (up to 5 MB) to pre-fill the form below. The server reads it, returns the
         extracted details and deletes the file immediately, whether or not parsing succeeds.
@@ -100,13 +105,20 @@ function ResumeUpload({ onParsed }: { onParsed: (profile: CandidateProfile) => v
             if (file) void handleFile(file);
           }}
         />
+        <span className="dropzone__icon" aria-hidden="true">
+          {state.status === "processing" ? <Spinner label="Processing résumé" /> : <UploadIcon size={20} />}
+        </span>
         {state.status === "processing" ? (
           <span className="dropzone__text">
-            <Spinner label="Processing résumé" /> Reading {state.fileName}…
+            <strong>Reading {state.fileName}…</strong>
+            <span className="dropzone__hint">This usually takes a second. Nothing is kept afterwards.</span>
           </span>
         ) : (
           <span className="dropzone__text">
-            <strong>Choose a résumé file</strong> (PDF or DOCX)
+            <span>
+              <strong>Choose a résumé file</strong> (PDF or DOCX)
+            </span>
+            <span className="dropzone__hint">Up to 5 MB · read once, then deleted by the server</span>
           </span>
         )}
       </label>
@@ -288,10 +300,25 @@ export function Profile() {
 
       {isSample && (
         <p className="notice notice--warning">
-          You're viewing the <strong>sample profile</strong> — a fictional student for demonstration. Edit and
-          save it to make it your own, or clear it.
+          <InfoIcon />
+          <span>
+            You're viewing the <strong>sample profile</strong> — a fictional student for demonstration. Edit
+            and save it to make it your own, or clear it.
+          </span>
         </p>
       )}
+
+      <aside className="privacy-panel" aria-label="How your information is handled">
+        <span className="privacy-panel__icon" aria-hidden="true">
+          <ShieldIcon size={18} />
+        </span>
+        <ul>
+          <li>Your profile is kept only in this browser tab and cleared when you close it.</li>
+          <li>A résumé is read once to pre-fill this form; the server deletes it straight away.</li>
+          <li>There is no account and no stored profile — nothing here is saved on a server.</li>
+          <li>The sample profile is a fictional student, for demonstrations only.</li>
+        </ul>
+      </aside>
 
       <ResumeUpload
         onParsed={(parsed) => {
@@ -304,7 +331,13 @@ export function Profile() {
       />
 
       <form className="card profile-form" onSubmit={handleSubmit} noValidate>
-        <h2 className="card__title">Education</h2>
+        <div className="card__eyebrow-row">
+          <span className="step-badge" aria-hidden="true">2</span>
+          <h2 className="card__title">Education</h2>
+        </div>
+        <p className="muted form-intro">
+          Check every value. Anything left blank stays "not stated" — it is never treated as zero.
+        </p>
         {form.education.map((entry, index) => (
           <EducationFields
             key={index}
