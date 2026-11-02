@@ -51,7 +51,16 @@ export function Layout({ route, children }: { route: Route; children: ReactNode 
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="app">
-      <a className="skip-link" href="#main">
+      {/* Moves focus without touching the hash: with hash routing, href="#main" would be read
+          as a route and land on "Page not found". */}
+      <a
+        className="skip-link"
+        href="#main"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById("main")?.focus();
+        }}
+      >
         Skip to content
       </a>
       <header className="topbar">

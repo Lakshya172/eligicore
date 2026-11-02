@@ -96,7 +96,7 @@ Environment variables: none are required.
 
 | Suite | Command | Result |
 |---|---|---|
-| Frontend unit and component tests | `npm test` (Vitest) | **40 passed** (39 at first push; 1 added in the merge-readiness audit) |
+| Frontend unit and component tests | `npm test` (Vitest) | **41 passed** (39 at first push; 2 added in the merge-readiness audit) |
 | Frontend lint | `npm run lint` | Clean |
 | Frontend type-check and build | `npm run build` | Clean; 84.6 kB gzipped JS |
 | Backend full suite | `pytest -q` from the feature worktree | **3030 passed, 1 warning** (a Starlette `BlockingPortal` deprecation notice) in 211 s |
