@@ -1,6 +1,6 @@
 import { api, ApiError } from "../api/client";
 import type { JobRead } from "../api/types";
-import { BriefcaseIcon, CalendarIcon, ExternalIcon, MapPinIcon } from "../components/icons";
+import { BriefcaseIcon, CalendarIcon, ChevronRightIcon, ExternalIcon, InfoIcon, MapPinIcon } from "../components/icons";
 import { companyInitial } from "../components/JobCard";
 import { RequirementBreakdown } from "../components/RequirementBreakdown";
 import { Badge, Card, CatalogueNotice, EmptyState, ErrorState, Spinner } from "../components/ui";
@@ -54,7 +54,10 @@ function Eligibility({ job }: { job: JobRead }) {
     <>
       {isSample && (
         <p className="notice notice--warning">
-          Evaluated against the <strong>fictional sample profile</strong>, not a real student.
+          <InfoIcon />
+          <span>
+            Evaluated against the <strong>fictional sample profile</strong>, not a real student.
+          </span>
         </p>
       )}
       <RequirementBreakdown eligibility={evaluation.item.eligibility} />
@@ -113,7 +116,19 @@ export function OpportunityDetail({ jobId }: { jobId: string }) {
 
   return (
     <div className="page">
-      <Link to="opportunities" className="back-link">← All opportunities</Link>
+      <nav className="breadcrumb" aria-label="Breadcrumb">
+        <ol>
+          <li>
+            <Link to="opportunities">Opportunities</Link>
+          </li>
+          <li aria-hidden="true" className="breadcrumb__sep">
+            <ChevronRightIcon size={13} />
+          </li>
+          <li>
+            <span aria-current="page">{data.role_title}</span>
+          </li>
+        </ol>
+      </nav>
       <header className="detail-header">
         <div className="detail-header__logo" aria-hidden="true">
           {companyInitial(data.company_name)}

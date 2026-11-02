@@ -120,6 +120,42 @@ export const InfoIcon = ({ size }: { size?: number }) => (
   </Icon>
 );
 
+export const GridIcon = ({ size }: { size?: number }) => (
+  <Icon size={size}>
+    <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+    <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+    <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+    <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+  </Icon>
+);
+
+export const CompassIcon = ({ size }: { size?: number }) => (
+  <Icon size={size}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m15.5 8.5-2 5-5 2 2-5 5-2Z" />
+  </Icon>
+);
+
+export const UserIcon = ({ size }: { size?: number }) => (
+  <Icon size={size}>
+    <circle cx="12" cy="8" r="3.5" />
+    <path d="M5 20c1.2-3.5 4-5 7-5s5.8 1.5 7 5" />
+  </Icon>
+);
+
+export const BookIcon = ({ size }: { size?: number }) => (
+  <Icon size={size}>
+    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z" />
+    <path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5" />
+  </Icon>
+);
+
+export const ChevronRightIcon = ({ size }: { size?: number }) => (
+  <Icon size={size}>
+    <path d="m9 6 6 6-6 6" />
+  </Icon>
+);
+
 export const AlertIcon = ({ size }: { size?: number }) => (
   <Icon size={size}>
     <path d="M12 3 2 20h20L12 3Z" />

@@ -20,17 +20,19 @@ const STEPS = [
 /** A static illustration built from the real components. It shows no catalogue data. */
 function ProductPreview() {
   const rows = [
-    { icon: <CheckIcon size={14} />, tone: "success", label: "Minimum grade 7.0 out of 10", value: "Yours: 8.2", status: "Pass" },
-    { icon: <CheckIcon size={14} />, tone: "success", label: "Graduation year 2026 – 2027", value: "Yours: 2027", status: "Pass" },
-    { icon: <QuestionIcon size={14} />, tone: "neutral", label: "Field of study", value: "Not an exact match", status: "Not verified" },
+    { icon: <CheckIcon size={13} />, tone: "success", label: "Minimum grade 7.0 out of 10", value: "Yours: 8.2", status: "Pass" },
+    { icon: <CheckIcon size={13} />, tone: "success", label: "Graduation year 2026 – 2027", value: "Yours: 2027", status: "Pass" },
+    { icon: <QuestionIcon size={13} />, tone: "neutral", label: "Field of study", value: "Not an exact match", status: "Not verified" },
   ] as const;
   return (
     <figure className="preview" aria-label="Illustration of an eligibility explanation">
+      <div className="preview__backplate" aria-hidden="true" />
       <div className="preview__window">
         <div className="preview__chrome" aria-hidden="true">
           <span />
           <span />
           <span />
+          <p>Eligibility · Example employer</p>
         </div>
         <div className="preview__body">
           <div className="preview__head">
@@ -70,17 +72,17 @@ export function Landing() {
     <div className="landing">
       <section className="hero">
         <div className="hero__copy">
-          <p className="pill">
-            <span className="pill__dot" aria-hidden="true" />
-            Eligibility-first job discovery for students
+          <p className="kicker">
+            <span className="kicker__rule" aria-hidden="true" />
+            Eligibility-first job discovery
           </p>
           <h1 className="hero__title">
-            Understand your eligibility <span className="accent-text">before you apply.</span>
+            Know where you stand.
+            <span className="hero__title-accent">Before you apply.</span>
           </h1>
           <p className="hero__lead">
-            EligiCore checks the requirements employers state — grades, graduation year, backlogs,
-            qualification and field of study — against your profile, and explains every result. Spend
-            your applications on roles you actually qualify for.
+            EligiCore helps students understand opportunity requirements, evaluate eligibility, and
+            prepare with clarity.
           </p>
           <div className="hero__actions">
             <Link to="opportunities" className="button button--primary button--lg">
@@ -93,29 +95,40 @@ export function Landing() {
           </div>
           <ul className="hero__facts">
             <li>
-              <CheckIcon size={14} /> No account needed
+              <CheckIcon size={13} /> No account needed
             </li>
             <li>
-              <CheckIcon size={14} /> Profile never stored on a server
+              <CheckIcon size={13} /> Profile never stored on a server
             </li>
             <li>
-              <CheckIcon size={14} /> Never applies for you
+              <CheckIcon size={13} /> Never applies for you
             </li>
           </ul>
         </div>
         <ProductPreview />
       </section>
 
+      <section className="checks-strip" aria-label="What EligiCore checks">
+        <p className="checks-strip__label">Checked against what employers state</p>
+        <ul>
+          <li>Minimum grade</li>
+          <li>Graduation year</li>
+          <li>Backlogs</li>
+          <li>Qualification level</li>
+          <li>Field of study</li>
+        </ul>
+      </section>
+
       <section className="section" aria-labelledby="how-heading">
         <div className="section__intro">
           <p className="eyebrow">How it works</p>
           <h2 id="how-heading" className="section-title">
-            Three steps to a clear answer
+            Three steps to a clear answer.
           </h2>
         </div>
         <ol className="steps">
           {STEPS.map((step, index) => (
-            <li key={step.title} className="card step">
+            <li key={step.title} className="step">
               <span className="step__number" aria-hidden="true">
                 {String(index + 1).padStart(2, "0")}
               </span>
@@ -129,44 +142,56 @@ export function Landing() {
         </ol>
       </section>
 
-      <section className="section" aria-labelledby="trust-heading">
-        <div className="section__intro">
+      <section className="section section--split" aria-labelledby="trust-heading">
+        <div className="section__intro section__intro--left">
           <p className="eyebrow">Built to be trusted</p>
           <h2 id="trust-heading" className="section-title">
-            Honest answers, and your data stays yours
+            Honest answers.
+            <br />
+            Your data stays yours.
           </h2>
+          <p className="section__lead">
+            EligiCore separates what it verified from what it could not, and it never keeps your
+            profile.
+          </p>
         </div>
         <div className="principles">
-          <article className="card principle">
+          <article className="principle">
             <span className="principle__icon" aria-hidden="true">
               <RuleIcon size={18} />
             </span>
-            <h3>Rules first, AI second</h3>
-            <p>
-              Grades, graduation years, backlogs and qualifications are checked by plain rules. AI is
-              consulted only when a field of study is ambiguous, and it can never overrule a failed
-              rule check.
-            </p>
+            <div>
+              <h3>Rules first, AI second</h3>
+              <p>
+                Grades, graduation years, backlogs and qualifications are checked by plain rules. AI
+                is consulted only when a field of study is ambiguous, and it can never overrule a
+                failed rule check.
+              </p>
+            </div>
           </article>
-          <article className="card principle">
+          <article className="principle">
             <span className="principle__icon" aria-hidden="true">
               <SparkIcon size={18} />
             </span>
-            <h3>Honest about uncertainty</h3>
-            <p>
-              Missing information is reported as "not verified", never as a failure. When something
-              needs your judgement, EligiCore says so instead of guessing.
-            </p>
+            <div>
+              <h3>Honest about uncertainty</h3>
+              <p>
+                Missing information is reported as "not verified", never as a failure. When something
+                needs your judgement, EligiCore says so instead of guessing.
+              </p>
+            </div>
           </article>
-          <article className="card principle">
+          <article className="principle">
             <span className="principle__icon" aria-hidden="true">
               <ShieldIcon size={18} />
             </span>
-            <h3>Private by design</h3>
-            <p>
-              Your profile lives in this browser tab. It is sent only to compute a result, and the
-              server keeps no profile, résumé or result.
-            </p>
+            <div>
+              <h3>Private by design</h3>
+              <p>
+                Your profile lives in this browser tab. It is sent only to compute a result, and the
+                server keeps no profile, résumé or result.
+              </p>
+            </div>
           </article>
         </div>
       </section>
@@ -180,10 +205,10 @@ export function Landing() {
           </p>
         </div>
         <div className="cta-band__actions">
-          <Link to="profile" className="button button--inverse">
+          <Link to="profile" className="button button--primary">
             Add your profile
           </Link>
-          <Link to="about" className="button button--ghost-inverse">
+          <Link to="about" className="button button--secondary">
             How EligiCore decides
           </Link>
         </div>
