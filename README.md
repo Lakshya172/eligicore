@@ -131,6 +131,12 @@ runs, and is tested. The authoritative, always-current state lives in
 - **Complete operational request logging** — every inbound request produces exactly one record,
   including the ones that end in an unhandled exception, which were previously missed. No candidate
   data in any log line.
+- **Student web app** (`frontend/`, React + TypeScript + Vite) — a local, student-facing UI over
+  the existing API: a landing page, a dashboard, an opportunity explorer, job details with a
+  requirement-by-requirement eligibility explanation, a profile form with résumé pre-fill, and a
+  help page. It calls only existing endpoints, keeps the profile in the browser tab, and labels
+  the synthetic catalogue and the fictional sample profile wherever they appear. See
+  [Student web app](#student-web-app) below.
 - **1567 tests**, running offline with no credentials and no network — including a full-flow
   integration test that walks résumé → profile → eligibility → recommendations → application
   preparation → Excel export
@@ -349,6 +355,46 @@ uvicorn app.main:app --reload
 All three are generated from the code itself, so they cannot drift from what the API actually
 does. The current surface is **ten endpoints**, listed under
 [Implemented](#implemented) above.
+
+### Student web app
+
+A local web interface for students, in `frontend/`. It needs **Node.js 20.19 or newer** and the API
+from steps 1–5 running on `http://127.0.0.1:8000`.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://127.0.0.1:5173`. The dev server forwards `/api` to the backend, so the API needs no
+CORS change. To use a backend on another address, set `ELIGICORE_API_URL` before starting, e.g.
+`ELIGICORE_API_URL=http://127.0.0.1:8001 npm run dev`. A production build is `npm run build`, served
+locally with `npm run preview` (port 4173, same proxy).
+
+**What it does, and what it does not:**
+
+| Screen | Backed by | Notes |
+|---|---|---|
+| Landing | — | Explains the product; the verdict card on it is a labelled illustration |
+| Dashboard | `GET /jobs`, `POST /recommendations` | Catalogue counts, then eligibility totals and top matches once a profile exists |
+| Opportunities | `GET /jobs`, `POST /recommendations` | Type and status filters are the API's; text search and the verdict filter run in the browser over the loaded catalogue |
+| Job details | `GET /jobs/{id}`, `POST /recommendations` | Every requirement with your value, result, method (rule or AI-assisted), provenance and the reason it needs review |
+| Profile | `POST /resumes/parse`, `POST /candidates/validate` | Résumé pre-fill (the server deletes the file after reading it), manual entry, and a **fictional sample profile** for demonstrations |
+| How it works | — | The verdicts, the data handling and the limitations |
+
+- The profile lives in the browser tab (`sessionStorage`) and is cleared when the tab closes. Raw
+  résumé text and contact details are not kept. The server stores nothing, as before.
+- Verdicts are always the API's. The UI explains them and never upgrades one: an AI-assisted
+  result is labelled as such, and a requirement read from a job description is labelled
+  "Read from job description".
+- The catalogue is the curated synthetic dataset; the UI says so on every page that lists jobs.
+  When the sample profile is in use, every evaluation says it was computed for a fictional student.
+- EligiCore never applies for anyone. "Apply" opens the employer's own page, and in this catalogue
+  those links are placeholders.
+
+Frontend checks: `npm run lint`, `npm run typecheck`, `npm test` (Vitest, API mocked) and
+`npm run build`. CI runs all four in a separate `frontend` job.
 
 ### Try the flow
 
