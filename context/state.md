@@ -227,6 +227,7 @@ route to evaluating it.
 | ADR-028 D8a / OD-8, concerning D8 for Greenhouse (docs) | #81 | Merged (`b7cdbb0`, 2026-11-02) as a proposal; **not approved; not in force** |
 | Step 9a-2 — the single authorized live Greenhouse fetch and derived fragments (D23, OD-7) | — | **Not started; awaits the owner's board token and final execution approval; not released to run (Blockers #4); D23 remains current, and D23b / OD-16 and D8a / OD-8 are proposed and not in force** |
 | Step 9b · Step 10 — connect AI extraction to derivation · enable on live Greenhouse | — | **Not started** |
+| Student web app (`frontend/`) — landing, dashboard, opportunity explorer, job details with eligibility breakdown, profile with résumé pre-fill, help; existing endpoints only, no backend change; profile kept in the browser tab; synthetic catalogue and fictional sample profile labelled. Outside the ADR-030 sequence, on owner instruction | `feat/student-ui-mvp` | **In review, not merged** (see `NEXT_STEPS.md`) |
 
 **Production behaviour today.** Extraction is **disabled** (`extraction_enabled: bool = False`,
 `app/config.py`) and no live source is wired into ingestion. The derived-requirement engine
@@ -758,6 +759,10 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
   gate as OD-15): the post-8b rulings, the unreachable `without backlogs` verifier pattern, ADR-028
   OD-1..OD-5/OD-7, proposed ADR-028 D8a and OD-8, proposed ADR-030 OD-16, final execution approval,
   and Week 9B's seven.
+- **F. Student web app (2026-11-02), in review.** `frontend/` adds a local student-facing UI over the
+  existing API with no backend change. Development pauses for one week from 2026-11-03; the
+  handoff, demo commands, tests run and the next task are in `NEXT_STEPS.md`. Whether the frontend
+  needs its own ADR is an open owner question.
 
 ### Known debt (2026-10-27)
 

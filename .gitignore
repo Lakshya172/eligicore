@@ -27,6 +27,10 @@
 *.db-shm
 
 # ---------- Python ----------
+# Frontend (frontend/): installed packages and build output.
+node_modules/
+*.tsbuildinfo
+
 __pycache__/
 *.py[cod]
 *$py.class
