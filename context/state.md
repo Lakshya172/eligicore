@@ -11,7 +11,8 @@
 
 | Field | Value |
 |---|---|
-| **Date** | 2026-11-02 |
+| **Date** | 2026-11-03 |
+| **Status** | **⏸ PAUSED — one-week development freeze, 2026-11-03 to 2026-11-10.** No implementation work, no merges by an agent, no Greenhouse request, no live Gemini call, extraction stays disabled. **Resume only through § Next actions → Handoff at the pause (verified 2026-11-03)**, which lists the open PRs, what awaits review and approval, what must not be executed, and the exact next task. `main` is unchanged at `1df4c48` (the PR #83 merge). |
 | **Phase** | **Post-Checkpoint 9A early-activation work · IN PROGRESS, no checkpoint recorded.** Owner-approved work on **ADR-028** (early activation of live job sources and live Gemini), **ADR-029** (explicit `UNKNOWN` employment type) and **ADR-030** (verified job-requirement extraction) has merged on top of Checkpoint 9A as PRs #48–#83 — see § Post-Checkpoint 9A below. **Verified job-requirement extraction is built through ADR-030 Step 8 (8a and 8b merged), and is DISABLED** (`extraction_enabled = False` in `app/config.py`); **Step 6 is complete**: PR A #63, PR B #64, PR C #66 (the D20 boundary and D20a R-COLLISION) and the wiring, PR #69 (`a758d18`), which supplies the same derived requirements to `/api/v1/eligibility/check` and `/api/v1/recommendations` through their shared path (OD-14). **Reads are gated on `extraction_enabled`, so with the default `False` derived requirements reach neither endpoint**; OPEN-4 is resolved as OD-14 (ADR-030 D20b, #68). **Step 7 is complete**: PR #71 (`56f8519`) adds the `extract_job_requirements` provider operation and its silent mock (D13, D14); **nothing calls it** — not `derive_for_job`, ingestion or either endpoint. **Step 8 is split, by owner instruction, into 8a and 8b. Step 8a is complete**: PR #74 (`a450e28`) migrates the two existing Gemini requests, resume extraction and field relatedness, to `gemini-3.8-flash` (D15) — no sampling parameters, `store: false`, an explicit `thinkingLevel` — and accounts thinking tokens; it adds no extraction code and **has never been called against the live Gemini service**. **Step 8b is complete**: PR #77 (`3337e58`) implements Gemini's `extract_job_requirements` behind a labelled `BEGIN … END` data block (D25) with strict whole-reply validation (D26), adds the injection corpus, and adds a verifier gate that refuses every proposal from a description carrying instruction-shaped text (D25a, OD-15, recorded in ADR-030 by PR #78, `1748341`). The gate is **a narrow heuristic, not prompt-injection prevention** (see Known debt). Still **nothing calls the operation**, and it has **never been called live**. **Step 9a-1 is complete**: PR #80 (`4f588ce`) adds the offline job-requirement fixture corpus — tests only, synthetic text, no network. Step 9a-2 (the single authorized live Greenhouse fetch, D23), Step 9b (connecting AI extraction to derivation) and Step 10 are **not started**. D23 and OD-7 record one bounded fetch as internally authorized; it has not been released to run. D23 remains current until OD-16 is explicitly approved; ADR-030 D23b / OD-16 and ADR-028 D8a / OD-8 are **proposed and not in force**. The Greenhouse adapter exists but **no live source is wired into any ingestion entry point**, and the default AI provider is still `mock`. Previously: **Week 9A — Local production readiness · COMPLETE.** All seven slices (9A-1 OpenAPI · 9A-2 PostgreSQL · 9A-3 production configuration · 9A-4 secret handling · 9A-5 privacy and logging · 9A-6 local end-to-end · 9A-7 documentation) are merged or verified and recorded as **Checkpoint 9A**. **Local execution is the normal operating mode; nothing is deployed.** **Week 9B — Deployment and Sharing — is OPTIONAL, owner-triggered and NOT started** (ADR-027). Previously: **Week 8 · COMPLETE.** Slice 8A (cost/usage accounting), Slice 8B (candidate-free corpus vectorizer cache) and Slice 8C (operational-log completeness) are all **complete and merged**, recorded as **Checkpoint 8**. Week 6 remains the dossier's declared safe stopping point (§15); Weeks 7 and 8 are enhancement on top of it. |
 | **Roadmap position** | **Weeks 1–8 complete and merged; Week 9A complete; post-9A early activation in progress.** ADR-028 deliberately moves live job sources forward from dossier §18 Phase 3 — a recorded roadmap-sequencing deviation, not a reinterpretation. Merged since Checkpoint 9A: ADR-028 record (#48) · live HTTP adapter infrastructure (#49) · ADR-029 (#50) and `JobType.UNKNOWN` (#51) · Greenhouse adapter (#52) · privacy-marker flake fix (#53) · live-job description disclosure fix (#54) · ADR-030 (#55) and its amendments (#56 ADR-028 D9a/D19a and ADR-017; #57 owner rulings OD-11..OD-13, D7a, D20a, D4a) · ADR-030 Steps 3–5 (#58 verifier · #59 `extracted_requirements` storage · #60 deterministic extractors · #61 derivation orchestration · #62 ACTIVE-only uniqueness) · Step 6 PR A (#63 provenance/evidence contract) and PR B (#64 amended D4 precedence, D4a test added) · test database isolation (#65) · ADR-030 D20b / OD-14, the OPEN-4 ruling (#68) · Step 6 PR C (#66, D20 engine boundary + D20a R-COLLISION) · state record (#67) · Step 6 wiring (#69, both endpoints through the shared path, read gate, `ENGINE_VERSION` 3) · state record (#70) · numeric privacy-marker matcher fix (#72, tests only) · Step 7 provider operation + mock (#71, D13/D14, called by no production path) · state record (#73) · Step 8a Gemini request migration (#74, D15; storage off, thinking tokens accounted) · dossier job-source strategy (#75, docs) · state record (#76) · Step 8b Gemini extraction, injection corpus and verifier gate (#77) · ADR-030 D25a / OD-15 (#78, docs) · Step 9a-1 offline fixture corpus (#80, tests only) · state record (#79) · ADR-028 D8a / OD-8 and ADR-030 D23b / OD-16, recorded as proposals only, not approved and not in force (#81, docs) · state record (#82) · student web app MVP (#83, `frontend/`; no backend change). Earlier: **Weeks 1–8 complete and merged; Week 9A complete.** Week 9 is two stages under **ADR-027** — 9A local production readiness (done, Checkpoint 9A) and 9B deployment and sharing (optional, not started). **Weeks 9B and 10 NOT started.** Earlier:  Week 7 delivered as Slice 7A (PR #24, no checkpoint) + Slice 7B (PR #28, **Checkpoint 7**) on **ADR-025**. Week 8 delivered as Slice 8A (PR #34), Slice 8B (PR #35) and Slice 8C (PR #36, **Checkpoint 8**) on the design gate ruled in **ADR-026** (PR #32, with ADR-020 §5's partial supersession recorded in PR #33) — **none of the three slices recorded a checkpoint of its own**. `/matching/score` and HTTP `/jobs/ingest` remain explicitly deferred (C-25, ADR-023 §11, ADR-024); **live Gemini application generation remains deferred** and was not implemented in Week 8. |
 | **Health** | 🟢 GREEN — **3030 backend tests and 41 frontend tests passing on `main` at `1df4c48`** (CI run `41450933519`, 2026-11-02, on the PR #83 merge: job `test` 3030 passed, 1 warning; job `frontend` 41 passed; 3030 on `a993440`, the PR #82 merge, run `41409575065`; 3030 on `b7cdbb0`, the PR #81 merge, run `41404729690`: 3030 passed, 1 warning; 3030 on `4f588ce`, the PR #80 merge, run `40886537958`, 2026-10-29; 2784 on `1748341`, the PR #78 merge, run `40871209373`; 2784 also on `3337e58`, the PR #77 merge, run `40868785406`; 2604 on `68c9c41`, the PR #76 merge, run `40822267866`, and on `80c3e81`, the PR #75 merge, run `40821998711`; 2604 on `a450e28`, the PR #74 merge, run `40665713891`; before it CI recorded 2566 on `defd8c5`, the PR #73 merge, run `40638085399`, and on `56f8519`, the PR #71 merge, run `40634581772`; 2543 on `c7a9add`, the PR #72 merge, run `40561603251`; and 2512 on `a758d18`, run `40526796486`). **CI on `e85a70e` (PR #70, docs only) failed** (run `40530305768`) on a numeric privacy-marker false positive in `test_eligibility_ai_stage.py` — a timing float `0.0202779…` contained the planted year `2027` — not a leak; PR #72 fixed the matcher and CI has been green since. **CI green on `1df4c48`**; Alembic head `d5c2e9a1f7b4` (unchanged by #75–#78 and #80); no blocker on the merged code; **the D23 fetch has not been released to run (Blockers #4)**; ADR-030 Step 8 is complete (8a #74, 8b #77) and Step 9a-1 is complete (#80); Step 9a-2 awaits the owner's final execution approval. Per-PR mutation results since 9A are recorded in the PR descriptions (e.g. 13/13 #63, 15/15 #64, 15/15 #66, 17/17 #69, 13/13 #71, 24/24 #74, 38/38 #77, 24/24 #80). As at Checkpoint 9A: 1567 tests passing on `main`; PostgreSQL 18.6 migration compatibility verified by execution; production configuration, secret handling, privacy and logging re-verified; local end-to-end run and two fresh-clone quickstarts passed; mutations **230/230** re-verified from a clean tree — 32/32 (8C), 34/34 (8B), 68/68 (8A), 54/54 (7B), 42/42 (7A) — plus 23/23 (6B), 30/30 (6A), 40/40 (5B), 36/36 (5A), 27/27 (Week 4); CI green on `e5d6d36`, `f3fbf35` and `9aba1f2`; live privacy sweep clean; no open blockers |
@@ -765,10 +766,121 @@ Recovery rules are in `context/workflow.md` § Recovery and rollback. In short: 
   OD-1..OD-5/OD-7, proposed ADR-028 D8a and OD-8, proposed ADR-030 OD-16, final execution approval,
   and Week 9B's seven.
 - **F. Student web app — merged as PR #83 (`1df4c48`, 2026-11-02).** `frontend/` is a local
-  student-facing UI over the existing API with no backend change. A presentation-only polish is open
-  as PR #84. Whether the frontend needs its own ADR is an open owner question.
+  student-facing UI over the existing API with no backend change. A frontend-only redesign is open
+  as PR #84 (three rounds: indigo polish, "Midnight Bronze", "Midnight Bronze: Precision Edition"),
+  **not merged and not reviewed** — see the handoff below. Whether the frontend needs its own ADR is
+  an open owner question.
 - **G. One-week development freeze: 2026-11-03 to 2026-11-10.** No implementation work during the
-  freeze. The demo guide, verification evidence and the next task are in `NEXT_STEPS.md`.
+  freeze. The demo guide, verification evidence and the next task are in `NEXT_STEPS.md`; the
+  complete handoff is § Handoff at the pause below.
+
+### Handoff at the pause (verified 2026-11-03)
+
+Every fact in this section was checked on 2026-11-03 against GitHub, `git` or the machine itself,
+unless it is marked *reported*. The record above it (§ Status at the freeze, 2026-11-02) is kept
+unchanged as history.
+
+**Verified state**
+
+| Item | Value |
+|---|---|
+| Remote `main` | `1df4c4888cdd464dfeed38136f7a7b3e35186bd0` — the PR #83 merge. No commit since. Push CI run [41450933519](https://github.com/Lakshya172/eligicore/actions/runs/41450933519): success (`test` 3030 passed, 1 warning; `frontend` 41 passed) |
+| Open PRs | Exactly two: **#84** and **#85**. Both `MERGEABLE`, both CI green, **neither reviewed, neither merged, auto-merge off on both** |
+| Alembic head | `d5c2e9a1f7b4`, unchanged — neither open PR touches a migration |
+| Extraction | `extraction_enabled = False` (`app/config.py`), unchanged |
+| AI provider | runtime default `mock`, unchanged; no live Gemini call has ever been made |
+| Live job sources | none wired into ingestion; **no Greenhouse request has ever been sent** |
+| Developer database | `E:/EligiCore/eligicore.db`, md5 `9ee7d979e041d5346bfab68e96216fd0`, unchanged through all PR #83–#85 work |
+
+**Open pull requests**
+
+| | [PR #84](https://github.com/Lakshya172/eligicore/pull/84) | [PR #85](https://github.com/Lakshya172/eligicore/pull/85) |
+|---|---|---|
+| **Title** | Polish student-facing EligiCore UI/UX | docs: one-week freeze handoff and post-merge record for PR #83 |
+| **Purpose** | Frontend-only redesign of the PR #83 student app: design tokens, "Midnight Bronze: Precision Edition" dark theme, editorial landing page with a five-step workflow, sidebar shell, dashboard profile strip and shares, flattened evidence rows, quick navigation (Ctrl/⌘ K), `/` to focus search, drag-and-drop résumé upload through the same request, a save-button busy state | This record: the PR #83 merge and post-merge CI, the freeze, the demo guide (`NEXT_STEPS.md`) and this handoff |
+| **Branch** | `feat/student-ui-visual-polish` | `docs/eligicore-one-week-freeze-handoff` |
+| **Base** | `main` (`1df4c48`) | `main` (`1df4c48`) |
+| **Commits** | 9 — `12ff3a0`, `82f7b2c`, `f2a6bad` (indigo polish, 2026-11-02); `3672b9f`, `83d9721` (Midnight Bronze, 2026-11-02); `a75b34a`, `4191d60`, `864a59b`, `5376967` (Precision Edition) | `a765461`, `f0842ed`, plus this handoff's commit |
+| **Latest commit** | `53769679635e6ecdae0b9599668d56abac22feac` | the commit that adds this section (`git log -1 origin/docs/eligicore-one-week-freeze-handoff`) |
+| **Files** | 23, all under `frontend/` (+5050 / −1182), including `frontend/DESIGN.md` (design audit and system), `CommandMenu.tsx`, `lib/shortcuts.ts`, `interaction.test.tsx`, `redesign.test.tsx`, `vite.config.ts` (Vitest loads `styles.css` as text for tests) | `context/state.md`, `NEXT_STEPS.md`, `context/memory.md` |
+| **CI (head)** | Run [41526430524](https://github.com/Lakshya172/eligicore/actions/runs/41526430524): `test` 3030 passed, 1 warning; `frontend` 12 files, **69 passed** | Run [41455803495](https://github.com/Lakshya172/eligicore/actions/runs/41455803495) on `f0842ed`: `test` 3030 passed, 1 warning; `frontend` 41 passed. A new run starts for this commit; read it from the PR |
+| **Review** | None. Review decision empty, 0 reviews | None. Review decision empty, 0 reviews |
+| **Dependencies** | None on other PRs; no file overlap with #85. After it merges, the state record needs its own docs PR (memory D-8) | None. Independent of #84 |
+| **Readiness** | **Ready for the owner's review, not ready to merge on CI alone.** Points for the reviewer: (1) the change is large (23 files) and goes beyond styling — it adds interactions (quick navigation, `/` shortcut, drop upload, save busy state); none sends, stores or reads anything new, and backend, API, verdict and storage behaviour are unchanged; (2) **the four Precision Edition commits were made at 02:43 IST on 2026-11-03 (21:13 UTC on 2026-11-02), inside the freeze window, on the owner's explicit instruction**; (3) whether the frontend needs its own ADR is still open; (4) reduced-motion behaviour is verified in CSS and by a test, not observed live; (5) the display and mono fonts fall back to Palatino and Consolas on this machine because Instrument Serif and JetBrains Mono are not installed (`frontend/DESIGN.md` records why no font files ship) | **Ready for the owner's review.** Documentation only; no code, test or schema change |
+
+Locally verified for PR #84 before pushing `5376967` (*local, not CI*): `tsc`, ESLint and `vite build`
+clean; 69 tests passed; every route and the 404 page in a browser against the API with an isolated
+seeded `demo.db`; the sample-profile journey; a fictional PDF résumé **dropped** onto the upload zone
+(mock provider; no name, email or phone stored); quick navigation and `/` with real key presses; no
+horizontal overflow at 375, 390, 768, 1024, 1366 and 1440 px; 0 text elements below WCAG AA at all six
+widths; a visible focus outline on every control in a Tab walk; only the dev-server host contacted and
+no font files fetched; storage limited to the one documented `sessionStorage` key.
+
+**Branches and worktrees**
+
+| Item | State | Action |
+|---|---|---|
+| `origin/docs/checkpoint-4-record` (`870711c`, 2026-09-17) | The only other remote branch not merged into `main`. No PR was ever opened from it; its Checkpoint 4 record was captured on `main` by later PRs. Stale | Owner decision: keep or delete. **Not touched** |
+| The other 69 remote branches (72 besides `main`, less the two PR branches and this one) | Merged into `main` | None |
+| Local worktree `E:/EligiCore` (main checkout) | On `feat/adr-030-step-6-pr-b-amended-precedence` (`4f05f01`), holds the developer database | **Preserved. Never run tests from it** (memory D-35) |
+| `.claude/worktrees/ui-visual-polish` | PR #84 branch at `5376967`, clean; git-ignored `demo.db` (seeded, synthetic) | Keep until PR #84 is decided |
+| `.claude/worktrees/freeze-handoff` | PR #85 branch, clean after this commit | Keep until PR #85 is decided |
+| `.claude/worktrees/student-ui-mvp`, `state-pr-81-merged`, `adr-030-d23b-adr-028-d8a` | Branches of merged PRs #83, #82, #81 | Safe to remove after the owner confirms; **not removed** |
+| `eligicore-handoff-recovery-7a7f6b`, `competent-williamson-64e4d1`, `objective-bassi-5bf0f5`, `eligicore-step9a-corpus`, two scratchpad worktrees (`adr-d25a-wt`, `state-8b-wt`) | Preserved from earlier sessions | **Do not modify or clean** |
+
+**Processes left running (verified 2026-11-03, not stopped)**
+
+Two dev servers started from the PR #84 worktree on 2026-11-03 at 01:54–01:55 survived their
+launcher being stopped. Stopping them was refused by the session's permission policy, so they are
+**still running**:
+
+| Port | Process | Launched as |
+|---|---|---|
+| 8000 | uvicorn, pid 8968 (venv launcher 18588, PowerShell 12444) | `ELIGICORE_DATABASE_URL=sqlite:///./demo.db` in `.claude/worktrees/ui-visual-polish` — the isolated demo database, **not** the developer database |
+| 5173 | Vite, pid 11916 (npm 18772, cmd 17700) | `npm run dev` in `.claude/worktrees/ui-visual-polish/frontend` |
+
+Stop them with `taskkill /PID 12444 /T /F` and `taskkill /PID 18772 /T /F` (pids valid until reboot),
+or close the terminals that own them. Until then, `NEXT_STEPS.md`'s default ports are taken.
+
+**Completed** — Weeks 1–8 and 9A; post-9A ADR-028/029/030 work through ADR-030 Step 8b and Step 9a-1;
+the student web app (PR #83). All on `main` and CI green.
+
+**In progress** — nothing. Development is paused.
+
+**Awaiting the owner's review** — PR #84 (frontend redesign) and PR #85 (this handoff).
+
+**Awaiting the owner's approval** — ADR-028 **D8a / OD-8** and ADR-030 **D23b / OD-16** (proposed,
+not in force); **final execution approval** for any Greenhouse request (not given); the ADR-030
+post-8b rulings; ADR-028 OD-1..OD-5 and OD-7; Week 9B's seven decisions; whether the frontend needs
+an ADR; whether to delete `docs/checkpoint-4-record` and the merged worktrees.
+
+**Must not be executed** without a new, explicit owner instruction:
+
+- any request to Greenhouse or any other live job source (ADR-030 Step 9a-2 is not released);
+- any live Gemini or other AI-provider call, or setting `ELIGICORE_AI_PROVIDER` away from `mock`;
+- enabling extraction (`ELIGICORE_EXTRACTION_ENABLED` / `extraction_enabled`);
+- ADR-030 Step 9b or Step 10; Week 9B deployment or any public hosting;
+- merging any PR, enabling auto-merge, force-pushing, or committing to `main`;
+- any change to eligibility, matching, extraction or privacy behaviour, or to the proposals' state;
+- running `pytest` or `alembic` from `E:/EligiCore` (the developer database).
+
+**Exact next task when development resumes (after 2026-11-10)**
+
+1. **Owner review of PR #85, then PR #84** — each merged or closed by the owner only. If either merges,
+   record it in a separate docs PR (memory D-8), verifying the merge with the REST API (D-7, D-15).
+2. **Owner decision gate: ADR-030 OD-16 (D23b) and ADR-028 D8a / OD-8** — approve, amend or reject,
+   each as its own documented decision. This is the next roadmap step; no implementation task is
+   unblocked until it exists, and even an approval does not release Step 9a-2 (its prerequisites are
+   listed in `NEXT_STEPS.md`).
+
+**How to resume safely**
+
+1. Read this file first (AgentOS session start protocol), then `NEXT_STEPS.md`.
+2. Confirm `git ls-remote origin refs/heads/main` and `gh pr list --state open` still match this
+   section; anything different is new information to report, not to reconcile silently.
+3. Stop any leftover dev servers (see above), and record the developer database's md5 before work.
+4. Work only in a worktree under `.claude/worktrees/`, never in `E:/EligiCore`.
+5. Take no step from "Must not be executed" without the owner's explicit instruction in the session.
 
 ### Status at the freeze (verified 2026-11-02)
 

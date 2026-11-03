@@ -1,9 +1,18 @@
 # EligiCore — one-week freeze handoff
 
-**Freeze:** 2026-11-03 to 2026-11-10. No implementation work during the freeze.
-**State at handoff (verified 2026-11-02):** `main` is `1df4c48`, the PR #83 merge, with post-merge CI
-run [41450933519](https://github.com/Lakshya172/eligicore/actions/runs/41450933519) green. Backend:
-3030 passed, 1 warning. Frontend: 41 passed. A presentation-only polish is open as PR #84.
+**Freeze:** 2026-11-03 to 2026-11-10. **Development is paused.** No implementation work during the
+freeze.
+**State at handoff (verified 2026-11-03):** `main` is `1df4c48`, the PR #83 merge, with no later
+commit. Post-merge CI run [41450933519](https://github.com/Lakshya172/eligicore/actions/runs/41450933519)
+is green: backend 3030 passed, 1 warning; frontend 41 passed. Two PRs are open, both CI green, and
+neither is reviewed or merged:
+
+- [PR #84](https://github.com/Lakshya172/eligicore/pull/84) is the frontend redesign, at `5376967`. Its
+  CI run [41526430524](https://github.com/Lakshya172/eligicore/actions/runs/41526430524) passed:
+  backend 3030, frontend 69.
+- [PR #85](https://github.com/Lakshya172/eligicore/pull/85) is this handoff.
+
+The complete handoff is `context/state.md` § Next actions → **Handoff at the pause**.
 
 EligiCore is a **local, demonstrable** product. It is not deployed and not production-ready.
 
@@ -69,6 +78,28 @@ the frontend with `ELIGICORE_API_URL` set, e.g. `ELIGICORE_API_URL=http://127.0.
 No environment variable is required beyond the database URL above. `ELIGICORE_AI_PROVIDER` defaults to
 `mock`; leave it there.
 
+**If 8000 or 5173 is already taken**, find out what holds it before starting anything. A Vite server
+forwards `/api` to whatever API owns 8000. On 2026-11-03 two leftover demo servers from the PR #84
+worktree were still running on those ports (see `context/state.md` § Handoff at the pause). Either
+stop them, or use other ports:
+
+```powershell
+uvicorn app.main:app --host 127.0.0.1 --port 8010
+```
+
+```powershell
+$env:ELIGICORE_API_URL="http://127.0.0.1:8010"; npm run dev -- --port 5174
+```
+
+**This guide describes `main`.** If PR #84 is checked out instead, the screens look different, and it
+adds a few things to show:
+- **Ctrl/⌘ K** opens quick navigation.
+- **/** focuses the opportunities search.
+- A résumé can be **dropped** onto the upload zone.
+- The landing page tells a five-step workflow.
+
+The routes, verdicts, counts and privacy behaviour are the same.
+
 ## Demonstration script (about five minutes)
 
 1. **Landing page** (`http://127.0.0.1:5173`). Explain the question EligiCore answers — "am I eligible,
@@ -128,7 +159,7 @@ No environment variable is required beyond the database URL above. `ELIGICORE_AI
 
 - The catalogue is synthetic; there is no live job source in the app.
 - Search and the verdict filter run in the browser over at most 100 jobs, the API's page limit.
-- Résumé upload is click-to-choose only.
+- Résumé upload is click-to-choose only on `main` (PR #84 adds drag-and-drop through the same request).
 - Application preparation and the Excel tracker exist in the API but not in the UI.
 - Relevance ("Relevance N/100") is labelled as not an eligibility score, but could still be misread
   as one.
@@ -136,8 +167,16 @@ No environment variable is required beyond the database URL above. `ELIGICORE_AI
 
 ## Exact next task after the break
 
-**Owner decision gate: decide the proposed ADR-030 OD-16 (D23b) and ADR-028 D8a.** That means
-approve, amend or reject each, as a separate documented owner decision.
+**First, the owner reviews the two open PRs:** PR #85 (this handoff), then PR #84 (the frontend
+redesign).
+- Only the owner merges or closes them.
+- A merge is recorded in its own docs PR.
+- For what to look at in PR #84, see `context/state.md` § Handoff at the pause → Open pull requests.
+  Its size, its new interactions, and four commits made inside the freeze window on the owner's
+  instruction all deserve a deliberate look, not a merge on green CI alone.
+
+**Then, the owner decision gate: decide the proposed ADR-030 OD-16 (D23b) and ADR-028 D8a.** That
+means approve, amend or reject each, as a separate documented owner decision.
 
 - **Why:** the approved roadmap is ADR-030's implementation sequence (`context/state.md` § Next
   approved phase). Its next step, **Step 9a-2**, is blocked, and no implementation task is unblocked
@@ -156,8 +195,34 @@ Extraction stays disabled. No Greenhouse request and no live Gemini call is auth
 *Correction:* the previous handoff named an "application tracker" as the next task. That was not an
 item on the approved roadmap and is withdrawn.
 
-Also pending, not blocking: review of PR #84 (visual polish), and whether the frontend needs its own
-ADR.
+Also pending, not blocking: whether the frontend needs its own ADR, and whether to delete the stale
+`docs/checkpoint-4-record` branch and the worktrees of merged PRs #81–#83.
+
+## Must not be executed
+
+Do none of the following without a new, explicit owner instruction:
+- any Greenhouse or other live job-source request
+- any live Gemini or other AI-provider call
+- enabling extraction
+- ADR-030 Step 9b or Step 10
+- any deployment
+- merging a PR, enabling auto-merge, force-pushing or committing to `main`
+- changing eligibility, matching or privacy behaviour
+- running `pytest` or `alembic` from `E:/EligiCore`, which holds the developer database
+
+## How to resume safely
+
+1. Read `context/state.md` (Snapshot, then § Handoff at the pause), then this file.
+2. Check `main` and the open PRs:
+   ```bash
+   git ls-remote origin refs/heads/main
+   ```
+   ```bash
+   gh pr list --state open
+   ```
+   Report any difference from the handoff; don't reconcile it silently.
+3. Free ports 8000 and 5173 (see above), and note the developer database's md5 before work.
+4. Work in a worktree under `.claude/worktrees/`, never in `E:/EligiCore`.
 
 ## Decisions that still require owner approval
 
