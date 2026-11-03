@@ -2,7 +2,13 @@ import type { JobRead } from "../api/types";
 import type { Evaluation } from "../lib/evaluations";
 import { JOB_TYPE_LABEL, formatDate } from "../lib/jobs";
 import { Link } from "../router";
+import { BriefcaseIcon, CalendarIcon, MapPinIcon } from "./icons";
 import { Badge, VerdictBadge } from "./ui";
+
+/** The initial shown in place of a logo. No employer logo is ever invented. */
+export function companyInitial(name: string): string {
+  return name.replace(/^(Example|Sample)\s+/i, "").charAt(0).toUpperCase();
+}
 
 export function JobCard({ job, evaluation }: { job: JobRead; evaluation?: Evaluation }) {
   const deadline = formatDate(job.deadline);
@@ -11,20 +17,39 @@ export function JobCard({ job, evaluation }: { job: JobRead; evaluation?: Evalua
     <article className="card job-card">
       <div className="job-card__top">
         <div className="job-card__logo" aria-hidden="true">
-          {job.company_name.replace(/^(Example|Sample)\s+/i, "").charAt(0).toUpperCase()}
+          {companyInitial(job.company_name)}
         </div>
-        {evaluation && <VerdictBadge state={evaluation.item.eligibility.eligibility_state} />}
+        <div className="job-card__heading">
+          <h3 className="job-card__title">
+            <Link to={`opportunities/${encodeURIComponent(job.id)}`} className="stretched-link">
+              {job.role_title}
+            </Link>
+          </h3>
+          <p className="job-card__company">{job.company_name}</p>
+        </div>
       </div>
-      <h3 className="job-card__title">
-        <Link to={`opportunities/${encodeURIComponent(job.id)}`} className="stretched-link">
-          {job.role_title}
-        </Link>
-      </h3>
-      <p className="job-card__company">{job.company_name}</p>
+      {evaluation && (
+        <div className="job-card__verdict">
+          <VerdictBadge state={evaluation.item.eligibility.eligibility_state} />
+        </div>
+      )}
       <ul className="job-card__meta">
-        {job.location && <li>{job.location}</li>}
-        <li>{JOB_TYPE_LABEL[job.job_type]}</li>
-        {deadline && <li>Apply by {deadline}</li>}
+        {job.location && (
+          <li>
+            <MapPinIcon size={14} />
+            {job.location}
+          </li>
+        )}
+        <li>
+          <BriefcaseIcon size={14} />
+          {JOB_TYPE_LABEL[job.job_type]}
+        </li>
+        {deadline && (
+          <li>
+            <CalendarIcon size={14} />
+            Apply by {deadline}
+          </li>
+        )}
       </ul>
       <div className="job-card__footer">
         <Badge tone={job.status === "ACTIVE" ? "accent" : "neutral"}>

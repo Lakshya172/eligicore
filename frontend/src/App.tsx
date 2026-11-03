@@ -11,7 +11,7 @@ import { Link, useRoute, type Route } from "./router";
 import { ProfileProvider } from "./state/ProfileContext";
 
 const TITLES: Record<Route["name"], string> = {
-  landing: "EligiCore — know which roles you can apply for",
+  landing: "EligiCore — understand your eligibility before you apply",
   dashboard: "Dashboard · EligiCore",
   opportunities: "Opportunities · EligiCore",
   opportunity: "Opportunity · EligiCore",

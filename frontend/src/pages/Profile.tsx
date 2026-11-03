@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { api, ApiError, describeError, MAX_RESUME_BYTES } from "../api/client";
 import type { CandidateProfile, ResumeParseResponse, ValidationIssue } from "../api/types";
+import { InfoIcon, ShieldIcon, UploadIcon } from "../components/icons";
 import { Badge, Card, PageHeader, Spinner } from "../components/ui";
 import {
   DEGREE_LEVELS,
@@ -57,7 +58,9 @@ type UploadState =
 
 function ResumeUpload({ onParsed }: { onParsed: (profile: CandidateProfile) => void }) {
   const [state, setState] = useState<UploadState>({ status: "idle" });
+  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const busy = state.status === "processing";
 
   async function handleFile(file: File) {
     const lower = file.name.toLowerCase();
@@ -83,30 +86,74 @@ function ResumeUpload({ onParsed }: { onParsed: (profile: CandidateProfile) => v
 
   return (
     <Card>
-      <h2 className="card__title">Start from your résumé</h2>
+      <div className="card__eyebrow-row">
+        <span className="step-badge" aria-hidden="true">1</span>
+        <h2 className="card__title">Start from your résumé</h2>
+        <span className="optional-tag">Optional</span>
+      </div>
       <p className="muted">
         Upload a PDF or DOCX (up to 5 MB) to pre-fill the form below. The server reads it, returns the
         extracted details and deletes the file immediately, whether or not parsing succeeds.
       </p>
-      <label className={`dropzone ${state.status === "processing" ? "dropzone--busy" : ""}`}>
+      {/* Dropping a file runs the same checks and the same single request as choosing one. */}
+      <label
+        className={`dropzone ${busy ? "dropzone--busy" : ""} ${dragging ? "dropzone--dragging" : ""}`}
+        onDragOver={(event) => {
+          if (busy) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+          if (!dragging) setDragging(true);
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+          if (busy) return;
+          const files = event.dataTransfer.files;
+          if (files.length > 1) {
+            setState({ status: "error", message: "Drop one résumé at a time." });
+            return;
+          }
+          const file = files[0];
+          if (file) void handleFile(file);
+        }}
+      >
         <input
           ref={inputRef}
           type="file"
           accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           className="visually-hidden"
-          disabled={state.status === "processing"}
+          disabled={busy}
           onChange={(event) => {
             const file = event.target.files?.[0];
             if (file) void handleFile(file);
           }}
         />
-        {state.status === "processing" ? (
+        <span className="dropzone__icon" aria-hidden="true">
+          {busy ? <Spinner label="Processing résumé" /> : <UploadIcon size={20} />}
+        </span>
+        {busy ? (
           <span className="dropzone__text">
-            <Spinner label="Processing résumé" /> Reading {state.fileName}…
+            <strong>Reading {state.fileName}…</strong>
+            <span className="dropzone__hint">Nothing is kept once the server has read it.</span>
+            {/* Indeterminate on purpose: the upload reports no progress, so none is invented. */}
+            <span className="progress" role="progressbar" aria-label="Reading résumé">
+              <span className="progress__bar" />
+            </span>
+          </span>
+        ) : dragging ? (
+          <span className="dropzone__text">
+            <strong>Release to read this résumé</strong>
+            <span className="dropzone__hint">PDF or DOCX, up to 5 MB</span>
           </span>
         ) : (
           <span className="dropzone__text">
-            <strong>Choose a résumé file</strong> (PDF or DOCX)
+            <span>
+              <strong>Choose a résumé file</strong> or drop it here
+            </span>
+            <span className="dropzone__hint">PDF or DOCX · up to 5 MB · read once, then deleted by the server</span>
           </span>
         )}
       </label>
@@ -288,10 +335,25 @@ export function Profile() {
 
       {isSample && (
         <p className="notice notice--warning">
-          You're viewing the <strong>sample profile</strong> — a fictional student for demonstration. Edit and
-          save it to make it your own, or clear it.
+          <InfoIcon />
+          <span>
+            You're viewing the <strong>sample profile</strong> — a fictional student for demonstration. Edit
+            and save it to make it your own, or clear it.
+          </span>
         </p>
       )}
+
+      <aside className="privacy-panel" aria-label="How your information is handled">
+        <span className="privacy-panel__icon" aria-hidden="true">
+          <ShieldIcon size={18} />
+        </span>
+        <ul>
+          <li>Your profile is kept only in this browser tab and cleared when you close it.</li>
+          <li>A résumé is read once to pre-fill this form; the server deletes it straight away.</li>
+          <li>There is no account and no stored profile — nothing here is saved on a server.</li>
+          <li>The sample profile is a fictional student, for demonstrations only.</li>
+        </ul>
+      </aside>
 
       <ResumeUpload
         onParsed={(parsed) => {
@@ -304,7 +366,13 @@ export function Profile() {
       />
 
       <form className="card profile-form" onSubmit={handleSubmit} noValidate>
-        <h2 className="card__title">Education</h2>
+        <div className="card__eyebrow-row">
+          <span className="step-badge" aria-hidden="true">2</span>
+          <h2 className="card__title">Education</h2>
+        </div>
+        <p className="muted form-intro">
+          Check every value. Anything left blank stays "not stated" — it is never treated as zero.
+        </p>
         {form.education.map((entry, index) => (
           <EducationFields
             key={index}
@@ -401,8 +469,15 @@ export function Profile() {
         </div>
 
         <div className="form-actions">
-          <button type="submit" className="button button--primary" disabled={saving}>
-            {saving ? "Saving…" : "Save and check eligibility"}
+          {/* Disabled while the request runs, so a second click cannot submit twice. */}
+          <button
+            type="submit"
+            className={`button button--primary ${saving ? "button--loading" : ""}`}
+            disabled={saving}
+            aria-busy={saving}
+          >
+            {saving && <span className="button__spinner" aria-hidden="true" />}
+            {saving ? "Checking your profile…" : "Save and check eligibility"}
           </button>
         </div>
       </form>

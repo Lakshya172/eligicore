@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProfileProvider } from "../state/ProfileContext";
 import { NEEDS_REVIEW_ELIGIBILITY, recommendationItem, recommendationResponse } from "../test/fixtures";
@@ -40,8 +40,10 @@ describe("Dashboard", () => {
 
     expect(await screen.findByText("Eligible or likely eligible")).toBeTruthy();
     expect(screen.getByText("Need review or unverified")).toBeTruthy();
-    // The row shows the job's own verdict, never a rounded-up "Eligible".
-    expect(screen.getByText("Likely eligible", { selector: ".verdict" })).toBeTruthy();
-    expect(screen.queryByText("Eligible", { selector: ".verdict" })).toBeNull();
+    // The row shows the job's own verdict, never a rounded-up "Eligible". Scoped to the results
+    // list: the static legend beside it shows example badges by design.
+    const results = within(screen.getByRole("list", { name: "Top matches" }));
+    expect(results.getByText("Likely eligible", { selector: ".verdict" })).toBeTruthy();
+    expect(results.queryByText("Eligible", { selector: ".verdict" })).toBeNull();
   });
 });

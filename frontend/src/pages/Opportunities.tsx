@@ -1,12 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, describeError } from "../api/client";
 import type { EligibilityState, JobType } from "../api/types";
+import { SearchIcon } from "../components/icons";
 import { JobCard } from "../components/JobCard";
 import { Badge, CatalogueNotice, EmptyState, ErrorState, PageHeader, SkeletonCards, Spinner } from "../components/ui";
 import { VERDICTS, VERDICT_ORDER } from "../lib/eligibility";
 import { evaluateJobs } from "../lib/evaluations";
 import { matchesSearch } from "../lib/jobs";
 import { hasEvaluableData } from "../lib/profile";
+import { isSearchShortcut, isTypingTarget } from "../lib/shortcuts";
 import { useAsync } from "../lib/useAsync";
 import { Link } from "../router";
 import { useProfile } from "../state/ProfileContext";
@@ -21,6 +23,18 @@ export function Opportunities() {
   const [jobType, setJobType] = useState<TypeFilter>("ALL");
   const [status, setStatus] = useState<StatusFilter>("open");
   const [verdict, setVerdict] = useState<VerdictFilter>("ALL");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // "/" jumps to search, as in most catalogue tools. Ignored while typing in any field.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isSearchShortcut(event) || isTypingTarget(event.target)) return;
+      event.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // Server-side filters: the two GET /jobs supports. The page size is the API maximum (100),
   // which covers the whole demo catalogue.
@@ -57,7 +71,7 @@ export function Opportunities() {
   return (
     <div className="page">
       <PageHeader eyebrow="Opportunities" title="Explore opportunities">
-        <p>Browse openings and see each employer's stated requirements.</p>
+        <p>Browse openings, see each employer's stated requirements, and check where you stand.</p>
       </PageHeader>
       <CatalogueNotice />
 
@@ -90,13 +104,21 @@ export function Opportunities() {
       <form className="filters" role="search" onSubmit={(event) => event.preventDefault()}>
         <label className="field field--grow">
           <span className="field__label">Search</span>
-          <input
-            type="search"
-            className="input"
-            placeholder="Role, company, location or skill"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
+          <span className="input-icon">
+            <SearchIcon />
+            <input
+              ref={searchRef}
+              type="search"
+              className="input input--with-icon input--with-kbd"
+              placeholder="Role, company, location or skill"
+              aria-keyshortcuts="/"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <kbd className="kbd input-kbd" aria-hidden="true">
+              /
+            </kbd>
+          </span>
         </label>
         <label className="field">
           <span className="field__label">Type</span>

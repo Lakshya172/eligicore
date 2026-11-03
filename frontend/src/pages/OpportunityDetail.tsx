@@ -1,5 +1,7 @@
 import { api, ApiError } from "../api/client";
 import type { JobRead } from "../api/types";
+import { BriefcaseIcon, CalendarIcon, ChevronRightIcon, ExternalIcon, InfoIcon, MapPinIcon } from "../components/icons";
+import { companyInitial } from "../components/JobCard";
 import { RequirementBreakdown } from "../components/RequirementBreakdown";
 import { Badge, Card, CatalogueNotice, EmptyState, ErrorState, Spinner } from "../components/ui";
 import { evaluateJobs } from "../lib/evaluations";
@@ -52,7 +54,10 @@ function Eligibility({ job }: { job: JobRead }) {
     <>
       {isSample && (
         <p className="notice notice--warning">
-          Evaluated against the <strong>fictional sample profile</strong>, not a real student.
+          <InfoIcon />
+          <span>
+            Evaluated against the <strong>fictional sample profile</strong>, not a real student.
+          </span>
         </p>
       )}
       <RequirementBreakdown eligibility={evaluation.item.eligibility} />
@@ -111,20 +116,47 @@ export function OpportunityDetail({ jobId }: { jobId: string }) {
 
   return (
     <div className="page">
-      <Link to="opportunities" className="back-link">← All opportunities</Link>
+      <nav className="breadcrumb" aria-label="Breadcrumb">
+        <ol>
+          <li>
+            <Link to="opportunities">Opportunities</Link>
+          </li>
+          <li aria-hidden="true" className="breadcrumb__sep">
+            <ChevronRightIcon size={13} />
+          </li>
+          <li>
+            <span aria-current="page">{data.role_title}</span>
+          </li>
+        </ol>
+      </nav>
       <header className="detail-header">
         <div className="detail-header__logo" aria-hidden="true">
-          {data.company_name.replace(/^(Example|Sample)\s+/i, "").charAt(0).toUpperCase()}
+          {companyInitial(data.company_name)}
         </div>
         <div className="detail-header__body">
           <h1 className="page-title">{data.role_title}</h1>
           <p className="detail-header__company">{data.company_name}</p>
-          <div className="detail-header__meta">
-            <Badge tone={data.is_active ? "accent" : "neutral"}>{data.is_active ? "Open" : data.status}</Badge>
-            <Badge>{JOB_TYPE_LABEL[data.job_type]}</Badge>
-            {data.location && <Badge>{data.location}</Badge>}
-            {deadline && <Badge>Apply by {deadline}</Badge>}
-          </div>
+          <ul className="detail-header__meta">
+            <li>
+              <Badge tone={data.is_active ? "accent" : "neutral"}>{data.is_active ? "Open" : data.status}</Badge>
+            </li>
+            <li>
+              <BriefcaseIcon size={14} />
+              {JOB_TYPE_LABEL[data.job_type]}
+            </li>
+            {data.location && (
+              <li>
+                <MapPinIcon size={14} />
+                {data.location}
+              </li>
+            )}
+            {deadline && (
+              <li>
+                <CalendarIcon size={14} />
+                Apply by {deadline}
+              </li>
+            )}
+          </ul>
         </div>
       </header>
       <CatalogueNotice />
@@ -189,7 +221,9 @@ export function OpportunityDetail({ jobId }: { jobId: string }) {
             {applyUrl ? (
               <>
                 <a className="button button--primary button--block" href={applyUrl} target="_blank" rel="noopener noreferrer">
-                  Open employer's application page ↗
+                  Open employer's application page
+                  <ExternalIcon size={15} />
+                  <span className="visually-hidden"> (opens in a new tab)</span>
                 </a>
                 <p className="fineprint">
                   You apply on the employer's own site. EligiCore never submits applications for you.

@@ -19,5 +19,8 @@ export default defineConfig({
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
     restoreMocks: true,
+    // Vitest blanks CSS by default; the stylesheet's own guarantees (no external fonts,
+    // reduced motion, visible focus) are asserted against its real text.
+    css: { include: [/styles\.css/] },
   },
 });
