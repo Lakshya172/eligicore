@@ -417,6 +417,45 @@ changed. Still never run the suite from `E:/EligiCore` — use a worktree — an
 `app.database` from a test helper before the conftest has run. Any new test needing the database
 inspects the one `get_db` serves (`application_database_tables()`), never the module engine.
 
+### D-36 · A stopped dev-server launcher can leave the server running
+During PR #84, uvicorn (`--port 8000`, on a worktree `demo.db`) and Vite (5173) outlived the
+PowerShell wrappers that started them. The next session found both ports taken. A new Vite would
+have proxied `/api` to whichever API held 8000 — one it had not started and could not vouch for.
+**What to do:** before starting servers, check the owner of each port
+(`Get-NetTCPConnection -LocalPort <p>` → `Win32_Process.CommandLine`). Never point the frontend at
+an API you did not start. If a port is taken, run elsewhere: `uvicorn … --port 8010` and
+`$env:ELIGICORE_API_URL="http://127.0.0.1:8010"; npm run dev -- --port 5174` (`strictPort` still
+applies). At the end of a session, confirm the ports are free.
+
+### D-37 · Vitest blanks CSS, including `?raw` imports
+`import styles from "../styles.css?raw"` returned `""` under Vitest's default `css` handling, so
+"stylesheet contains no external font" passed vacuously.
+**What to do:** `test.css.include: [/styles\.css/]` in `frontend/vite.config.ts` (PR #84). Have
+every stylesheet test first assert a token that must exist, so a blank import fails loudly.
+
+### D-38 · A component's `box-shadow` silently replaces a `box-shadow` focus ring
+The first frontend focus ring was `:focus-visible { box-shadow: … }`. Bronze buttons and the active
+nav item set their own `box-shadow` with equal specificity later in the file, so keyboard focus on
+them was invisible. A real Tab walk found it; unit tests could not.
+**What to do:** draw focus with `outline` (+ `outline-offset`). Ring a composite control on its
+container (`.job-card:has(.stretched-link:focus-visible)`, `.dropzone:has(input:focus-visible)`).
+
+### D-39 · Browser automation can mislead about focus, keys and rendering
+In the in-app browser: programmatic `focus()` does not reliably trigger `:focus-visible`; the
+`type` action inserts text without a `keydown`, so shortcuts never fire; `key: "slash"` sends an
+empty `key` while `key: "/"` works; screenshots often show the previous frame or a half-finished
+entrance animation.
+**What to do:** verify focus by pressing real Tab keys and reading `document.activeElement` and its
+computed `outline`. Verify shortcuts with the literal key. Before calling a screenshot a bug, read
+computed state with JavaScript (`getComputedStyle`, `document.getAnimations()`).
+
+### D-40 · PowerShell 5.1 mangles a here-string piped to `git commit -F -`
+`@'…'@ | git commit -F -` treated the message as pathspecs and committed nothing. Files staged
+earlier in the same command stayed staged, so the next attempt swept them into the wrong commit.
+**What to do:** write each message to a file and `git commit -F <file>`. After any failed commit,
+run `git status` before retrying, and check `git show --stat HEAD` before pushing. Splitting an
+unpushed commit with `git reset --soft HEAD~1` is safe; never on a pushed one.
+
 ---
 
 ## Lessons
